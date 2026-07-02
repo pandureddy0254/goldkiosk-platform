@@ -4,6 +4,7 @@
     <Project Path="src/kiosk/GoldKiosk.Kiosk.Api/GoldKiosk.Kiosk.Api.csproj" />
     <Project Path="src/kiosk/GoldKiosk.Kiosk.Core/GoldKiosk.Kiosk.Core.csproj" />
     <Project Path="src/kiosk/GoldKiosk.Kiosk.Devices/GoldKiosk.Kiosk.Devices.csproj" />
+    <Project Path="src/kiosk/GoldKiosk.Kiosk.UI/GoldKiosk.Kiosk.UI.csproj" />
   </Folder>
   <Folder Name="/src/orchestration/">
     <Project Path="src/orchestration/GoldKiosk.AppHost/GoldKiosk.AppHost.csproj" />
