@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/orchestration/">
+    <Project Path="src/orchestration/GoldKiosk.AppHost/GoldKiosk.AppHost.csproj" />
+    <Project Path="src/orchestration/GoldKiosk.ServiceDefaults/GoldKiosk.ServiceDefaults.csproj" />
+  </Folder>
+</Solution>
