@@ -1,0 +1,248 @@
+{
+  "info": {
+    "name": "GoldKiosk Kiosk API (v1)",
+    "description": "Local kiosk edge API (GoldKiosk.Kiosk.Api, dev port 7201). Batched-payload design: selections club into tray/open and tray/close; contact and payout are single combined calls. Wire: snake_case JSON, money envelope, RFC 7807 errors, Idempotency-Key on state-changing calls. Companion: docs/api/kiosk-api-payload-samples.md",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "https://localhost:7201/api/v1" },
+    { "key": "session_id", "value": "ses_01JZC7H2Q4R8TN5M9W3VXK6P0D" }
+  ],
+  "item": [
+    {
+      "name": "0 · System",
+      "item": [
+        { "name": "Health", "request": { "method": "GET", "url": "{{base_url}}/../health" } },
+        { "name": "Alive", "request": { "method": "GET", "url": "{{base_url}}/../alive" } },
+        { "name": "Devices — health snapshot", "request": { "method": "GET", "url": "{{base_url}}/devices" } },
+        {
+          "name": "Devices — probe one device",
+          "request": { "method": "POST", "url": "{{base_url}}/devices/scale/probe" }
+        },
+        { "name": "Rates ticker", "request": { "method": "GET", "url": "{{base_url}}/rates" } }
+      ]
+    },
+    {
+      "name": "1 · Session lifecycle",
+      "item": [
+        {
+          "name": "Begin session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.session_id) pm.collectionVariables.set('session_id', j.session_id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/sessions",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"locale\": \"en-US\",\n  \"attract_source\": \"touch\",\n  \"kiosk_time\": \"2026-07-02T14:03:11.412-05:00\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Session snapshot (crash resume)",
+          "request": { "method": "GET", "url": "{{base_url}}/sessions/{{session_id}}" }
+        },
+        {
+          "name": "Abort session",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/sessions/{{session_id}}/abort",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{$guid}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"user_cancel\",\n  \"return_item\": true\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 · Tray (clubbed payloads)",
+      "item": [
+        {
+          "name": "Tray OPEN + clubbed setup payload",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/sessions/{{session_id}}/tray/open",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{$guid}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"command\": \"tray_open\",\n  \"setup\": {\n    \"service_type\": \"sell\",\n    \"locale\": \"en-US\",\n    \"terms\": { \"version\": \"2026-06-01.v3\", \"accepted\": true, \"accepted_at\": \"2026-07-02T14:03:58.101-05:00\" },\n    \"item_hint\": null,\n    \"promo_code\": null\n  },\n  \"client_events\": [\n    { \"at\": \"2026-07-02T14:03:41.220-05:00\", \"event\": \"service_selected\", \"data\": { \"service_type\": \"sell\", \"dwell_ms\": 4180 } }\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "Tray CLOSE with item (starts analysis)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/sessions/{{session_id}}/tray/close",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{$guid}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"command\": \"tray_close\",\n  \"has_item\": true,\n  \"client_events\": [\n    { \"at\": \"2026-07-02T14:04:31.876-05:00\", \"event\": \"item_placed_confirmed\", \"data\": { \"retries\": 0 } }\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "Tray CLOSE without item (back out)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/sessions/{{session_id}}/tray/close",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{$guid}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"command\": \"tray_close\",\n  \"has_item\": false,\n  \"client_events\": []\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 · Offer",
+      "item": [
+        {
+          "name": "Accept offer",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/sessions/{{session_id}}/offer/accept",
+            "header": [{ "key": "Idempotency-Key", "value": "{{$guid}}" }]
+          }
+        },
+        {
+          "name": "Decline offer (return item)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/sessions/{{session_id}}/offer/decline",
+            "header": [{ "key": "Idempotency-Key", "value": "{{$guid}}" }]
+          }
+        },
+        {
+          "name": "Explain offer (AI)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/sessions/{{session_id}}/offer/explain",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"question\": \"Why is my offer lower than the gold price I saw online?\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4 · Identity",
+      "item": [
+        {
+          "name": "Start identity sequence",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/sessions/{{session_id}}/identity/start",
+            "header": [{ "key": "Idempotency-Key", "value": "{{$guid}}" }]
+          }
+        },
+        {
+          "name": "Submit signature + terms",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/sessions/{{session_id}}/identity/signature",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{$guid}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"signature_png_base64\": \"iVBORw0KGgoAAAANSUhEUgAA...\",\n  \"signed_terms_version\": \"2026-06-01.v3\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5 · Contact · Payout · Settle",
+      "item": [
+        {
+          "name": "Contact & receipt (combined)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/sessions/{{session_id}}/contact",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{$guid}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"customer@example.com\",\n  \"phone\": \"+13125550147\",\n  \"receipt_channels\": [\"qr\", \"email\"]\n}"
+            }
+          }
+        },
+        {
+          "name": "Payout — cash",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/sessions/{{session_id}}/payout",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{$guid}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"method\": \"cash\"\n}" }
+          }
+        },
+        {
+          "name": "Payout — bank transfer (combined bank details)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/sessions/{{session_id}}/payout",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{$guid}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"method\": \"bank_transfer\",\n  \"bank\": {\n    \"account_holder\": \"Jordan Avery\",\n    \"routing_number\": \"071000013\",\n    \"account_number\": \"000123456789\",\n    \"account_type\": \"checking\"\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "Settle (bag + dispense/transfer)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/sessions/{{session_id}}/settle",
+            "header": [{ "key": "Idempotency-Key", "value": "{{$guid}}" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6 · Live agent",
+      "item": [
+        {
+          "name": "Request agent item check",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/sessions/{{session_id}}/agent/item-check",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{$guid}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"trigger\": \"analysis_escalation\"\n}" }
+          }
+        }
+      ]
+    }
+  ]
+}
