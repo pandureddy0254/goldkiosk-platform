@@ -1,0 +1,45 @@
+# Normalize line endings: LF in the repo, native on checkout
+* text=auto
+
+# Source and config — explicit text
+*.cs        text diff=csharp
+*.csproj    text
+*.props     text
+*.targets   text
+*.slnx      text
+*.slnf      text
+*.json      text
+*.md        text
+*.yml       text
+*.yaml      text
+*.xml       text
+*.xaml      text
+*.razor     text
+*.css       text
+*.js        text
+*.sql       text
+*.editorconfig text
+*.gitignore text
+*.gitattributes text
+
+# Windows scripts need CRLF
+*.cmd       text eol=crlf
+*.bat       text eol=crlf
+*.ps1       text eol=crlf
+
+# Unix scripts need LF
+*.sh        text eol=lf
+
+# Binary — never diff or normalize
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.ico       binary
+*.woff      binary
+*.woff2     binary
+*.ttf       binary
+*.eot       binary
+*.dll       binary
+*.exe       binary
+*.pdf       binary
