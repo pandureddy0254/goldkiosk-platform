@@ -28,7 +28,7 @@ fail fast at boundaries / resilient across them.
 
 ## 4. Edge/cloud split (the defining constraint)
 The kiosk must work when the internet doesn't.
-- **Local durability first**: every customer transaction is persisted by Kiosk.Api locally (SQLite/file store per ADR) before any cloud call; a **queue-and-forward outbox** syncs to Cloud.Api.
+- **Local durability first**: every customer transaction is persisted by Kiosk.Api locally (file-based transaction folders per ADR 0002 — no kiosk-local SQL) before any cloud call; a **queue-and-forward outbox** syncs to Cloud.Api.
 - **Idempotency keys** on all edge→cloud writes; cloud endpoints are idempotent consumers; reconciliation compares edge outbox vs cloud ledger and alerts on discrepancy — never auto-fixes silently.
 - **Gold price staleness policy** in Kiosk.Core: cached price with explicit TTL; stale price locks buy/sell with a clear customer-facing state — never a silent wrong price.
 - **Hardware isolation**: only Kiosk.Api talks to Devices; Kiosk.UI consumes REST + SignalR. UI crash never loses a transaction; Kiosk.Api restart is safe mid-session (state machine resumes or safely aborts with audit).

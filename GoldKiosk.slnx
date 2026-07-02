@@ -1,7 +1,16 @@
 <Solution>
   <Folder Name="/src/" />
+  <Folder Name="/src/kiosk/">
+    <Project Path="src/kiosk/GoldKiosk.Kiosk.Api/GoldKiosk.Kiosk.Api.csproj" />
+    <Project Path="src/kiosk/GoldKiosk.Kiosk.Core/GoldKiosk.Kiosk.Core.csproj" />
+    <Project Path="src/kiosk/GoldKiosk.Kiosk.Devices/GoldKiosk.Kiosk.Devices.csproj" />
+  </Folder>
   <Folder Name="/src/orchestration/">
     <Project Path="src/orchestration/GoldKiosk.AppHost/GoldKiosk.AppHost.csproj" />
     <Project Path="src/orchestration/GoldKiosk.ServiceDefaults/GoldKiosk.ServiceDefaults.csproj" />
+  </Folder>
+  <Folder Name="/src/shared/">
+    <Project Path="src/shared/GoldKiosk.Contracts/GoldKiosk.Contracts.csproj" />
+    <Project Path="src/shared/GoldKiosk.Domain/GoldKiosk.Domain.csproj" />
   </Folder>
 </Solution>

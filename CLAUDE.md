@@ -83,6 +83,7 @@ Namespaces mirror project names exactly. Resource names in the AppHost are kebab
 - **.NET 10 / C# 14** everywhere (`net10.0`; `net10.0-windows` only for Kiosk.UI, Devices, Diagnostics, Package).
 - **Frontend (kiosk) = Blazor Hybrid** — BlazorWebView in a WPF shell. Hardware lives behind `GoldKiosk.Kiosk.Api` (REST + SignalR), never in-process with the UI.
 - **Two APIs**: `Kiosk.Api` on the machine owns hardware + local durability; `Cloud.Api` is the shared backend. All edge→cloud writes are idempotent via the outbox.
+- **Edge decisions locked 2026-07-02** (see `docs/adr/`): no kiosk-local SQL — durability is file-based transaction folders in the legacy layout (ADR 0002); kiosks talk exclusively to `Cloud.Api`, never CRM (ADR 0003); every device selects mock/real per device via layered config, cloud overrides local (ADR 0004); DB baseline = platform2 schema sets with enumerated fixes (ADR 0005).
 - **Testing = NUnit + Moq + FluentAssertions.** No xUnit anywhere. See testing standards.
 - **Dev orchestration = Aspire; never deployed.** Prod = App Service + MSIX.
 - **One MSIX** packages Kiosk.UI + Kiosk.Api + Devices + Diagnostics, auto-updated via `.appinstaller` from Azure Blob/CDN; `Kiosk.Api` runs as a logon-launched process (MSIX cannot host a Windows service). Staged rollout + health-gated rollback controlled from AdminPortal.
