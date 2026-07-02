@@ -73,3 +73,6 @@ coverage/
 *.coverage
 *.coveragexml
 coverage.*.xml
+
+# Crash dumps
+*.stackdump
