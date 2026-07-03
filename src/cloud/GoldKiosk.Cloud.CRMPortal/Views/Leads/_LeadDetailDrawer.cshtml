@@ -1,0 +1,191 @@
+@using GoldKiosk.Cloud.CRMPortal.Models.Domain
+@using GoldKiosk.Cloud.CRMPortal.Models.ViewModels
+@model LeadDetailViewModel
+@{
+    var l = Model.Lead;
+    string Money(decimal? v) => v.HasValue ? string.Format("{0} {1:N0}", l.CurrencyCode, v.Value) : "—";
+    string SourcePill(string s) => s switch
+    {
+        "website"          => "src-website",
+        "inbound_call"     => "src-call",
+        "partner_referral" => "src-referral",
+        "conference"       => "src-conference",
+        "outbound"         => "src-outbound",
+        _ => "src-website"
+    };
+    string SourceLabel(string s) => s switch
+    {
+        "website"          => "Website",
+        "inbound_call"     => "Inbound call",
+        "partner_referral" => "Partner referral",
+        "conference"       => "Conference",
+        "outbound"         => "Outbound",
+        _ => s
+    };
+    string StageColor(string s) => s switch
+    {
+        "won"      => "var(--success)",
+        "lost"     => "var(--danger)",
+        "proposal" => "var(--warning)",
+        _          => "var(--accent)"
+    };
+    string ActivityClass(string t) => t switch
+    {
+        "note"         => "tl-note",
+        "call"         => "tl-call",
+        "email"        => "tl-email",
+        "meeting"      => "tl-call",
+        "stage_change" => "tl-stage",
+        "system_event" => "tl-stage",
+        _ => "tl-note"
+    };
+
+    string Owner = Model.Owner?.FullName ?? "Unassigned";
+    string OwnerInitials = Model.Owner?.Initials ?? "—";
+    var locParts = new[] { l.Region, l.Country }.Where(x => !string.IsNullOrWhiteSpace(x)).ToArray();
+    string shortId = l.Id.ToString("N").Substring(0, 8);
+
+    var recentActivities = Model.Activities.OrderByDescending(a => a.OccurredAt).Take(5).ToList();
+
+    var allStages = new[] {
+        ("new", "New"), ("contacted", "Contacted"), ("qualified", "Qualified"),
+        ("proposal", "Proposal"), ("won", "Won"), ("lost", "Lost")
+    };
+}
+
+<div class="drawer-head">
+    <div class="drawer-eyebrow">LEAD-@shortId &middot; <span class="src-pill @SourcePill(l.Source)">@SourceLabel(l.Source)</span></div>
+    <div class="drawer-title">@l.CompanyName</div>
+    <div style="margin-top:6px; font-size:var(--fs-13);">
+        Stage: <strong style="color:@StageColor(l.Stage);">@(char.ToUpperInvariant(l.Stage[0]) + l.Stage[1..])</strong>
+        @if (l.EstimatedValue.HasValue)
+        {
+            <text> &middot; est. <span class="mono">@Money(l.EstimatedValue)</span></text>
+        }
+    </div>
+</div>
+
+<div class="drawer-section">
+    <div class="drawer-section-title">Contact</div>
+    <div class="drawer-info-row">
+        <div class="drawer-info-label">Company</div>
+        <div class="drawer-info-value">@l.CompanyName</div>
+    </div>
+    <div class="drawer-info-row">
+        <div class="drawer-info-label">Contact</div>
+        <div class="drawer-info-value">@l.ContactName</div>
+    </div>
+    @if (!string.IsNullOrWhiteSpace(l.ContactEmail))
+    {
+        <div class="drawer-info-row">
+            <div class="drawer-info-label">Email</div>
+            <div class="drawer-info-value mono">@l.ContactEmail</div>
+        </div>
+    }
+    @if (!string.IsNullOrWhiteSpace(l.ContactPhone))
+    {
+        <div class="drawer-info-row">
+            <div class="drawer-info-label">Phone</div>
+            <div class="drawer-info-value mono">@l.ContactPhone</div>
+        </div>
+    }
+    <div class="drawer-info-row">
+        <div class="drawer-info-label">Region</div>
+        <div class="drawer-info-value">
+            @if (locParts.Length > 0)
+            {
+                @locParts[0]
+                for (int i = 1; i < locParts.Length; i++)
+                {
+                    <text> &middot; </text>@locParts[i]
+                }
+            }
+            else
+            {
+                <text>—</text>
+            }
+        </div>
+    </div>
+    <div class="drawer-info-row">
+        <div class="drawer-info-label">Owner</div>
+        <div class="drawer-info-value">
+            <span class="mini-avatar">@OwnerInitials</span> @Owner
+        </div>
+    </div>
+</div>
+
+<div class="drawer-section">
+    <div class="drawer-section-title">Deal estimate</div>
+    <div class="drawer-info-row">
+        <div class="drawer-info-label">Value (yr 1)</div>
+        <div class="drawer-info-value mono">@Money(l.EstimatedValue)</div>
+    </div>
+    <div class="drawer-info-row">
+        <div class="drawer-info-label">Currency</div>
+        <div class="drawer-info-value mono">@l.CurrencyCode</div>
+    </div>
+    @if (l.EstimatedKioskCount.HasValue)
+    {
+        <div class="drawer-info-row">
+            <div class="drawer-info-label">Kiosks</div>
+            <div class="drawer-info-value mono">@l.EstimatedKioskCount.Value.ToString("N0")</div>
+        </div>
+    }
+</div>
+
+@if (recentActivities.Count > 0)
+{
+    <div class="drawer-section">
+        <div class="drawer-section-title">Recent activity</div>
+        <div class="timeline" style="margin:0; padding:0;">
+            @foreach (var a in recentActivities)
+            {
+                <div class="tl-item @ActivityClass(a.Type)" style="padding-left:0;">
+                    <div class="tl-body" style="font-size:var(--fs-13);">
+                        @(a.Type switch {
+                            "stage_change" => "Stage change",
+                            "call"         => "Call logged",
+                            "email"        => "Email sent",
+                            "meeting"      => "Meeting",
+                            "system_event" => "System event",
+                            _              => "Note"
+                        })
+                        <span class="tl-meta">@Model.ActorName(a.ActorId) &middot; @a.OccurredAt.ToString("dd MMM HH:mm")</span>
+                    </div>
+                    <span class="tl-time">@a.OccurredAt.ToString("dd MMM")</span>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+<div class="drawer-section">
+    <div class="drawer-section-title">Move stage</div>
+    <div class="drawer-stage-grid">
+        @foreach (var (stageKey, stageLabel) in allStages)
+        {
+            if (stageKey == l.Stage) { continue; }
+            <form method="post" action="@Url.Action("MoveStage", "Leads")" style="display:inline;">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="id" value="@l.Id" />
+                <input type="hidden" name="newStage" value="@stageKey" />
+                <button class="btn btn-ghost btn-sm" type="submit">@stageLabel</button>
+            </form>
+        }
+    </div>
+</div>
+
+<div class="drawer-section">
+    <div class="drawer-section-title">Add note</div>
+    <form method="post" action="@Url.Action("AddNote", "Leads", new { id = l.Id })" class="drawer-note-form">
+        @Html.AntiForgeryToken()
+        <textarea name="text" placeholder="Log a call, email, or add a note…" required></textarea>
+        <div style="display:flex; justify-content:flex-end;">
+            <button class="btn btn-gold btn-sm" type="submit">Add note</button>
+        </div>
+    </form>
+</div>
+
+<div class="drawer-section">
+    <a class="drawer-full-link" href="@Url.Action("Details", "Leads", new { id = l.Id })">Full view &#8594;</a>
+</div>

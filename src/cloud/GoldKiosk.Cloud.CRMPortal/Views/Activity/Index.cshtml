@@ -1,0 +1,118 @@
+@model IReadOnlyList<LeadActivity>
+@{
+    var leads = ViewData["LeadLookup"] as Dictionary<Guid, Lead> ?? new Dictionary<Guid, Lead>();
+    var grouped = Model
+        .GroupBy(a => a.OccurredAt.Date)
+        .OrderByDescending(g => g.Key)
+        .ToList();
+
+    string TypeClass(string t) => t switch
+    {
+        ActivityType.Call         => "tl-call",
+        ActivityType.Email        => "tl-email",
+        ActivityType.Meeting      => "tl-call",
+        ActivityType.StageChange  => "tl-stage",
+        ActivityType.SystemEvent  => "tl-email",
+        _                          => "tl-note"
+    };
+
+    string FormatBody(LeadActivity a, Lead? lead)
+    {
+        var co = lead?.CompanyName ?? "lead";
+        return a.Type switch
+        {
+            ActivityType.Call        => $"Logged a call with {co}",
+            ActivityType.Email       => $"Sent email regarding {co}",
+            ActivityType.Meeting     => $"Held a meeting with {co}",
+            ActivityType.StageChange => $"Moved {co} to a new stage",
+            ActivityType.SystemEvent => $"System event on {co}",
+            _                         => $"Added a note on {co}"
+        };
+    }
+}
+
+<div class="page-head">
+    <div class="page-title-block">
+        <div class="eyebrow">Workspace · activity feed</div>
+        <h1 class="page-title">Live <em>activity.</em></h1>
+        <p class="page-subtitle">All actions across the workspace · backed by <code>lead_activities</code>.</p>
+    </div>
+    <div style="display:flex; gap:10px;">
+        <button class="btn btn-ghost btn-sm">Filter</button>
+        <button class="btn btn-ghost btn-sm">All users</button>
+    </div>
+</div>
+
+<section class="card" style="margin-bottom:16px;">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Live stream</h2>
+            <div class="card-meta" style="margin-top:6px;"><span class="dot-pulse"></span><span>New events appear here in real time</span></div>
+        </div>
+    </header>
+    <div class="feed" id="activity-feed">
+        <div class="feed-row">
+            <span class="feed-code">·</span>
+            <div class="feed-meta">Listening for new activity…</div>
+            <span class="feed-amount" style="font-size:11px; color:var(--ink-faint);">live</span>
+            <span class="feed-status ok">●</span>
+        </div>
+    </div>
+</section>
+
+@if (!grouped.Any())
+{
+    <section class="card">
+        <header class="card-head"><div><h2 class="card-title">No activity yet</h2></div></header>
+        <div class="card-body" style="color:var(--ink-faint);">Nothing has been logged. New events will stream in here.</div>
+    </section>
+}
+else
+{
+    var first = true;
+    foreach (var day in grouped)
+    {
+        var label = day.Key == DateTime.UtcNow.Date
+            ? $"Today · {day.Key:dd MMM yyyy}"
+            : day.Key == DateTime.UtcNow.Date.AddDays(-1)
+                ? $"Yesterday · {day.Key:dd MMM yyyy}"
+                : day.Key.ToString("dd MMM yyyy");
+
+        <section class="card" style="@(first ? "" : "margin-top:16px;")">
+            <header class="card-head">
+                <div>
+                    <h2 class="card-title">@label</h2>
+                    @if (first)
+                    {
+                        <div class="card-meta" style="margin-top:6px;"><span>Latest activity</span></div>
+                    }
+                </div>
+            </header>
+            <div class="timeline">
+                @foreach (var a in day.OrderByDescending(x => x.OccurredAt))
+                {
+                    leads.TryGetValue(a.LeadId, out var lead);
+                    <div class="tl-item @TypeClass(a.Type)">
+                        <div class="tl-body">
+                            @FormatBody(a, lead)
+                            @if (lead is not null)
+                            {
+                                <text> · </text>
+                                <a asp-controller="Leads" asp-action="Details" asp-route-id="@lead.Id" style="color:var(--accent);">@lead.CompanyName</a>
+                            }
+                            <span class="tl-meta">activity · @a.Type</span>
+                        </div>
+                        <span class="tl-time">@a.OccurredAt.ToString("dd MMM · HH:mm")</span>
+                    </div>
+                }
+            </div>
+        </section>
+        first = false;
+    }
+}
+
+<footer class="crm-foot">
+    <span>Gold Kiosk · CRM · © AI Kiosks International Inc. 2026</span>
+    <span class="mono">activity · source: lead_activities</span>
+</footer>
+

@@ -1,0 +1,111 @@
+@model IReadOnlyList<Partner>
+@{
+    var totalKiosks = Model.Sum(p => p.InitialKioskCount);
+    var totalPartners = Model.Count;
+    var byRegion = Model
+        .GroupBy(p => string.IsNullOrWhiteSpace(p.Region) ? "—" : p.Region!)
+        .OrderByDescending(g => g.Sum(p => p.InitialKioskCount))
+        .ToList();
+    var regionCount = byRegion.Count(g => g.Key != "—");
+    var provisioningKiosks = Model.Where(p => p.TenantStatus == TenantStatus.Provisioning).Sum(p => p.InitialKioskCount);
+}
+
+<div class="page-head">
+    <div class="page-title-block">
+        <div class="eyebrow">Partners · kiosks · informational · read-only</div>
+        <h1 class="page-title">Kiosk <em>fleet.</em></h1>
+        <p class="page-subtitle">@totalKiosks kiosks across @totalPartners partners · read-only mirror of what each partner's admin sees. Write operations live in the Admin Dashboard.</p>
+    </div>
+    <div style="display:flex; gap:10px;">
+        <a class="btn btn-ghost btn-sm" href="#" target="_blank" rel="noopener">Open Admin Dashboard ↗</a>
+    </div>
+</div>
+
+<div class="callout">
+    <div class="ico">i</div>
+    <div class="body">
+        <strong>Kiosks belong to the partner; manage in Admin Dashboard.</strong>
+        The CRM only sees aggregated counts, status, and last-tx timestamps so account execs can hold a credible conversation. To order, decommission, or reconfigure a kiosk, open the partner's admin workspace from <a asp-controller="Partners" asp-action="Index" style="color:var(--accent);">Partners → Directory</a>.
+    </div>
+</div>
+
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Total kiosks<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value">@totalKiosks</div>
+        <div class="kpi-foot"><span class="delta delta-flat">across @totalPartners partners</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">In provisioning<span class="dot" style="background:var(--warning);"></span></div>
+        <div class="kpi-value">@provisioningKiosks</div>
+        <div class="kpi-foot"><span class="delta delta-flat">tenant_status = provisioning</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Markets<span class="dot"></span></div>
+        <div class="kpi-value">@regionCount</div>
+        <div class="kpi-foot"><span class="delta delta-flat">distinct regions</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Avg per partner<span class="dot"></span></div>
+        <div class="kpi-value">@(totalPartners == 0 ? 0 : Math.Round((double)totalKiosks / totalPartners, 1))</div>
+        <div class="kpi-foot"><span class="delta delta-flat">kiosks / partner</span></div>
+    </div>
+</div>
+
+<section class="card">
+    <header class="card-head"><div><h2 class="card-title">By region</h2></div></header>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Region</th>
+                <th style="text-align:right;">Partners</th>
+                <th style="text-align:right;">Kiosks</th>
+                <th style="text-align:right;">Active tenants</th>
+                <th style="text-align:right;">Provisioning</th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var g in byRegion)
+        {
+            <tr>
+                <td>@g.Key</td>
+                <td class="num-cell" style="text-align:right;">@g.Count()</td>
+                <td class="num-cell" style="text-align:right;">@g.Sum(p => p.InitialKioskCount)</td>
+                <td class="num-cell" style="text-align:right;">@g.Count(p => p.TenantStatus == TenantStatus.Active)</td>
+                <td class="num-cell" style="text-align:right;">@g.Count(p => p.TenantStatus == TenantStatus.Provisioning)</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</section>
+
+<section class="card" style="margin-top:16px;">
+    <header class="card-head"><div><h2 class="card-title">By partner</h2></div></header>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Partner</th><th>Region</th>
+                <th style="text-align:right;">Kiosks</th>
+                <th>Status</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var p in Model.OrderByDescending(x => x.InitialKioskCount))
+        {
+            <tr>
+                <td><a class="row-link" asp-controller="Partners" asp-action="Details" asp-route-id="@p.Id">@p.DisplayName</a></td>
+                <td>@(p.Region ?? "—")</td>
+                <td class="num-cell" style="text-align:right;">@p.InitialKioskCount</td>
+                <td><span class="t-pill t-@p.TenantStatus">@p.TenantStatus</span></td>
+                <td><a asp-controller="Partners" asp-action="Details" asp-route-id="@p.Id" style="color:var(--accent);">→</a></td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</section>
+
+<footer class="crm-foot">
+    <span>Gold Kiosk · CRM · © AI Kiosks International Inc. 2026</span>
+    <span class="mono">kiosks · informational · source-of-truth: admin dashboard</span>
+</footer>

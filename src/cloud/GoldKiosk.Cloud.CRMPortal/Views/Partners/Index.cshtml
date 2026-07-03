@@ -1,0 +1,157 @@
+@model GoldKiosk.Cloud.CRMPortal.Models.ViewModels.PartnerDirectoryViewModel
+@{
+    string Money(decimal v) => v.ToString("N0");
+    string Pill(string s) => s switch {
+        "active"       => "t-active",
+        "provisioning" => "t-provisioning",
+        "suspended"    => "t-suspended",
+        "churned"      => "t-churned",
+        _              => "t-provisioning"
+    };
+    string KeyPill(string? s) => s switch {
+        "consumed" => "s-active",
+        "pending"  => "s-pending",
+        "revoked"  => "s-disabled",
+        "expired"  => "s-disabled",
+        _          => "s-pending"
+    };
+    string KeyLabel(string? s) => string.IsNullOrEmpty(s) ? "—" : char.ToUpper(s[0]) + s[1..];
+    string TitleCase(string s) => string.IsNullOrEmpty(s) ? "" : char.ToUpper(s[0]) + s[1..];
+}
+
+<div class="page-head">
+    <div class="page-title-block">
+        <div class="eyebrow">Partners · directory</div>
+        <h1 class="page-title">Partner <em>directory.</em></h1>
+        <p class="page-subtitle">@Model.TotalCount partners · @Model.ActiveCount active · @Model.KiosksDeployed kiosks deployed.</p>
+    </div>
+    <div style="display:flex; gap:10px;">
+        <button class="btn btn-ghost btn-sm">Export CSV</button>
+        <a class="btn btn-gold btn-sm" asp-controller="Onboard" asp-action="Index">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 3V11M3 7H11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            Onboard partner
+        </a>
+    </div>
+</div>
+
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Active partners<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value">@Model.ActiveCount<span class="unit">/ @Model.TotalCount</span></div>
+        <div class="kpi-foot"><span class="delta delta-flat">tenant_status = active</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Kiosks deployed<span class="dot"></span></div>
+        <div class="kpi-value">@Model.KiosksDeployed</div>
+        <div class="kpi-foot"><span class="delta delta-flat">sum of initial_kiosk_count</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Live MRR<span class="dot"></span></div>
+        <div class="kpi-value">
+            @if (!Model.LiveMrrByCurrency.Any())
+            {
+                <span class="unit">—</span>
+            }
+            else
+            {
+                @string.Join(" · ", Model.LiveMrrByCurrency.Select(kv => $"{kv.Key} {kv.Value:N0}"))
+            }
+        </div>
+        <div class="kpi-foot"><span class="delta delta-flat">from live subscriptions</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Keys outstanding<span class="dot" style="background:var(--warning);"></span></div>
+        <div class="kpi-value">@Model.KeysOutstanding</div>
+        <div class="kpi-foot"><span class="delta delta-flat">pending consumption</span></div>
+    </div>
+</div>
+
+<form method="get" asp-action="Index" class="filter-bar">
+    <input type="search" name="search" value="@Model.Search" placeholder="Search legal name…" style="flex:0 0 280px;" />
+    <span class="filter-label">Tenant status</span>
+    <select name="status">
+        <option value="all" selected="@(string.IsNullOrEmpty(Model.Status) || Model.Status == "all")">All</option>
+        <option value="active" selected="@(Model.Status == "active")">Active</option>
+        <option value="provisioning" selected="@(Model.Status == "provisioning")">Provisioning</option>
+        <option value="suspended" selected="@(Model.Status == "suspended")">Suspended</option>
+        <option value="churned" selected="@(Model.Status == "churned")">Churned</option>
+    </select>
+    <span class="filter-label">Region</span>
+    <input type="text" name="region" value="@Model.Region" placeholder="UAE · DXB" style="flex:0 0 180px;" />
+    <span class="filter-label">Key state</span>
+    <select name="keyState">
+        <option value="all" selected="@(string.IsNullOrEmpty(Model.KeyState) || Model.KeyState == "all")">All</option>
+        <option value="consumed" selected="@(Model.KeyState == "consumed")">Consumed</option>
+        <option value="pending" selected="@(Model.KeyState == "pending")">Pending</option>
+        <option value="expired" selected="@(Model.KeyState == "expired")">Expired</option>
+        <option value="revoked" selected="@(Model.KeyState == "revoked")">Revoked</option>
+    </select>
+    <button class="btn btn-ghost btn-sm" type="submit">Apply</button>
+</form>
+
+<section class="card">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Partners</h2>
+            <div class="card-meta" style="margin-top:6px;"><span>@Model.Rows.Count records · sorted by MRR desc</span></div>
+        </div>
+        <div style="font-size:13px; color:var(--ink-faint); font-family:var(--font-mono);">1–@Model.Rows.Count of @Model.Rows.Count</div>
+    </header>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Partner</th><th>Region</th>
+                <th style="text-align:right;">Kiosks</th>
+                <th style="text-align:right;">MRR</th>
+                <th>Tenant status</th><th>Primary admin</th><th>Activation key</th><th></th>
+            </tr>
+        </thead>
+        <tbody>
+        @if (!Model.Rows.Any())
+        {
+            <tr><td colspan="8" style="text-align:center; padding:32px; color:var(--ink-faint);">No partners match those filters.</td></tr>
+        }
+        @foreach (var r in Model.Rows)
+        {
+            var p   = r.Partner;
+            var k   = r.LatestKey;
+            var det = Url.Action("Details", "Partners", new { id = p.Id });
+            <tr>
+                <td>
+                    <a class="row-link" href="@det">@p.LegalName</a>
+                    <span class="secondary">
+                        @if (p.ProvisionedAt.HasValue) { @($"Onboarded {p.ProvisionedAt:dd MMM yyyy}") }
+                        else if (p.ChurnedAt.HasValue) { @($"Churned {p.ChurnedAt:dd MMM yyyy}") }
+                        else { @($"Created {p.CreatedAt:dd MMM yyyy}") }
+                    </span>
+                </td>
+                <td>@(p.Region ?? "—")</td>
+                <td class="num-cell" style="text-align:right;">@p.InitialKioskCount</td>
+                <td class="num-cell" style="text-align:right;">@r.LiveCurrency @Money(r.LiveMrr)</td>
+                <td><span class="t-pill @Pill(p.TenantStatus)">@TitleCase(p.TenantStatus)</span></td>
+                <td>
+                    <span class="primary">@p.PrimaryAdminName</span>
+                    <span class="secondary">@p.PrimaryAdminEmail</span>
+                </td>
+                <td>
+                    @if (k is null)
+                    {
+                        <span class="status-pill s-disabled">— None</span>
+                    }
+                    else
+                    {
+                        <span class="status-pill @KeyPill(k.State)">@KeyLabel(k.State)</span>
+                        <span class="secondary" style="margin-top:4px;">@k.KeyPrefix · @k.IssuedAt.ToString("dd MMM")</span>
+                    }
+                </td>
+                <td><a href="@det" style="color:var(--accent);">→</a></td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</section>
+
+<footer class="crm-foot">
+    <span>Gold Kiosk · CRM · © AI Kiosks International Inc. 2026</span>
+    <span class="mono">partners · @Model.Rows.Count records · sorted: mrr desc</span>
+</footer>

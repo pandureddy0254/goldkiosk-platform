@@ -1,0 +1,69 @@
+﻿/*calander start*/
+#calendar {
+    /* max-width: 1080px; */
+    max-width: 100%;
+    margin: 12px auto;
+}
+
+.vertical-tabs {
+    display: flex;
+    flex-direction: row;
+    gap: 20px;
+}
+
+.nav-tabs-vertical {
+    flex-direction: column;
+    /* width: 220px; */
+    width: auto;
+}
+
+    .nav-tabs-vertical .nav-link {
+        border: none;
+        border-radius: 0.5rem;
+        margin-bottom: 8px;
+        color: #333;
+        background-color: #f8f9fa;
+        padding: 12px 16px;
+        font-weight: 500;
+        text-align: left;
+        transition: all 0.3s;
+    }
+
+        .nav-tabs-vertical .nav-link.active {
+            background-color: #0ab39c;
+            color: #fff;
+            font-weight: 600;
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
+            ;
+        }
+
+.tab-content {
+    flex-grow: 1;
+    background: #fff;
+    border-radius: 0.5rem;
+    padding: 20px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.05);
+}
+
+.fc-theme-standard td, .fc-theme-standard th {
+    border: 1px solid #d8d8e3 !important;
+}
+
+.fc .fc-col-header-cell {
+    background-color: #1a1e4e;
+    padding: 5px;
+}
+
+.fc .fc-col-header-cell-cushion {
+    color: #fff !important;
+}
+
+.fc-theme-standard th {
+    border: 1px solid #1a1e4e !important;
+    border-bottom: none !important;
+}
+
+.fc .fc-daygrid-day-number {
+    font-size: 14px !important;
+}
+/*calender End*/

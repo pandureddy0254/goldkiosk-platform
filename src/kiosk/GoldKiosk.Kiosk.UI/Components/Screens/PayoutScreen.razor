@@ -1,0 +1,67 @@
+@page "/payout"
+
+<div class="screen screen-payout">
+    <span class="mono-label screen-kicker">@L["payout.kicker"]</span>
+    <h1 class="serif-hero screen-title">@L["payout.title"]</h1>
+
+    <div class="payout-cards">
+        @foreach (string method in Methods)
+        {
+            bool unavailable = _unavailableMethods.Contains(method);
+            <button class="select-card @(_method == method ? "selected" : null) @(unavailable ? "unavailable" : null)"
+                    disabled="@unavailable"
+                    @onclick="() => SelectMethod(method)">
+                <span class="card-icon">@GetIcon(method)</span>
+                <span class="card-copy">
+                    <span class="card-title">@L[$"payout.{method}.title"]</span>
+                    <span class="card-subtitle">@(unavailable ? L["payout.cash.unavailable"] : L[$"payout.{method}.subtitle"])</span>
+                </span>
+                <span class="card-check">
+                    @if (_method == method)
+                    {
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="m5 12.5 4.5 4.5L19 7.5" />
+                        </svg>
+                    }
+                </span>
+            </button>
+
+            @if (method == "bank_transfer" && _method == "bank_transfer")
+            {
+                <div class="bank-fields">
+                    <button class="field @(_activeField == BankField.Holder ? "field-active" : null)" @onclick="() => FocusField(BankField.Holder)">
+                        <span class="field-label mono-label">@L["payout.bank.account_holder"]</span>
+                        <span class="field-value">@(_accountHolder.Length > 0 ? _accountHolder : " ")</span>
+                    </button>
+                    <button class="field @(_activeField == BankField.Routing ? "field-active" : null)" @onclick="() => FocusField(BankField.Routing)">
+                        <span class="field-label mono-label">@L["payout.bank.routing_number"]</span>
+                        <span class="field-value">@MaskNumber(_routingNumber)</span>
+                    </button>
+                    <button class="field @(_activeField == BankField.Account ? "field-active" : null)" @onclick="() => FocusField(BankField.Account)">
+                        <span class="field-label mono-label">@L["payout.bank.account_number"]</span>
+                        <span class="field-value">@MaskNumber(_accountNumber)</span>
+                    </button>
+                    <div class="channel-toggles">
+                        <button class="chip @(_accountType == "checking" ? "selected" : null)" @onclick='() => SetAccountType("checking")'>
+                            @L["payout.bank.type.checking"]
+                        </button>
+                        <button class="chip @(_accountType == "savings" ? "selected" : null)" @onclick='() => SetAccountType("savings")'>
+                            @L["payout.bank.type.savings"]
+                        </button>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+
+    @if (_method == "bank_transfer" && _activeField != BankField.None)
+    {
+        <TouchKeyboard Layout="KeyboardLayout" OnKey="OnKey" OnBackspace="OnBackspace" />
+    }
+
+    <div class="screen-actions">
+        <button class="btn-primary" disabled="@(!CanContinue)" @onclick="ContinueAsync">
+            @L["common.continue"]
+        </button>
+    </div>
+</div>

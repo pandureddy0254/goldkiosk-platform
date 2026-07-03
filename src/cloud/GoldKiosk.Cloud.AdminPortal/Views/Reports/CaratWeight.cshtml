@@ -1,0 +1,151 @@
+@model CaratWeightReportViewModel
+@using System.Globalization
+@{
+    var report = Model ?? throw new InvalidOperationException("This report view requires a model.");
+
+    var inv = CultureInfo.InvariantCulture;
+
+    ViewBag.PageTitle = "Carat-weight <em>summary.</em>";
+    ViewBag.Eyebrow   = "R-03 · CARAT × WEIGHT · REFRESH · 15 MIN";
+    ViewBag.Subtitle  = "Settled weight rolled up by billed karat and metal — the canonical view of fleet purity composition.";
+    ViewBag.ActiveNav = "reports";
+
+    var rows = report.Rows ?? new List<CaratWeightReportRow>();
+    var from = report.From?.ToString("yyyy-MM-dd", inv) ?? "";
+    var to   = report.To?.ToString("yyyy-MM-dd", inv) ?? "";
+
+    string PurityClass(decimal k) => k switch
+    {
+        >= 23.5m => "k24",
+        >= 21.5m => "k22",
+        >= 20.5m => "k21",
+        >= 17.5m => "k18",
+        _        => "silv"
+    };
+}
+
+@section Head {
+    @await Html.PartialAsync("_ReportDetailStyles")
+}
+
+<div class="breadcrumb">
+    <a asp-controller="Reports" asp-action="Index">Reports library</a>
+    <span class="sep">&rsaquo;</span>
+    <span>R-03 &middot; Carat × Weight</span>
+</div>
+
+<form method="get" asp-controller="Reports" asp-action="CaratWeight" class="report-filter">
+    @Html.AntiForgeryToken()
+    <label>From <input type="date" name="from" value="@from" /></label>
+    <label>To <input type="date" name="to" value="@to" /></label>
+    <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+    <a class="btn btn-ghost btn-sm" asp-controller="Reports" asp-action="CaratWeight">Reset</a>
+    <span style="flex:1;"></span>
+    <button type="button" class="btn btn-ghost btn-sm">Export &middot; CSV</button>
+    <button type="button" class="btn btn-ghost btn-sm">Export &middot; PDF</button>
+</form>
+
+<section class="card" style="margin-bottom:24px;">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Karat composition</h2>
+            <div class="card-meta" style="margin-top:6px;">
+                <span><span class="mono">@report.TotalWeightG.ToString("N3", inv)</span> g across
+                <span class="mono">@report.TotalItems.ToString("N0", inv)</span> items</span>
+            </div>
+        </div>
+    </header>
+    <div class="card-body">
+        <div class="chart">
+            <svg viewBox="0 0 1000 240" preserveAspectRatio="none">
+                @* Decorative grouped bars — 5 purity buckets *@
+                <g>
+                    <rect x="60" y="40" width="120" height="180" fill="var(--accent)" opacity="0.85"/>
+                    <rect x="220" y="80" width="120" height="140" fill="var(--accent)" opacity="0.65"/>
+                    <rect x="380" y="120" width="120" height="100" fill="var(--info)" opacity="0.7"/>
+                    <rect x="540" y="150" width="120" height="70" fill="var(--danger)" opacity="0.7"/>
+                    <rect x="700" y="190" width="120" height="30" fill="var(--ink-faint)" opacity="0.55"/>
+                </g>
+                <g font-family="var(--font-mono)" font-size="10" fill="var(--ink-faint)">
+                    <text x="120" y="232" text-anchor="middle">22K</text>
+                    <text x="280" y="232" text-anchor="middle">21K</text>
+                    <text x="440" y="232" text-anchor="middle">18K</text>
+                    <text x="600" y="232" text-anchor="middle">24K</text>
+                    <text x="760" y="232" text-anchor="middle">Ag</text>
+                </g>
+            </svg>
+        </div>
+    </div>
+</section>
+
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Total weight<span class="dot"></span></div>
+        <div class="kpi-value"><span class="mono">@report.TotalWeightG.ToString("N0", inv)</span><span class="unit">g</span></div>
+        <div class="kpi-foot"><span class="label-suffix">across all karats</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Items processed<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value"><span class="mono">@report.TotalItems.ToString("N0", inv)</span></div>
+        <div class="kpi-foot"><span class="label-suffix">jewelry pieces</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Avg per item<span class="dot"></span></div>
+        <div class="kpi-value"><span class="mono">@(report.TotalItems > 0 ? (report.TotalWeightG / report.TotalItems).ToString("F2", inv) : "0.00")</span><span class="unit">g</span></div>
+        <div class="kpi-foot"><span class="label-suffix">weighted mean</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Distinct karats<span class="dot"></span></div>
+        <div class="kpi-value"><span class="mono">@rows.Select(r => r.BilledKarat).Distinct().Count()</span></div>
+        <div class="kpi-foot"><span class="label-suffix">22K · 21K · 18K · 24K · Ag</span></div>
+    </div>
+</div>
+
+<section class="card" style="margin-bottom:24px;">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Breakdown by karat &middot; metal</h2>
+            <div class="card-meta" style="margin-top:6px;"><span>Aggregated from tx.transactions across the selected window</span></div>
+        </div>
+    </header>
+    <div style="overflow-x:auto;">
+        <table class="report-table">
+            <thead>
+                <tr>
+                    <th>Karat</th>
+                    <th>Metal</th>
+                    <th class="num">Total weight (g)</th>
+                    <th class="num">Items</th>
+                    <th class="num">Share</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (rows.Count == 0)
+                {
+                    <tr><td colspan="5" style="text-align:center; padding:32px 18px; color:var(--ink-faint);">No items in the selected window.</td></tr>
+                }
+                else
+                {
+                    foreach (var r in rows)
+                    {
+                        var share = report.TotalWeightG > 0 ? (r.TotalWeightG / report.TotalWeightG * 100m) : 0m;
+                        <tr>
+                            <td><span class="purity-chip @PurityClass(r.BilledKarat)">@r.BilledKarat.ToString("0.#", inv)K</span></td>
+                            <td>@r.Metal</td>
+                            <td class="num mono">@r.TotalWeightG.ToString("N3", inv)</td>
+                            <td class="num mono">@r.ItemCount.ToString("N0", inv)</td>
+                            <td class="num mono">@share.ToString("F1", inv)%</td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@await Html.PartialAsync("_ReportMetaCard", new ReportMetaCardModel {
+    ReportCode = "R-03",
+    Matview    = "mv_carat_weight",
+    Cadence    = "Every 15 minutes",
+    Rows       = report.TotalItems
+})

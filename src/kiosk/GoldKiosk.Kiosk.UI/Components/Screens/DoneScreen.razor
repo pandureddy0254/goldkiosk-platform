@@ -1,0 +1,33 @@
+@page "/done"
+
+<div class="screen screen-done">
+    @if (IsHappyPath)
+    {
+        <div class="done-check check-pop">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m5.5 12.5 4.3 4.3L18.5 8" />
+            </svg>
+        </div>
+        <h1 class="serif-hero screen-title">@L["done.title"]</h1>
+        <p class="screen-subtitle">@Message</p>
+
+        @if (Store.Receipt is { } receipt)
+        {
+            <div class="qr-card glass">
+                <QrCode Payload="@receipt.QrPayload" />
+            </div>
+            <span class="mono-label">@L["done.receipt.label"]</span>
+            <span class="mono-label invoice-number">@receipt.InvoiceNumber</span>
+        }
+    }
+    else
+    {
+        <div class="done-check done-neutral">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <path d="M12 7v6" /><circle cx="12" cy="16.8" r="0.6" fill="currentColor" />
+            </svg>
+        </div>
+        <h1 class="serif-hero screen-title">@L["done.ended.title"]</h1>
+        <p class="screen-subtitle">@Message</p>
+    }
+</div>

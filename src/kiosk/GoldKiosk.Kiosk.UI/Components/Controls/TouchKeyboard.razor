@@ -1,0 +1,26 @@
+<div class="touch-keyboard glass">
+    @foreach (IReadOnlyList<string> row in Rows)
+    {
+        <div class="kb-row">
+            @foreach (string key in row)
+            {
+                @if (key == "⇧")
+                {
+                    <button class="kb-key kb-wide @(_shift ? "kb-active" : null)" @onclick="ToggleShift">⇧</button>
+                }
+                else if (key == "⌫")
+                {
+                    <button class="kb-key kb-wide" @onclick="BackspaceAsync">⌫</button>
+                }
+                else if (key == "space")
+                {
+                    <button class="kb-key kb-space" @onclick='() => KeyAsync(" ")'>&nbsp;</button>
+                }
+                else
+                {
+                    <button class="kb-key" @onclick="() => KeyAsync(key)">@Display(key)</button>
+                }
+            }
+        </div>
+    }
+</div>

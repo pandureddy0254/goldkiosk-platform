@@ -1,0 +1,355 @@
+@using GoldKiosk.Cloud.CRMPortal.Models.Domain
+@using GoldKiosk.Cloud.CRMPortal.Models.ViewModels
+@model LeadListViewModel
+@{
+    string Money(Lead l) => l.EstimatedValue.HasValue
+        ? string.Format("{0} {1:N0}", l.CurrencyCode, l.EstimatedValue.Value)
+        : "—";
+    string Kiosks(Lead l) => l.EstimatedKioskCount.HasValue ? l.EstimatedKioskCount.Value.ToString("N0") : "—";
+    string StagePill(string s) => s switch
+    {
+        "new"        => "s-new",
+        "contacted"  => "s-contacted",
+        "qualified"  => "s-qualified",
+        "proposal"   => "s-proposal",
+        "won"        => "s-won",
+        "lost"       => "s-lost",
+        _ => "s-new"
+    };
+    string StageLabel(string s) => char.ToUpperInvariant(s[0]) + s[1..];
+    string SourcePill(string s) => s switch
+    {
+        "website"          => "src-website",
+        "inbound_call"     => "src-call",
+        "partner_referral" => "src-referral",
+        "conference"       => "src-conference",
+        "outbound"         => "src-outbound",
+        _ => "src-website"
+    };
+    string SourceLabel(string s) => s switch
+    {
+        "website"          => "Website",
+        "inbound_call"     => "Inbound call",
+        "partner_referral" => "Partner referral",
+        "conference"       => "Conference",
+        "outbound"         => "Outbound",
+        _ => s
+    };
+    string Ago(DateTime when)
+    {
+        var diff = DateTime.UtcNow - when.ToUniversalTime();
+        if (diff.TotalMinutes < 1) return "just now";
+        if (diff.TotalMinutes < 60) return $"{(int)diff.TotalMinutes}m ago";
+        if (diff.TotalHours   < 24) return $"{(int)diff.TotalHours}h ago";
+        return $"{(int)diff.TotalDays}d ago";
+    }
+
+    var stages    = new[] { "new", "contacted", "qualified", "proposal", "won", "lost" };
+    var sources   = new[] { "website", "inbound_call", "partner_referral", "conference", "outbound" };
+    var openCount = Model.Leads.Count(l => l.Stage != LeadStage.Won && l.Stage != LeadStage.Lost);
+}
+
+<div class="page-head">
+    <div class="page-title-block">
+        <div class="eyebrow">Pipeline · inbox</div>
+        <h1 class="page-title">Lead <em>inbox.</em></h1>
+        <p class="page-subtitle">@openCount open · @Model.CountInStage(LeadStage.Qualified) qualified · @Model.TotalCount total in view.</p>
+    </div>
+    <div style="display:flex; gap:10px; align-items:center;">
+        <div class="view-seg" id="view-toggle">
+            <button class="active" data-view="table">Table</button>
+            <button data-view="kanban">Kanban</button>
+        </div>
+        <button class="btn btn-ghost btn-sm" type="button">Export CSV</button>
+        <button class="btn btn-gold btn-sm" id="open-add-lead" type="button">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 3V11M3 7H11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            Add lead
+        </button>
+    </div>
+</div>
+
+@if (TempData["LeadError"] is string err)
+{
+    <div class="card" style="border-color:rgba(168,50,50,0.22); margin-bottom:12px;">
+        <div class="card-body" style="color:var(--danger); font-size:13px;">@err</div>
+    </div>
+}
+
+<form method="get" asp-action="Index" class="filter-bar">
+    <input type="search" name="q" value="@Model.Query" placeholder="Search company, contact, email…" style="flex: 0 0 280px;" />
+    <span class="filter-label">Stage</span>
+    <select name="stage" onchange="this.form.submit()">
+        <option value="">All stages</option>
+        @foreach (var s in stages)
+        {
+            <option value="@s" selected="@(Model.Stage == s)">@StageLabel(s)</option>
+        }
+    </select>
+    <span class="filter-label">Source</span>
+    <select name="source" onchange="this.form.submit()">
+        <option value="">All sources</option>
+        @foreach (var s in sources)
+        {
+            <option value="@s" selected="@(Model.Source == s)">@SourceLabel(s)</option>
+        }
+    </select>
+    <span class="filter-label">Owner</span>
+    <select name="owner" onchange="this.form.submit()">
+        <option value="">All owners</option>
+        @foreach (var kv in Model.Owners)
+        {
+            <option value="@kv.Key" selected="@(Model.OwnerId == kv.Key.ToString())">@kv.Value.FullName</option>
+        }
+    </select>
+    <button class="btn btn-ghost btn-sm" type="submit">Apply</button>
+</form>
+
+<section class="card" id="view-table">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Open leads · @Model.TotalCount</h2>
+            <div class="card-meta" style="margin-top:6px;"><span>Sorted by last touched</span></div>
+        </div>
+        <div style="font-size:13px; color:var(--ink-faint); font-family:var(--font-mono);">Showing @Model.TotalCount of @Model.TotalCount</div>
+    </header>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th style="width:36px;"><input type="checkbox" /></th>
+                <th>Company</th>
+                <th>Contact</th>
+                <th>Source</th>
+                <th>Stage</th>
+                <th>Owner</th>
+                <th style="text-align:right;">Est. value</th>
+                <th style="text-align:right;">Kiosks</th>
+                <th>Last touched</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        @if (!Model.Leads.Any())
+        {
+            <tr><td colspan="10" style="text-align:center; color:var(--ink-faint); padding:32px;">No leads match the current filters.</td></tr>
+        }
+        @foreach (var l in Model.Leads)
+        {
+            var loc = string.Join(" · ", new[] { l.Region, l.Country }.Where(x => !string.IsNullOrWhiteSpace(x)));
+            <tr>
+                <td><input type="checkbox" /></td>
+                <td>
+                    <a class="row-link" asp-action="Details" asp-route-id="@l.Id">@l.CompanyName</a>
+                    @if (!string.IsNullOrEmpty(loc))
+                    {
+                        <span class="secondary">@loc</span>
+                    }
+                </td>
+                <td>
+                    <span class="primary">@l.ContactName</span>
+                    @if (!string.IsNullOrEmpty(l.ContactEmail))
+                    {
+                        <span class="secondary">@l.ContactEmail</span>
+                    }
+                </td>
+                <td><span class="src-pill @SourcePill(l.Source)">@SourceLabel(l.Source)</span></td>
+                <td><span class="stage-pill @StagePill(l.Stage)">@StageLabel(l.Stage)</span></td>
+                <td>
+                    <span class="mini-avatar">@Model.OwnerInitials(l.OwnerId)</span>
+                </td>
+                <td class="num-cell" style="text-align:right;">@Money(l)</td>
+                <td class="num-cell" style="text-align:right;">@Kiosks(l)</td>
+                <td>@Ago(l.UpdatedAt)</td>
+                <td><a asp-action="Details" asp-route-id="@l.Id" style="color:var(--accent);">→</a></td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</section>
+
+<section id="view-kanban" style="display:none;">
+    <div class="kanban">
+        @foreach (var st in stages)
+        {
+            <div class="kb-col">
+                <div class="kb-col-head"><span>@StageLabel(st)</span><span class="kb-count">@Model.CountInStage(st)</span></div>
+                @foreach (var l in Model.InStage(st))
+                {
+                    var loc = string.Join(" · ", new[] { l.Region, l.Country }.Where(x => !string.IsNullOrWhiteSpace(x)));
+                    <a class="kb-card" asp-action="Details" asp-route-id="@l.Id">
+                        <div class="kb-co">@l.CompanyName</div>
+                        <div class="kb-meta"><span class="src-pill @SourcePill(l.Source)">@SourceLabel(l.Source)</span>@(string.IsNullOrEmpty(loc) ? "" : " · " + loc)</div>
+                        <div class="kb-meta">
+                            <span>@Model.OwnerInitials(l.OwnerId) · @Ago(l.CreatedAt)</span>
+                            <span class="kb-val">@Money(l)</span>
+                        </div>
+                    </a>
+                }
+            </div>
+        }
+    </div>
+</section>
+
+<footer class="crm-foot">
+    <span>Gold Kiosk · CRM · © AI Kiosks International Inc. 2026</span>
+    <span class="mono">leads · sorted: created_at desc</span>
+</footer>
+
+@* ============== ADD LEAD MODAL ============== *@
+<div class="modal-overlay" id="add-lead-modal" role="dialog" aria-modal="true" aria-labelledby="add-lead-title" hidden>
+    <div class="modal">
+        <header class="modal-head">
+            <div>
+                <div class="modal-eyebrow">Pipeline · new lead</div>
+                <h2 class="modal-title" id="add-lead-title">Add <em>lead.</em></h2>
+            </div>
+            <button class="modal-close" id="close-add-lead" type="button" aria-label="Close">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4L12 12M4 12L12 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </button>
+        </header>
+
+        <form id="add-lead-form" method="post" asp-action="Create">
+            @Html.AntiForgeryToken()
+            <div class="modal-body">
+                <div class="form-grid">
+
+                    <div class="field">
+                        <label for="al-company">Company name <span class="req">*</span></label>
+                        <input id="al-company" name="company" type="text" placeholder="Emirates Gold Bank PJSC" required />
+                    </div>
+
+                    <div class="field">
+                        <label for="al-contact">Contact person <span class="req">*</span></label>
+                        <input id="al-contact" name="contact" type="text" placeholder="Sara Al Mansoori" required />
+                    </div>
+
+                    <div class="field">
+                        <label for="al-email">Email</label>
+                        <input id="al-email" name="email" type="email" placeholder="contact@partner.com" />
+                    </div>
+
+                    <div class="field">
+                        <label for="al-phone">Phone</label>
+                        <input id="al-phone" name="phone" type="tel" placeholder="+1 555 0148" />
+                    </div>
+
+                    <div class="field">
+                        <label for="al-source">Source <span class="req">*</span></label>
+                        <select id="al-source" name="source" required>
+                            <option value="">Select source…</option>
+                            <option value="website">Website</option>
+                            <option value="inbound_call">Inbound call</option>
+                            <option value="partner_referral">Partner referral</option>
+                            <option value="conference">Conference</option>
+                            <option value="outbound">Outbound</option>
+                        </select>
+                    </div>
+
+                    <div class="field">
+                        <label for="al-owner">Owner</label>
+                        <select id="al-owner" name="owner">
+                            <option value="self">Assign to me</option>
+                            @foreach (var kv in Model.Owners)
+                            {
+                                <option value="@kv.Key">@kv.Value.FullName</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="field">
+                        <label for="al-country">Country</label>
+                        <input id="al-country" name="country" type="text" placeholder="United Arab Emirates" />
+                    </div>
+
+                    <div class="field">
+                        <label for="al-city">City</label>
+                        <input id="al-city" name="city" type="text" placeholder="Dubai" />
+                    </div>
+
+                    <div class="field">
+                        <label for="al-value">Est. first-year value</label>
+                        <input id="al-value" name="value" type="number" inputmode="numeric" placeholder="500000" min="0" step="0.01" />
+                    </div>
+
+                    <div class="field">
+                        <label for="al-currency">Currency</label>
+                        <select id="al-currency" name="currency">
+                            <option value="USD">USD</option>
+                            <option value="AED">AED</option>
+                            <option value="EUR">EUR</option>
+                            <option value="GBP">GBP</option>
+                            <option value="INR">INR</option>
+                            <option value="SAR">SAR</option>
+                            <option value="QAR">QAR</option>
+                            <option value="KWD">KWD</option>
+                            <option value="BHD">BHD</option>
+                            <option value="OMR">OMR</option>
+                        </select>
+                    </div>
+
+                    <div class="field">
+                        <label for="al-kiosks">Est. kiosk count</label>
+                        <input id="al-kiosks" name="kiosks" type="number" inputmode="numeric" placeholder="4" min="0" />
+                    </div>
+
+                    <div class="field full">
+                        <label for="al-notes">Enquiry details</label>
+                        <textarea id="al-notes" name="notes" placeholder="What did they ask for? Where did they come from? Any constraints to flag?"></textarea>
+                    </div>
+
+                </div>
+            </div>
+
+            <footer class="modal-foot">
+                <button class="btn btn-ghost btn-sm" type="button" id="cancel-add-lead">Cancel</button>
+                <button class="btn btn-gold btn-sm" type="submit">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L6 11L12 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    Save lead
+                </button>
+            </footer>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    // View toggle (Table / Kanban) — client-side; the data is already in the page.
+    document.querySelectorAll('#view-toggle button').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('#view-toggle button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const v = btn.dataset.view;
+            document.getElementById('view-table').style.display  = v === 'table'  ? '' : 'none';
+            document.getElementById('view-kanban').style.display = v === 'kanban' ? '' : 'none';
+        });
+    });
+
+    // Add lead modal
+    (function () {
+        const modal = document.getElementById('add-lead-modal');
+        const openBtn = document.getElementById('open-add-lead');
+        const closeBtn = document.getElementById('close-add-lead');
+        const cancelBtn = document.getElementById('cancel-add-lead');
+
+        function open() {
+            modal.hidden = false;
+            modal.classList.add('open');
+            document.body.style.overflow = 'hidden';
+            setTimeout(() => document.getElementById('al-company').focus(), 50);
+        }
+        function close() {
+            modal.classList.remove('open');
+            modal.hidden = true;
+            document.body.style.overflow = '';
+        }
+
+        openBtn.addEventListener('click', open);
+        closeBtn.addEventListener('click', close);
+        cancelBtn.addEventListener('click', close);
+
+        modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && modal.classList.contains('open')) close();
+        });
+    })();
+</script>
+}

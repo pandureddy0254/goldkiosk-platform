@@ -1,0 +1,16 @@
+@page "/analysis"
+
+<div class="screen screen-analysis">
+    <OrbitalRings />
+
+    <h1 class="serif-hero screen-title">@L["analysis.title"]</h1>
+    <p class="screen-subtitle">@L["analysis.subtitle"]</p>
+
+    <div class="checklist">
+        @for (int i = 0; i < Stages.Count; i++)
+        {
+            int index = i;
+            <ChecklistRow Label="@L[$"analysis.step.{Stages[index]}"]" State="StateFor(index)" />
+        }
+    </div>
+</div>

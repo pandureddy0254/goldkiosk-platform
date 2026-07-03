@@ -1,0 +1,86 @@
+@model IReadOnlyList<Profile>
+@{
+    int managers = Model.Count(p => p.Role == CrmRole.SalesManager);
+    int reps     = Model.Count(p => p.Role == CrmRole.SalesRep);
+}
+
+<div class="page-head">
+    <div class="page-title-block">
+        <div class="eyebrow">Administration · identity</div>
+        <h1 class="page-title">CRM <em>users.</em></h1>
+        <p class="page-subtitle">Internal sales staff only · @Model.Count users · invite-only · Microsoft Entra ID SSO.</p>
+    </div>
+    <div style="display:flex; gap:10px;">
+        <a class="btn btn-ghost btn-sm" asp-controller="AuditLog" asp-action="Index">Audit log</a>
+        <button class="btn btn-gold btn-sm">Invite user</button>
+    </div>
+</div>
+
+<div class="role-grid">
+    <div class="role-card">
+        <span class="role-pill r-manager">Sales Manager</span>
+        <h4>Sales Manager</h4>
+        <p class="role-desc">Sees every lead and every partner. Can re-assign owners, reissue activation keys, and access the audit log. Owns the team.</p>
+        <div class="role-stats"><span><strong>@managers</strong> seat@(managers == 1 ? "" : "s") used</span><span>full-table RLS bypass</span></div>
+    </div>
+    <div class="role-card">
+        <span class="role-pill r-operator">Sales Rep</span>
+        <h4>Sales Rep</h4>
+        <p class="role-desc">Sees their own leads and the partners that came from their leads only. Can move stages, send proposals, and onboard partners they own.</p>
+        <div class="role-stats"><span><strong>@reps</strong> seat@(reps == 1 ? "" : "s") used</span><span>Per-row RLS in PostgreSQL</span></div>
+    </div>
+</div>
+
+<section class="card">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">User roster</h2>
+            <div class="card-meta" style="margin-top:6px;"><span>@Model.Count internal · SSO via Microsoft Entra · MFA enforced</span></div>
+        </div>
+    </header>
+    <table class="user-table">
+        <thead><tr><th>User</th><th>Role</th><th>MFA</th><th>Seeded</th><th>Status</th></tr></thead>
+        <tbody>
+        @if (!Model.Any())
+        {
+            <tr><td colspan="5" style="text-align:center; color:var(--ink-faint); padding:24px 0;">No users yet.</td></tr>
+        }
+        else
+        {
+            foreach (var p in Model)
+            {
+                var roleCls = p.Role == CrmRole.SalesManager ? "r-manager" : "r-operator";
+                var roleLabel = p.Role == CrmRole.SalesManager ? "Sales Manager" : "Sales Rep";
+                <tr>
+                    <td>
+                        <div class="user-cell">
+                            <span class="avatar">@p.Initials</span>
+                            <div class="meta">
+                                <strong>@p.FullName</strong>
+                                <span>@p.Email</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="role-pill @roleCls">@roleLabel</span></td>
+                    <td><span class="status-pill s-active">Enforced</span></td>
+                    <td>@p.CreatedAt.ToString("dd MMM yyyy")</td>
+                    <td><span class="status-pill s-active">Active</span></td>
+                </tr>
+            }
+        }
+        </tbody>
+    </table>
+</section>
+
+<div class="callout" style="margin-top:24px;">
+    <div class="ico">i</div>
+    <div class="body">
+        <strong>Partner-side users are managed elsewhere.</strong>
+        The six AIKI RBAC roles (Owner · Manager · Operator · Analyst · Support · Auditor) live in the Admin Dashboard. The CRM is intentionally limited to two internal roles for the sales team.
+    </div>
+</div>
+
+<footer class="crm-foot">
+    <span>Gold Kiosk · CRM · © AI Kiosks International Inc. 2026</span>
+    <span class="mono">users · @Model.Count internal · sso: entra · mfa: required</span>
+</footer>

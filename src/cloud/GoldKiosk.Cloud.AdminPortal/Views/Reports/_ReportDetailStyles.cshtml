@@ -1,0 +1,148 @@
+@*
+    Shared page-scoped styles for every Reports/* detail view.
+    TODO promote — once design is signed off, fold the .breadcrumb / .report-table /
+    .purity-chip / .meta-grid / .report-filter rules into wwwroot/css/main.css.
+*@
+<style>
+    /* Breadcrumb */
+    .breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 14px;
+        font-size: 12px;
+        color: var(--ink-faint);
+        letter-spacing: var(--tracking-wide);
+        text-transform: uppercase;
+    }
+    .breadcrumb a {
+        color: var(--ink-faint);
+        text-decoration: none;
+        transition: color var(--dur-fast);
+    }
+    .breadcrumb a:hover { color: var(--accent); }
+    .breadcrumb .sep { color: var(--ink-ghost); }
+
+    /* Report filter row */
+    .report-filter {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-bottom: 24px;
+        padding: 14px 18px;
+        background: var(--canvas-elevated);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+    }
+    .report-filter label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: var(--tracking-wide);
+        color: var(--ink-faint);
+    }
+    .report-filter input[type="date"],
+    .report-filter select {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        padding: 6px 8px;
+        border: 1px solid var(--line-strong);
+        background: var(--canvas);
+        color: var(--ink);
+        border-radius: var(--radius-sm);
+    }
+
+    /* Report tables — hairline, mono-numeric */
+    .report-table { width: 100%; border-collapse: collapse; }
+    .report-table th {
+        font-family: var(--font-sans);
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: var(--tracking-wider);
+        text-transform: uppercase;
+        color: var(--ink-faint);
+        text-align: left;
+        padding: 12px 18px;
+        background: var(--canvas-sunken);
+        border-bottom: 1px solid var(--line-strong);
+    }
+    .report-table th.num { text-align: right; }
+    .report-table td {
+        padding: 12px 18px;
+        border-bottom: 1px solid var(--line);
+        font-size: 13px;
+        color: var(--ink-soft);
+    }
+    .report-table td.num { text-align: right; color: var(--ink); }
+    .report-table td strong { color: var(--ink); font-weight: 500; }
+    .report-table tbody tr:hover td { background: var(--canvas-sunken); }
+    .report-table tbody tr:last-child td { border-bottom: none; }
+
+    /* Purity chips */
+    .purity-chip {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: var(--radius-xs);
+        font-family: var(--font-mono);
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.04em;
+    }
+    .purity-chip.k22 { background: var(--accent-soft); color: var(--accent); }
+    .purity-chip.k21 { background: var(--info-soft); color: var(--info); }
+    .purity-chip.k18 { background: var(--danger-soft); color: var(--danger); }
+    .purity-chip.k24 { background: var(--accent-soft); color: var(--accent); }
+    .purity-chip.silv { background: var(--canvas-sunken); color: var(--ink-soft); border: 1px solid var(--line-strong); }
+
+    /* Status pills (txn / payout) */
+    .pill { display:inline-block; padding:3px 9px; border-radius: var(--radius-full); font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.04em; }
+    .pill.s-ok   { background: var(--success-soft); color: var(--success); }
+    .pill.s-warn { background: var(--warning-soft); color: var(--warning); }
+    .pill.s-bad  { background: var(--danger-soft); color: var(--danger); }
+    .pill.s-info { background: var(--info-soft); color: var(--info); }
+    .pill.s-mute { background: var(--canvas-sunken); color: var(--ink-faint); border:1px solid var(--line); }
+
+    /* Metadata grid */
+    .meta-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0;
+        border-top: 1px solid var(--line);
+    }
+    @@media (max-width: 980px) {
+        .meta-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    .meta-cell {
+        padding: 18px 22px;
+        border-right: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+    }
+    .meta-cell:nth-child(3n) { border-right: none; }
+    .meta-cell:nth-last-child(-n+3) { border-bottom: none; }
+    .meta-label {
+        font-size: 10px;
+        letter-spacing: var(--tracking-wider);
+        text-transform: uppercase;
+        color: var(--ink-faint);
+        font-family: var(--font-mono);
+        margin-bottom: 6px;
+    }
+    .meta-value {
+        font-family: var(--font-display);
+        font-size: 18px;
+        color: var(--ink);
+        margin-bottom: 4px;
+    }
+    .meta-value.mono {
+        font-family: var(--font-mono);
+        font-size: 14px;
+        font-weight: 500;
+    }
+    .meta-sub {
+        font-size: 11px;
+        color: var(--ink-faint);
+    }
+</style>

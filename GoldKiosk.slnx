@@ -1,9 +1,15 @@
 <Solution>
   <Folder Name="/src/" />
+  <Folder Name="/src/cloud/">
+    <Project Path="src/cloud/GoldKiosk.Cloud.AdminPortal/GoldKiosk.Cloud.AdminPortal.csproj" />
+    <Project Path="src/cloud/GoldKiosk.Cloud.Api/GoldKiosk.Cloud.Api.csproj" />
+    <Project Path="src/cloud/GoldKiosk.Cloud.CRMPortal/GoldKiosk.Cloud.CRMPortal.csproj" />
+  </Folder>
   <Folder Name="/src/kiosk/">
     <Project Path="src/kiosk/GoldKiosk.Kiosk.Api/GoldKiosk.Kiosk.Api.csproj" />
     <Project Path="src/kiosk/GoldKiosk.Kiosk.Core/GoldKiosk.Kiosk.Core.csproj" />
     <Project Path="src/kiosk/GoldKiosk.Kiosk.Devices/GoldKiosk.Kiosk.Devices.csproj" />
+    <Project Path="src/kiosk/GoldKiosk.Kiosk.UI/GoldKiosk.Kiosk.UI.csproj" />
   </Folder>
   <Folder Name="/src/orchestration/">
     <Project Path="src/orchestration/GoldKiosk.AppHost/GoldKiosk.AppHost.csproj" />
@@ -12,5 +18,13 @@
   <Folder Name="/src/shared/">
     <Project Path="src/shared/GoldKiosk.Contracts/GoldKiosk.Contracts.csproj" />
     <Project Path="src/shared/GoldKiosk.Domain/GoldKiosk.Domain.csproj" />
+    <Project Path="src/shared/GoldKiosk.Infrastructure/GoldKiosk.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/GoldKiosk.Domain.Tests/GoldKiosk.Domain.Tests.csproj" />
+    <Project Path="tests/GoldKiosk.Kiosk.Api.Tests/GoldKiosk.Kiosk.Api.Tests.csproj" />
+    <Project Path="tests/GoldKiosk.Kiosk.Core.Tests/GoldKiosk.Kiosk.Core.Tests.csproj" />
+    <Project Path="tests/GoldKiosk.Kiosk.Devices.Tests/GoldKiosk.Kiosk.Devices.Tests.csproj" />
+    <Project Path="tests/GoldKiosk.TestKit/GoldKiosk.TestKit.csproj" />
   </Folder>
 </Solution>

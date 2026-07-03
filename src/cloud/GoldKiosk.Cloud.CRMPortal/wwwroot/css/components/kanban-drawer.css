@@ -1,0 +1,238 @@
+/* kanban-drawer.css
+ * Styles for the Kanban drag-and-drop interactions and the lead detail drawer.
+ * Uses only var(--token) references — no raw hex values.
+ * Loaded globally via _Layout.cshtml so it's available on every page that
+ * references the kanban or the drawer (the drawer is only rendered on Kanban.cshtml).
+ */
+
+/* -----------------------------------------------------------------------
+ * Kanban card drag states
+ * ----------------------------------------------------------------------- */
+
+.kb-card {
+    cursor: grab;
+    user-select: none;
+    transition: opacity 0.15s ease, box-shadow 0.15s ease;
+}
+
+.kb-card:active {
+    cursor: grabbing;
+}
+
+.kb-card.dragging {
+    opacity: 0.4;
+    cursor: grabbing;
+    box-shadow: none;
+}
+
+/* -----------------------------------------------------------------------
+ * Drop target column highlight
+ * ----------------------------------------------------------------------- */
+
+.kb-col.drop-target {
+    background: var(--surface-2);
+    outline: 2px dashed var(--accent);
+    outline-offset: -4px;
+    border-radius: var(--radius);
+}
+
+/* -----------------------------------------------------------------------
+ * Drawer overlay backdrop
+ * ----------------------------------------------------------------------- */
+
+#drawerBackdrop:not([hidden]) {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 99;
+}
+
+/* -----------------------------------------------------------------------
+ * Lead detail drawer
+ * ----------------------------------------------------------------------- */
+
+.drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: min(480px, 92vw);
+    height: 100vh;
+    background: var(--surface);
+    box-shadow: var(--shadow-md);
+    transform: translateX(100%);
+    transition: transform 0.2s ease;
+    z-index: 100;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.drawer:not([hidden]) {
+    transform: translateX(0);
+}
+
+.drawer-close {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    background: transparent;
+    border: 0;
+    font-size: 24px;
+    cursor: pointer;
+    color: var(--ink-faint);
+    line-height: 1;
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    transition: color 0.1s ease, background 0.1s ease;
+}
+
+.drawer-close:hover {
+    color: var(--ink);
+    background: var(--surface-2);
+}
+
+/* -----------------------------------------------------------------------
+ * Drawer inner content layout
+ * ----------------------------------------------------------------------- */
+
+.drawer-loading {
+    padding: 24px;
+    color: var(--ink-faint);
+    font-size: var(--fs-13);
+}
+
+.drawer-head {
+    padding: 48px 24px 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+.drawer-title {
+    font-size: var(--fs-18);
+    font-weight: 600;
+    color: var(--ink);
+    margin: 0 0 6px;
+    font-family: var(--font-display);
+}
+
+.drawer-eyebrow {
+    font-size: var(--fs-11);
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
+}
+
+.drawer-section {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+}
+
+.drawer-section:last-child {
+    border-bottom: none;
+}
+
+.drawer-section-title {
+    font-size: var(--fs-11);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-faint);
+    margin: 0 0 10px;
+}
+
+.drawer-info-row {
+    display: flex;
+    gap: 12px;
+    font-size: var(--fs-13);
+    padding: 4px 0;
+}
+
+.drawer-info-label {
+    width: 110px;
+    flex-shrink: 0;
+    color: var(--ink-faint);
+}
+
+.drawer-info-value {
+    color: var(--ink);
+    word-break: break-word;
+}
+
+/* -----------------------------------------------------------------------
+ * Drawer stage move buttons
+ * ----------------------------------------------------------------------- */
+
+.drawer-stage-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+/* -----------------------------------------------------------------------
+ * Drawer note composer
+ * ----------------------------------------------------------------------- */
+
+.drawer-note-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.drawer-note-form textarea {
+    resize: vertical;
+    min-height: 64px;
+    font-size: var(--fs-13);
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--ink);
+    font-family: var(--font-sans);
+}
+
+.drawer-note-form textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+/* -----------------------------------------------------------------------
+ * Drawer full-view link
+ * ----------------------------------------------------------------------- */
+
+.drawer-full-link {
+    display: inline-block;
+    margin-top: 16px;
+    font-size: var(--fs-13);
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.drawer-full-link:hover {
+    text-decoration: underline;
+}
+
+/* -----------------------------------------------------------------------
+ * Toast for optimistic-UI revert notification
+ * ----------------------------------------------------------------------- */
+
+.kanban-toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--danger);
+    color: #fff;
+    font-size: var(--fs-13);
+    padding: 8px 18px;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-md);
+    z-index: 200;
+    animation: toastIn 0.2s ease;
+    pointer-events: none;
+}
+
+@keyframes toastIn {
+    from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}

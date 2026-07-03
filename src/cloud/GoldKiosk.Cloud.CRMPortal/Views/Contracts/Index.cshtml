@@ -1,0 +1,283 @@
+@model IReadOnlyList<Contract>
+@{
+    var partners = ViewData["PartnerLookup"] as Dictionary<Guid, Partner> ?? new Dictionary<Guid, Partner>();
+    int signed = Model.Count(c => c.Status == ContractStatus.FullySigned);
+    int outForSig = Model.Count(c => c.Status == ContractStatus.OutForSignature);
+    decimal aggregate = Model.Where(c => c.Status == ContractStatus.FullySigned).Sum(c => c.ValueAmount ?? 0m);
+    var primaryCurrency = Model.Select(c => c.CurrencyCode).FirstOrDefault() ?? "USD";
+
+    string TypeLabel(string t) => t switch
+    {
+        ContractType.Msa      => "MSA",
+        ContractType.Sow      => "SOW",
+        ContractType.Dpa      => "DPA",
+        ContractType.Sla      => "SLA",
+        ContractType.Nda      => "NDA",
+        ContractType.Addendum => "Addendum",
+        _ => t.ToUpperInvariant()
+    };
+
+    // DB-sourced URLs must NOT carry javascript:/data:/vbscript: schemes — those
+    // execute on click in an authenticated origin. Razor encodes the value into
+    // the attribute but does not strip dangerous schemes.
+    string? SafeHref(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+        if (!Uri.TryCreate(raw, UriKind.Absolute, out var u)) return null;
+        return (u.Scheme == Uri.UriSchemeHttp || u.Scheme == Uri.UriSchemeHttps) ? u.AbsoluteUri : null;
+    }
+}
+
+<div class="page-head">
+    <div class="page-title-block">
+        <div class="eyebrow">Pipeline · contracts</div>
+        <h1 class="page-title">Contracts <em>register.</em></h1>
+        <p class="page-subtitle">@signed signed · @outForSig out for signature · aggregate signed value @($"{primaryCurrency} {aggregate:N0}").</p>
+    </div>
+    <div style="display:flex; gap:10px;">
+        <button type="button" id="open-new-contract" class="btn btn-gold btn-sm">New contract</button>
+        <button type="button" class="btn btn-ghost btn-sm" disabled title="DocuSign integration not wired yet">Send for signature</button>
+    </div>
+</div>
+
+@if (TempData["ContractError"] is string contractErr)
+{
+    <div class="warn-callout" style="margin-bottom:16px;"><div class="ico">!</div><div class="body">@contractErr</div></div>
+}
+@if (TempData["ContractFlash"] is string contractFlash)
+{
+    <div class="callout" style="margin-bottom:16px;"><div class="ico">i</div><div class="body">@contractFlash</div></div>
+}
+
+<form method="get" class="filter-bar">
+    <input type="search" name="q" value="@(ViewBag.Q as string ?? "")" placeholder="Search by partner name…" style="flex:0 0 280px;" />
+    <span class="filter-label">Type</span>
+    <select name="type">
+        <option value="all" selected="@(string.IsNullOrEmpty(ViewBag.Type as string) || ViewBag.Type == "all")">All types</option>
+        <option value="msa"      selected="@(ViewBag.Type == "msa")">MSA</option>
+        <option value="sow"      selected="@(ViewBag.Type == "sow")">SOW</option>
+        <option value="dpa"      selected="@(ViewBag.Type == "dpa")">DPA</option>
+        <option value="sla"      selected="@(ViewBag.Type == "sla")">SLA</option>
+        <option value="nda"      selected="@(ViewBag.Type == "nda")">NDA</option>
+        <option value="addendum" selected="@(ViewBag.Type == "addendum")">Addendum</option>
+    </select>
+    <span class="filter-label">Status</span>
+    <select name="status">
+        <option value="all"               selected="@(string.IsNullOrEmpty(ViewBag.Status as string) || ViewBag.Status == "all")">All</option>
+        <option value="draft"             selected="@(ViewBag.Status == "draft")">Draft</option>
+        <option value="out_for_signature" selected="@(ViewBag.Status == "out_for_signature")">Out for signature</option>
+        <option value="signed"            selected="@(ViewBag.Status == "signed")">Signed</option>
+        <option value="terminated"        selected="@(ViewBag.Status == "terminated")">Terminated</option>
+    </select>
+    <button type="submit" class="btn btn-ghost btn-sm">Apply</button>
+</form>
+
+<section class="card">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">All contracts</h2>
+            <div class="card-meta" style="margin-top:6px;"><span>Document URLs tracked per contract</span></div>
+        </div>
+    </header>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Contract ID</th><th>Partner</th><th>Type</th><th>Status</th>
+                <th style="text-align:right;">Value</th><th>Term</th><th>Signed</th><th></th>
+            </tr>
+        </thead>
+        <tbody>
+        @if (!Model.Any())
+        {
+            <tr><td colspan="8" style="text-align:center; color:var(--ink-faint); padding:24px 0;">No contracts yet.</td></tr>
+        }
+        else
+        {
+            foreach (var c in Model)
+            {
+                partners.TryGetValue(c.PartnerId, out var p);
+                var partnerName = p?.DisplayName ?? p?.LegalName ?? c.PartnerId.ToString().Substring(0, 8);
+                var pillClass = c.Status switch
+                {
+                    ContractStatus.FullySigned           => "t-pill t-active",
+                    ContractStatus.OutForSignature  => "stage-pill s-proposal",
+                    ContractStatus.Terminated       => "t-pill t-churned",
+                    _                                => "stage-pill s-new"
+                };
+                var statusLabel = c.Status switch
+                {
+                    ContractStatus.FullySigned           => "Signed",
+                    ContractStatus.OutForSignature  => "Out for sig",
+                    ContractStatus.Terminated       => "Terminated",
+                    _                                => "Draft"
+                };
+                <tr>
+                    <td class="num-cell">@($"{TypeLabel(c.ContractTypeCode)}-{c.Id.ToString().Substring(0, 8)}")</td>
+                    <td><a class="row-link" asp-controller="Partners" asp-action="Details" asp-route-id="@c.PartnerId">@partnerName</a></td>
+                    <td>@TypeLabel(c.ContractTypeCode)</td>
+                    <td><span class="@pillClass">@statusLabel</span></td>
+                    <td class="num-cell" style="text-align:right;">
+                        @if (c.ValueAmount.HasValue)
+                        {
+                            @($"{c.CurrencyCode} {c.ValueAmount.Value:N0}")
+                        }
+                        else
+                        {
+                            <span style="color:var(--ink-faint);">—</span>
+                        }
+                    </td>
+                    <td>@(c.TermMonths.HasValue ? $"{c.TermMonths} mo" : "—")</td>
+                    <td>@(c.SignedAt?.ToString("dd MMM yyyy") ?? "—")</td>
+                    <td>
+                        @{ var safeHref = SafeHref(c.DocumentUrl); }
+                        @if (safeHref is not null)
+                        {
+                            <a href="@safeHref" style="color:var(--accent);" target="_blank" rel="noopener noreferrer">Open PDF</a>
+                        }
+                        else
+                        {
+                            <a href="#" style="color:var(--accent);">DocuSign →</a>
+                        }
+                    </td>
+                </tr>
+            }
+        }
+        </tbody>
+    </table>
+</section>
+
+@{
+    var allPartners = ViewBag.AllPartners as List<Partner> ?? new List<Partner>();
+}
+
+@* ============== NEW CONTRACT MODAL ============== *@
+<div class="modal-overlay" id="new-contract-modal" role="dialog" aria-modal="true" aria-labelledby="new-contract-title" hidden>
+    <div class="modal">
+        <header class="modal-head">
+            <div>
+                <div class="modal-eyebrow">Pipeline · new contract</div>
+                <h2 class="modal-title" id="new-contract-title">New <em>contract.</em></h2>
+            </div>
+            <button class="modal-close" id="close-new-contract" type="button" aria-label="Close">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4L12 12M4 12L12 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </button>
+        </header>
+
+        <form id="new-contract-form" method="post" asp-action="Create">
+            @Html.AntiForgeryToken()
+            <div class="modal-body">
+                <div class="form-grid">
+                    <div class="field full">
+                        <label for="nc-partner">Partner <span class="req">*</span></label>
+                        <select id="nc-partner" name="partnerId" required>
+                            <option value="">Select partner…</option>
+                            @foreach (var p in allPartners)
+                            {
+                                <option value="@p.Id">@(p.DisplayName ?? p.LegalName)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="nc-type">Type <span class="req">*</span></label>
+                        <select id="nc-type" name="contractType" required>
+                            <option value="msa">MSA</option>
+                            <option value="sow">SOW</option>
+                            <option value="dpa">DPA</option>
+                            <option value="sla">SLA</option>
+                            <option value="nda">NDA</option>
+                            <option value="addendum">Addendum</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="nc-status">Status</label>
+                        <select id="nc-status" name="status">
+                            <option value="draft" selected>Draft</option>
+                            <option value="out_for_signature">Out for signature</option>
+                            <option value="signed">Signed</option>
+                            <option value="terminated">Terminated</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="nc-value">Value</label>
+                        <input id="nc-value" name="valueAmount" type="number" inputmode="numeric" placeholder="500000" min="0" step="0.01" />
+                    </div>
+                    <div class="field">
+                        <label for="nc-currency">Currency</label>
+                        <select id="nc-currency" name="currencyCode">
+                            <option value="USD">USD</option>
+                            <option value="AED">AED</option>
+                            <option value="EUR">EUR</option>
+                            <option value="GBP">GBP</option>
+                            <option value="INR">INR</option>
+                            <option value="SAR">SAR</option>
+                            <option value="QAR">QAR</option>
+                            <option value="KWD">KWD</option>
+                            <option value="BHD">BHD</option>
+                            <option value="OMR">OMR</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="nc-term">Term (months)</label>
+                        <input id="nc-term" name="termMonths" type="number" inputmode="numeric" placeholder="12" min="1" />
+                    </div>
+                    <div class="field">
+                        <label for="nc-signed-at">Signed at (UTC, optional)</label>
+                        <input id="nc-signed-at" name="signedAt" type="date" />
+                    </div>
+                    <div class="field full">
+                        <label for="nc-url">Document URL</label>
+                        <input id="nc-url" name="documentUrl" type="url" placeholder="https://…  (http/https only — javascript: rejected at render)" />
+                    </div>
+                    <div class="field">
+                        <label for="nc-signer-name">Signed by (name)</label>
+                        <input id="nc-signer-name" name="signedByName" type="text" maxlength="200" />
+                    </div>
+                    <div class="field">
+                        <label for="nc-signer-email">Signed by (email)</label>
+                        <input id="nc-signer-email" name="signedByEmail" type="email" maxlength="200" />
+                    </div>
+                </div>
+            </div>
+            <footer class="modal-foot">
+                <button class="btn btn-ghost btn-sm" type="button" id="cancel-new-contract">Cancel</button>
+                <button class="btn btn-gold btn-sm" type="submit">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L6 11L12 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    Save contract
+                </button>
+            </footer>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    (function () {
+        const modal     = document.getElementById('new-contract-modal');
+        const openBtn   = document.getElementById('open-new-contract');
+        const closeBtn  = document.getElementById('close-new-contract');
+        const cancelBtn = document.getElementById('cancel-new-contract');
+
+        function open() {
+            modal.hidden = false;
+            modal.classList.add('open');
+            document.body.style.overflow = 'hidden';
+            setTimeout(() => document.getElementById('nc-partner').focus(), 50);
+        }
+        function close() {
+            modal.hidden = true;
+            modal.classList.remove('open');
+            document.body.style.overflow = '';
+        }
+        openBtn?.addEventListener('click', open);
+        closeBtn?.addEventListener('click', close);
+        cancelBtn?.addEventListener('click', close);
+        modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !modal.hidden) close(); });
+    })();
+</script>
+}
+
+<footer class="crm-foot">
+    <span>Gold Kiosk · CRM · © AI Kiosks International Inc. 2026</span>
+    <span class="mono">contracts · signed URLs · bucket: storage/contracts (private)</span>
+</footer>

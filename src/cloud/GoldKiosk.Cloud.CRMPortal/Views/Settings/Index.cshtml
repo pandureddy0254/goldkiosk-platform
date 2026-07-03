@@ -1,0 +1,127 @@
+@model GoldKiosk.Cloud.CRMPortal.Models.ViewModels.ChangePasswordViewModel
+@{
+    var me = ViewData["Profile"] as GoldKiosk.Cloud.CRMPortal.Models.Domain.Profile;
+    var flash = TempData["SettingsFlash"] as string;
+    var modelErrors = ViewData.ModelState
+        .Where(kv => kv.Value!.Errors.Count > 0)
+        .SelectMany(kv => kv.Value!.Errors.Select(e => (Field: kv.Key, Message: e.ErrorMessage)))
+        .ToList();
+}
+
+<div class="page-head">
+    <div class="page-title-block">
+        <div class="eyebrow">Administration · workspace</div>
+        <h1 class="page-title">Workspace <em>settings.</em></h1>
+        <p class="page-subtitle">Account security · org-wide preferences · integrations.</p>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(flash))
+{
+    <div class="card" style="border-color: rgba(57,135,86,0.35); background: rgba(57,135,86,0.06); margin-bottom:16px;">
+        <div class="card-body" style="display:flex; align-items:center; gap:10px;">
+            <span style="color:var(--success);">✓</span>
+            <span>@flash</span>
+        </div>
+    </div>
+}
+
+<div class="detail-rail">
+    <section style="display:flex; flex-direction:column; gap:16px;">
+        <div class="card">
+            <header class="card-head"><div><h2 class="card-title">My account</h2></div></header>
+            <div class="info-list">
+                <div class="info-row"><div class="info-label">Name</div><div class="info-value">@(me?.FullName ?? "—")</div></div>
+                <div class="info-row"><div class="info-label">Email</div><div class="info-value mono">@(me?.Email ?? "—")</div></div>
+                <div class="info-row"><div class="info-label">Role</div><div class="info-value">@(me?.Role ?? "—")</div></div>
+                <div class="info-row"><div class="info-label">Member since</div><div class="info-value mono">@(me?.CreatedAt.ToString("dd MMM yyyy") ?? "—")</div></div>
+            </div>
+        </div>
+
+        <div class="card" id="change-password">
+            <header class="card-head">
+                <div>
+                    <h2 class="card-title">Change password</h2>
+                    <div class="card-meta" style="margin-top:6px;">Updates your CRM password — bcrypt-hashed in PostgreSQL via pgcrypto. You'll stay signed in after the change.</div>
+                </div>
+            </header>
+            <div class="card-body">
+                @if (modelErrors.Any())
+                {
+                    <div style="background:rgba(168,50,50,0.08); border:1px solid rgba(168,50,50,0.25); border-radius:8px; padding:10px 12px; margin-bottom:14px; color:var(--danger);">
+                        <ul style="margin:0; padding-left:18px;">
+                            @foreach (var err in modelErrors)
+                            {
+                                <li>@err.Message</li>
+                            }
+                        </ul>
+                    </div>
+                }
+                <form method="post" asp-action="ChangePassword" class="form-grid" style="grid-template-columns:1fr;">
+                    @Html.AntiForgeryToken()
+                    <div class="field">
+                        <label asp-for="CurrentPassword">Current password</label>
+                        <input asp-for="CurrentPassword" type="password" autocomplete="current-password" required />
+                    </div>
+                    <div class="field">
+                        <label asp-for="NewPassword">New password</label>
+                        <input asp-for="NewPassword" type="password" autocomplete="new-password" minlength="8" required />
+                    </div>
+                    <div class="field">
+                        <label asp-for="ConfirmPassword">Confirm new password</label>
+                        <input asp-for="ConfirmPassword" type="password" autocomplete="new-password" minlength="8" required />
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <button type="submit" class="btn btn-primary btn-sm">Update password</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <header class="card-head"><div><h2 class="card-title">Workspace identity</h2></div></header>
+            <div class="card-body">
+                <div class="form-grid">
+                    <div class="field"><label>Workspace name</label><input type="text" value="Gold Kiosk · Internal CRM" disabled /></div>
+                    <div class="field"><label>Default currency</label>
+                        <select disabled>
+                            <option>USD</option><option>AED</option><option>EUR</option><option>SAR</option>
+                        </select>
+                    </div>
+                    <div class="field"><label>Timezone</label>
+                        <select disabled>
+                            <option>UTC</option><option>Asia/Dubai (GST · +04:00)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="card-meta" style="margin-top:10px;">Editable workspace-wide settings ship in the next release.</div>
+            </div>
+        </div>
+    </section>
+
+    <section style="display:flex; flex-direction:column; gap:16px;">
+        <div class="card">
+            <header class="card-head"><div><h2 class="card-title">Identity provider</h2></div></header>
+            <div class="info-list">
+                <div class="info-row"><div class="info-label">Auth</div><div class="info-value">CRM · email + password (bcrypt)</div></div>
+                <div class="info-row"><div class="info-label">Sign-up</div><div class="info-value">Disabled · invite-only</div></div>
+                <div class="info-row"><div class="info-label">Session TTL</div><div class="info-value mono">1 hour · refresh-rotating</div></div>
+                <div class="info-row"><div class="info-label">MFA</div><div class="info-value">Not enforced · planned</div></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <header class="card-head"><div><h2 class="card-title">Integrations</h2></div></header>
+            <div class="info-list">
+                <div class="info-row"><div class="info-label">Database</div><div class="info-value mono">PostgreSQL · crm / billing / audit · <span style="color:var(--success);">✓ Connected</span></div></div>
+                <div class="info-row"><div class="info-label">Payments · Stripe</div><div class="info-value mono">test mode · <span style="color:var(--ink-faint);">— Awaiting live keys</span></div></div>
+                <div class="info-row"><div class="info-label">Email · Amazon SES</div><div class="info-value mono">me-central-1 · <span style="color:var(--success);">✓ Connected</span></div></div>
+            </div>
+        </div>
+    </section>
+</div>
+
+<footer class="crm-foot">
+    <span>Gold Kiosk · CRM · © AI Kiosks International Inc. 2026</span>
+    <span class="mono">settings · personal + workspace</span>
+</footer>

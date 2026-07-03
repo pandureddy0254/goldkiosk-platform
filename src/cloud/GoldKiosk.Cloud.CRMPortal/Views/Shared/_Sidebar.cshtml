@@ -1,0 +1,55 @@
+@model string
+@inject GoldKiosk.Cloud.CRMPortal.Services.ICurrentUserService CurrentUser
+@{
+    string Cls(string section) => Model == section ? "nav-link active" : "nav-link";
+}
+<aside class="sidebar">
+    <nav class="sidebar-nav">
+        <div class="nav-section">
+            <div class="nav-section-title">Overview</div>
+            <a class="@Cls("dashboard")" asp-controller="Home" asp-action="Index"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>Dashboard</a>
+        </div>
+        <div class="nav-section">
+            <div class="nav-section-title">Pipeline</div>
+            <a class="@Cls("leads")" asp-controller="Leads" asp-action="Index"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="6" cy="6" r="3" stroke="currentColor" stroke-width="1.5"/></svg>Leads</a>
+            <a class="@Cls("onboard")" asp-controller="Onboard" asp-action="Index"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 13V5L8 2L13 5V13H3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>Onboard partner</a>
+            <a class="@Cls("proposals")" asp-controller="Proposals" asp-action="Index"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="13" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>Proposals</a>
+            <a class="@Cls("contracts")" asp-controller="Contracts" asp-action="Index"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 2H10L13 5V14H4V2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>Contracts</a>
+        </div>
+        <div class="nav-section">
+            <div class="nav-section-title">Partners</div>
+            <a class="@Cls("partners")" asp-controller="Partners" asp-action="Index"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 6L8 3L13 6V13H3V6Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>Directory</a>
+            <a class="@Cls("kiosks")" asp-controller="Kiosks" asp-action="Index"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="3" y="2" width="10" height="13" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>Kiosks</a>
+            <a class="@Cls("api-credentials")" asp-controller="ApiCredentials" asp-action="Index"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M11 7C11 5.5 9.5 4 8 4C6.5 4 5 5.5 5 7L2 10V13H6L8 11L10 13H14V10L11 7z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>API credentials</a>
+        </div>
+        <div class="nav-section">
+            <div class="nav-section-title">Billing</div>
+            <a class="@Cls("subscriptions")" asp-controller="Subscriptions" asp-action="Index"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="9" rx="1" stroke="currentColor" stroke-width="1.5"/><line x1="2" y1="7" x2="14" y2="7" stroke="currentColor" stroke-width="1.5"/><line x1="5" y1="10" x2="8" y2="10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Subscriptions</a>
+            <a class="@Cls("invoices")" asp-controller="Invoices" asp-action="Index"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 2H10L13 5V14H4V2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>Invoices</a>
+            <a class="@Cls("renewals")" asp-controller="Renewals" asp-action="Index"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M8 5V8L10 10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Renewals queue</a>
+        </div>
+        <div class="nav-section">
+            <div class="nav-section-title">Workspace</div>
+            <a class="@Cls("tasks")" asp-controller="Tasks" asp-action="Index"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="3" y="3" width="10" height="11" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>Tasks</a>
+            <a class="@Cls("activity")" asp-controller="Activity" asp-action="Index"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 13L5 8L8 10L11 5L14 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Activity</a>
+            <a class="@Cls("inbox")" asp-controller="Inbox" asp-action="Index"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4H14V12H2V4z" stroke="currentColor" stroke-width="1.5"/></svg>Inbox</a>
+        </div>
+        <div class="nav-section">
+            <div class="nav-section-title">Administration</div>
+            <a class="@Cls("users")" asp-controller="Users" asp-action="Index"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="6" cy="5" r="2" stroke="currentColor" stroke-width="1.5"/></svg>Users</a>
+            @if (CurrentUser.IsSuperadmin)
+            {
+                <a class="@Cls("members")" asp-controller="Members" asp-action="Index"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="6" cy="5" r="2.2" stroke="currentColor" stroke-width="1.5"/><circle cx="11" cy="6" r="1.6" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 13c0-2 1.6-3.2 3.5-3.2S9.5 11 9.5 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Members</a>
+            }
+            <a class="@Cls("workspace-settings")" asp-controller="Settings" asp-action="Index"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/></svg>Workspace settings</a>
+            <a class="@Cls("audit-log")" asp-controller="AuditLog" asp-action="Index"><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2L14 5V8C14 11.5 11.5 13.5 8 14C4.5 13.5 2 11.5 2 8V5L8 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>Audit log</a>
+        </div>
+    </nav>
+    <div class="sidebar-foot">
+        <div class="tenant-card">
+            <div class="eyebrow" style="margin-bottom:6px;">Workspace</div>
+            <div style="font-family:var(--font-display); font-size:17px;">Gold Kiosk · CRM</div>
+            <div style="font-size:12px; color:var(--ink-faint); margin-top:2px;">Internal · GCC region · production</div>
+        </div>
+    </div>
+</aside>

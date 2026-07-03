@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>gk-cloud-api-dev</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Serilog.AspNetCore" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\orchestration\GoldKiosk.ServiceDefaults\GoldKiosk.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\shared\GoldKiosk.Contracts\GoldKiosk.Contracts.csproj" />
+    <ProjectReference Include="..\..\shared\GoldKiosk.Domain\GoldKiosk.Domain.csproj" />
+    <ProjectReference Include="..\..\shared\GoldKiosk.Infrastructure\GoldKiosk.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

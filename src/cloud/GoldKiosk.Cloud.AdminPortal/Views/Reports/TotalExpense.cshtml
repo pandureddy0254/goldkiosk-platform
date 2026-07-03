@@ -1,0 +1,136 @@
+@model TotalExpenseReportViewModel
+@using System.Globalization
+@{
+    var report = Model ?? throw new InvalidOperationException("This report view requires a model.");
+
+    var inv = CultureInfo.InvariantCulture;
+
+    ViewBag.PageTitle = "Expense <em>report.</em>";
+    ViewBag.Eyebrow   = "R-04 · OPERATING EXPENSES · DAILY";
+    ViewBag.Subtitle  = "Operating expenses booked against the kiosk fleet and back-office, normalised to AED, rolled up to date.";
+    ViewBag.ActiveNav = "reports";
+
+    var rows = report.Rows ?? new List<TotalExpenseReportRow>();
+    var from = report.From?.ToString("yyyy-MM-dd", inv) ?? "";
+    var to   = report.To?.ToString("yyyy-MM-dd", inv) ?? "";
+}
+
+@section Head {
+    @await Html.PartialAsync("_ReportDetailStyles")
+}
+
+<div class="breadcrumb">
+    <a asp-controller="Reports" asp-action="Index">Reports library</a>
+    <span class="sep">&rsaquo;</span>
+    <span>R-04 &middot; Total Expense</span>
+</div>
+
+@if (report.ExpenseTableMissing)
+{
+    <div class="flash flash-error" style="margin-bottom:18px;">
+        The expenses table is not yet provisioned in this database.
+        Once <code class="mono">tx.expense_entries</code> is added and the
+        <code class="mono">reporting.expenses_source</code> view is updated, this report will populate automatically.
+    </div>
+}
+
+<form method="get" asp-controller="Reports" asp-action="TotalExpense" class="report-filter">
+    @Html.AntiForgeryToken()
+    <label>From <input type="date" name="from" value="@from" /></label>
+    <label>To <input type="date" name="to" value="@to" /></label>
+    <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+    <a class="btn btn-ghost btn-sm" asp-controller="Reports" asp-action="TotalExpense">Reset</a>
+    <span style="flex:1;"></span>
+    <button type="button" class="btn btn-ghost btn-sm">Export &middot; CSV</button>
+    <button type="button" class="btn btn-ghost btn-sm">Export &middot; PDF</button>
+</form>
+
+<section class="card" style="margin-bottom:24px;">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Expense trend</h2>
+            <div class="card-meta" style="margin-top:6px;">
+                <span><span class="mono">@report.TotalAmount.ToString("N2", inv)</span> AED total in window</span>
+            </div>
+        </div>
+    </header>
+    <div class="card-body">
+        <div class="chart">
+            <svg viewBox="0 0 1000 240" preserveAspectRatio="none">
+                <g stroke="var(--line)" stroke-dasharray="2 4">
+                    <line x1="0" x2="1000" y1="60" y2="60"/><line x1="0" x2="1000" y1="120" y2="120"/><line x1="0" x2="1000" y1="180" y2="180"/>
+                </g>
+                <path d="M0,160 L50,165 L100,155 L150,170 L200,158 L250,148 L300,140 L350,155 L400,138 L450,125 L500,142 L550,128 L600,118 L650,125 L700,108 L750,118 L800,98 L850,108 L900,88 L950,92 L1000,78"
+                      fill="none" stroke="var(--warning)" stroke-width="2"/>
+            </svg>
+        </div>
+    </div>
+</section>
+
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Total expense<span class="dot" style="background:var(--warning);"></span></div>
+        <div class="kpi-value"><span class="mono">@report.TotalAmount.ToString("N0", inv)</span><span class="unit">AED</span></div>
+        <div class="kpi-foot"><span class="label-suffix">window-bounded</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Entries<span class="dot"></span></div>
+        <div class="kpi-value"><span class="mono">@rows.Count.ToString("N0", inv)</span></div>
+        <div class="kpi-foot"><span class="label-suffix">expense lines</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Daily avg<span class="dot"></span></div>
+        <div class="kpi-value"><span class="mono">@(rows.Count > 0 ? (report.TotalAmount / rows.Count).ToString("N0", inv) : "0")</span><span class="unit">AED</span></div>
+        <div class="kpi-foot"><span class="label-suffix">per entry</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Peak day<span class="dot" style="background:var(--danger);"></span></div>
+        <div class="kpi-value"><span class="mono">@(rows.Any() ? rows.Max(r => r.Amount).ToString("N0", inv) : "0")</span><span class="unit">AED</span></div>
+        <div class="kpi-foot"><span class="label-suffix">single-day max</span></div>
+    </div>
+</div>
+
+<section class="card" style="margin-bottom:24px;">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Expense ledger</h2>
+            <div class="card-meta" style="margin-top:6px;"><span>Daily roll-up &middot; AED normalised</span></div>
+        </div>
+    </header>
+    <div style="overflow-x:auto;">
+        <table class="report-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th class="num">Amount</th>
+                    <th>Currency</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (rows.Count == 0)
+                {
+                    <tr><td colspan="3" style="text-align:center; padding:32px 18px; color:var(--ink-faint);">No expenses recorded.</td></tr>
+                }
+                else
+                {
+                    foreach (var r in rows)
+                    {
+                        <tr>
+                            <td class="mono"><strong>@r.ExpenseDate.ToString("yyyy-MM-dd", inv)</strong></td>
+                            <td class="num mono">@r.Amount.ToString("N2", inv)</td>
+                            <td>@r.CurrencyCode</td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@await Html.PartialAsync("_ReportMetaCard", new ReportMetaCardModel {
+    ReportCode = "R-04",
+    Matview    = "mv_daily_expense",
+    Cadence    = "Daily &middot; 02:00 GST",
+    Rows       = rows.Count,
+    SlaText    = "End-of-day rebuild · target ≤ 04:00 GST"
+})

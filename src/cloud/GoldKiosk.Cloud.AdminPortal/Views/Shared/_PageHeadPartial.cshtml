@@ -1,0 +1,22 @@
+@model GoldKiosk.Cloud.AdminPortal.Models.Layout.PageHeadViewModel
+
+<div class="page-head">
+    <div class="page-title-block">
+        @if (!string.IsNullOrWhiteSpace(Model.Eyebrow))
+        {
+            <div class="eyebrow">@Model.Eyebrow</div>
+        }
+        <h1 class="page-title">@Html.Raw(Model.Title)</h1>
+        @if (!string.IsNullOrWhiteSpace(Model.Subtitle))
+        {
+            <p class="page-subtitle">@Html.Raw(Model.Subtitle)</p>
+        }
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Model.ActionsRaw))
+    {
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            @Html.Raw(Model.ActionsRaw)
+        </div>
+    }
+</div>

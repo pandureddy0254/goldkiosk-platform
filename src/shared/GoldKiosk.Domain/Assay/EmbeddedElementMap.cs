@@ -1,0 +1,120 @@
+namespace GoldKiosk.Domain.Assay;
+
+/// <summary>
+/// The canonical element density table, embedded verbatim from the legacy
+/// <c>ElementMap.txt</c> (repository root of <c>GoldCube.Store</c>) so the platform runs
+/// without an external file. A field-deployed <c>ElementMap.txt</c> can override these
+/// defaults via <see cref="ElementMap.Parse"/>.
+/// </summary>
+public static class EmbeddedElementMap
+{
+    /// <summary>
+    /// The legacy element density table text (format <c>Density;Name;Symbol;AtomicNumber</c>),
+    /// exactly as shipped in <c>ElementMap.txt</c>.
+    /// </summary>
+    public const string DefaultMapText =
+        """
+        0.00;LightElement;Le;1
+        0.09;Hydrogen;H;1
+        0.18;Helium;He;2
+        0.53;Lithium;Li;3
+        0.86;Argon;Ar;18
+        0.9;Neon;Ne;10
+        0.97;Sodium;Na;11
+        1.25;Nitrogen;N;7
+        1.43;Oxygen;O;8
+        1.55;Calcium;Ca;20
+        1.63;Rubidium;Rb;37
+        1.7;Fluorine;F;9
+        1.74;Magnesium;Mg;12
+        1.78;Potassium;K;19
+        1.82;Phosphorus;P;15
+        1.85;Beryllium;Be;4
+        1.87;Cesium;Cs;55
+        2.07;Sulfur;S;16
+        2.26;Carbon;C;6
+        2.33;Silicon;Si;14
+        2.34;Boron;B;5
+        2.54;Strontium;Sr;38
+        2.7;Aluminum;Al;13
+        3.00;Scandium;Sc;21
+        3.12;Bromine;Br;35
+        3.21;Chlorine;Cl;17
+        3.59;Barium;Ba;56
+        3.75;Krypton;Kr;36
+        4.47;Yttrium;Y;39
+        4.54;Titanium;Ti;22
+        4.79;Selenium;Se;34
+        4.93;Tellurium;Te;52
+        5.24;Europium;Eu;63
+        5.32;Germanium;Ge;32
+        5.5;Radium;Ra;88
+        5.72;Arsenic;As;33
+        5.9;Xenon;Xe;54
+        5.91;Gallium;Ga;31
+        6.11;Vanadium;V;23
+        6.15;Lanthanum;La;57
+        6.24;Iodine;I;53
+        6.51;Zirconium;Zr;40
+        6.68;Antimony;Sb;51
+        6.77;Cerium;Ce;58
+        6.77;Praseodymium;Pr;59
+        6.9;Ytterbium;Yb;70
+        7.01;Neodymium;Nd;60
+        7.13;Zinc;Zn;30
+        7.19;Chromium;Cr;24
+        7.3;Promethium;Pm;61
+        7.31;Indium;In;49
+        7.31;Tin;Sn;50
+        7.43;Manganese;Mn;25
+        7.52;Samarium;Sm;62
+        7.87;Iron;Fe;26
+        7.9;Gadolinium;Gd;64
+        8.23;Terbium;Tb;65
+        8.55;Dysprosium;Dy;66
+        8.57;Niobium;Nb;41
+        8.65;Cadmium;Cd;48
+        8.8;Holmium;Ho;67
+        8.9;Nickel;Ni;28
+        8.9;Cobalt;Co;27
+        8.96;Copper;Cu;29
+        9.07;Erbium;Er;68
+        9.3;Polonium;Po;84
+        9.32;Thulium;Tm;69
+        9.73;Radon;Rn;86
+        9.75;Bismuth;Bi;83
+        9.84;Lutetium;Lu;71
+        10.07;Actinium;Ac;89
+        10.22;Molybdenum;Mo;42
+        10.5;Silver;Ag;47
+        11.35;Lead;Pb;82
+        11.5;Technetium;Tc;43
+        11.72;Protactinium;Pa;91
+        11.85;Thallium;Tl;81
+        12.02;Palladium;Pd;46
+        12.37;Ruthenium;Ru;44
+        12.41;Rhodium;Rh;45
+        13.31;Hafnium;Hf;72
+        13.5;Curium;Cm;96
+        13.55;Mercury;Hg;80
+        13.67;Plutonium;Pu;94
+        14.78;Berkelium;Bk;97
+        15.1;Californium;Cf;98
+        15.4;Thorium;Th;90
+        16.65;Tantalum;Ta;73
+        18.95;Neptunium;Np;93
+        19.32;Gold;Au;79
+        19.35;Tungsten;W;74
+        19.84;Americium;Am;95
+        20.2;Uranium;U;92
+        21.04;Rhenium;Re;75
+        21.45;Platinum;Pt;78
+        22.4;Iridium;Ir;77
+        22.6;Osmium;Os;76
+        """;
+
+    private static readonly Lazy<ElementMap> LazyDefault = new(() => ElementMap.Parse(DefaultMapText));
+
+    /// <summary>Gets the shared, parsed default element map built from <see cref="DefaultMapText"/>.</summary>
+    public static ElementMap Default => LazyDefault.Value;
+}

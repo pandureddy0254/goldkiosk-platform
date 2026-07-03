@@ -1,0 +1,321 @@
+@inject GoldKiosk.Cloud.AdminPortal.Services.Invitations.IUserInvitationService Invitations
+@inject GoldKiosk.Infrastructure.Common.ICurrentUserService CurrentUser
+@{
+    ViewBag.PageTitle = "User <em>management.</em>";
+    ViewBag.Eyebrow   = "Administration · Identity";
+    ViewBag.Subtitle  = "Invite employees, assign predefined RBAC roles, and audit access. Only the primary admin (Owner) can change roles for users with elevated permissions.";
+    ViewBag.ActiveNav = "user-management";
+
+    var pendingInvites = new List<GoldKiosk.Cloud.AdminPortal.Services.Invitations.PendingInviteRow>();
+    if (CurrentUser.TenantId is Guid tid)
+        pendingInvites = await Invitations.ListPendingAsync(tid, Context.RequestAborted);
+}
+
+<div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin: -16px 0 22px;">
+    <div class="seg seg-tabs">
+        <a class="active" asp-controller="UserManagement" asp-action="ProfileRoles">Users</a>
+        <a asp-controller="UserManagement" asp-action="RoleMaster">Role master</a>
+        <a asp-controller="UserManagement" asp-action="AccessControl">Access control</a>
+    </div>
+    <span style="flex:1;"></span>
+    <button type="button" class="btn btn-ghost btn-sm">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1V13M1 7H13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Bulk invite
+    </button>
+    <a class="btn btn-primary btn-sm" asp-controller="UserManagement" asp-action="Invite">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 3V11M3 7H11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Invite user
+    </a>
+</div>
+
+@* ── KPI strip ─────────────────────────────────────────────────────── *@
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Active users<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value mono">14</div>
+        <div class="kpi-foot"><span class="delta delta-up">&#9650; 2</span><span class="label-suffix">this month</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Pending invites<span class="dot" style="background:var(--warning);"></span></div>
+        <div class="kpi-value mono">3</div>
+        <div class="kpi-foot"><span class="label-suffix">oldest · 4 days</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Role definitions<span class="dot"></span></div>
+        <div class="kpi-value mono">6<span class="unit">presets</span></div>
+        <div class="kpi-foot"><span class="label-suffix">+ 2 custom roles</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Failed sign-ins · 7d<span class="dot" style="background:var(--danger);"></span></div>
+        <div class="kpi-value mono">7</div>
+        <div class="kpi-foot"><span class="delta delta-down">&#9660; 4</span><span class="label-suffix">vs prior 7d</span></div>
+    </div>
+</div>
+
+@* ── Predefined role cards ─────────────────────────────────────────── *@
+<div class="eyebrow" style="margin-bottom:14px;">Predefined RBAC roles</div>
+<div class="role-grid">
+    <div class="role-card">
+        <span class="role-pill r-admin">Primary admin</span>
+        <h4>Owner</h4>
+        <p class="role-desc">Full access. Manages billing, tenant settings, all users and roles. Only one per tenant &mdash; bound to the activation key.</p>
+        <div class="role-stats"><span>1 user</span><span><strong>All</strong> modules</span></div>
+    </div>
+    <div class="role-card">
+        <span class="role-pill r-manager">Manager</span>
+        <h4>Branch manager</h4>
+        <p class="role-desc">Operates a region or branch. Approves payouts, manages kiosk schedules, reviews tickets. Cannot edit roles.</p>
+        <div class="role-stats"><span>3 users</span><span><strong>9</strong> modules</span></div>
+    </div>
+    <div class="role-card">
+        <span class="role-pill r-operator">Operator</span>
+        <h4>Kiosk operator</h4>
+        <p class="role-desc">Day-to-day floor staff. Views fleet status, processes transactions, raises tickets. Read-only on customers.</p>
+        <div class="role-stats"><span>6 users</span><span><strong>5</strong> modules</span></div>
+    </div>
+    <div class="role-card">
+        <span class="role-pill r-analyst">Analyst</span>
+        <h4>Finance &amp; ops analyst</h4>
+        <p class="role-desc">Reads everything. Runs reports, exports CSV, no write permissions. Suitable for finance and compliance.</p>
+        <div class="role-stats"><span>2 users</span><span><strong>All</strong> modules · RO</span></div>
+    </div>
+    <div class="role-card">
+        <span class="role-pill r-support">Support</span>
+        <h4>Helpdesk agent</h4>
+        <p class="role-desc">Owns tickets, SOS workflow, customer feedback. Can mask/unmask PII with reason logged.</p>
+        <div class="role-stats"><span>2 users</span><span><strong>3</strong> modules</span></div>
+    </div>
+    <div class="role-card">
+        <span class="role-pill r-auditor">Auditor</span>
+        <h4>External auditor</h4>
+        <p class="role-desc">Time-boxed read-only access to audit logs and reports. Cannot see PII. Auto-revokes after window expires.</p>
+        <div class="role-stats"><span>0 users</span><span><strong>2</strong> modules · time-boxed</span></div>
+    </div>
+</div>
+
+@* ── Permission matrix ─────────────────────────────────────────────── *@
+<section class="card" style="margin-bottom:32px;">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Permission matrix</h2>
+            <div class="card-meta" style="margin-top:6px;">
+                <span><span class="perm full" style="width:14px; height:14px;"></span> Read &amp; write</span>
+                <span><span class="perm read" style="width:14px; height:14px;"></span> Read only</span>
+                <span><span class="perm partial" style="width:14px; height:14px;"></span> Conditional</span>
+                <span><span class="perm none" style="width:14px; height:14px; border:1px dashed var(--line-strong); border-radius:50%;"></span> No access</span>
+            </div>
+        </div>
+        <a class="btn btn-ghost btn-sm" asp-controller="UserManagement" asp-action="AccessControl">Edit access control</a>
+    </header>
+    <div style="overflow-x:auto;">
+        <table class="rbac-matrix">
+            <thead>
+                <tr>
+                    <th>Module</th><th>Owner</th><th>Manager</th><th>Operator</th>
+                    <th>Analyst</th><th>Support</th><th>Auditor</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>Dashboard <span class="sub">overview &amp; KPIs</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm read">R</span></td><td><span class="perm read">R</span></td><td><span class="perm read">R</span></td><td><span class="perm read">R</span></td></tr>
+                <tr><td>Kiosks <span class="sub">fleet config &amp; deployment</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm read">R</span></td><td><span class="perm read">R</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td></tr>
+                <tr><td>Transactions <span class="sub">live &amp; historical</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm partial">P</span></td><td><span class="perm read">R</span></td><td><span class="perm read">R</span></td><td><span class="perm read">R</span></td></tr>
+                <tr><td>Customers <span class="sub">PII · KYC</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm partial">P</span></td><td><span class="perm read">R</span></td><td><span class="perm read">R</span></td><td><span class="perm partial">P</span></td><td><span class="perm none">&mdash;</span></td></tr>
+                <tr><td>Merchants &amp; wallets <span class="sub">topups · ledger</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm read">R</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td></tr>
+                <tr><td>Reports <span class="sub">9 matview reports · CSV</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm read">R</span></td></tr>
+                <tr><td>Helpdesk <span class="sub">tickets · SOS</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm partial">P</span></td><td><span class="perm read">R</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm none">&mdash;</span></td></tr>
+                <tr><td>Audit logs <span class="sub">immutable · GDPR</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm read">R</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm read">R</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm read">R</span></td></tr>
+                <tr><td>User management <span class="sub">invite · role assign</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm partial">P</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td></tr>
+                <tr><td>Tenant settings <span class="sub">billing · branding · keys</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@* ── Pending invitations (live) ───────────────────────────────────── *@
+@if (pendingInvites.Count > 0)
+{
+    <section class="card" style="margin-bottom:24px;">
+        <header class="card-head">
+            <div>
+                <h2 class="card-title">Pending invitations · @pendingInvites.Count</h2>
+                <div class="card-meta" style="margin-top:6px;">
+                    <span>Outstanding invites — token expires 7 days after send</span>
+                </div>
+            </div>
+            <a class="btn btn-ghost btn-sm" asp-controller="UserManagement" asp-action="Invite">+ New invite</a>
+        </header>
+        <div style="overflow-x:auto;">
+            <table class="user-table">
+                <thead>
+                    <tr>
+                        <th style="width:32%;">Invitee</th>
+                        <th style="width:18%;">Role</th>
+                        <th style="width:16%;">Invited</th>
+                        <th style="width:16%;">Expires</th>
+                        <th style="width:8%;">Resent</th>
+                        <th style="width:10%; text-align:right; padding-right:22px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var inv in pendingInvites)
+                    {
+                        var initials = string.Concat(inv.FullName.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                            .Select(t => t[0])).ToUpperInvariant();
+                        if (string.IsNullOrWhiteSpace(initials)) initials = inv.InviteeEmail.Substring(0, 1).ToUpperInvariant();
+                        <tr>
+                            <td>
+                                <div class="user-cell">
+                                    <span class="avatar">@initials</span>
+                                    <div class="meta">
+                                        <strong>@(string.IsNullOrWhiteSpace(inv.FullName) ? inv.InviteeEmail : inv.FullName)</strong>
+                                        <span>@inv.InviteeEmail</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td><span class="role-pill">@inv.RoleName</span></td>
+                            <td class="mono">@inv.InvitedAt.ToString("dd MMM HH:mm")</td>
+                            <td class="mono">@inv.ExpiresAt.ToString("dd MMM HH:mm")</td>
+                            <td class="mono">@inv.ResentCount</td>
+                            <td style="text-align:right; padding-right:22px;">
+                                <form asp-controller="UserManagement" asp-action="ResendInvite" method="post" style="display:inline;">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="invitationId" value="@inv.Id" />
+                                    <button type="submit" class="btn btn-ghost btn-sm">Resend</button>
+                                </form>
+                                <form asp-controller="UserManagement" asp-action="RevokeInvite" method="post" style="display:inline;">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="invitationId" value="@inv.Id" />
+                                    <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger);">Revoke</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+}
+
+@* ── User roster ──────────────────────────────────────────────────── *@
+<section class="card">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Users · 14 active · 3 pending</h2>
+            <div class="card-meta" style="margin-top:6px;"><span>Emirates Gold Bank · primary tenant</span></div>
+        </div>
+        <div style="display:flex; gap:6px;">
+            <button type="button" class="btn btn-ghost btn-sm">Filter</button>
+            <button type="button" class="btn btn-ghost btn-sm">Export CSV</button>
+        </div>
+    </header>
+    <div style="overflow-x:auto;">
+        <table class="user-table">
+            <thead>
+                <tr>
+                    <th style="width:32%;">User</th>
+                    <th style="width:18%;">Role</th>
+                    <th style="width:16%;">Last active</th>
+                    <th style="width:12%;">MFA</th>
+                    <th style="width:14%;">Status</th>
+                    <th style="width:8%; text-align:right; padding-right:22px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><div class="user-cell"><span class="avatar">SM</span><div class="meta"><strong>Sara Al Mansoori</strong><span>cio@@emiratesgold.ae · you</span></div></div></td>
+                    <td><span class="role-pill r-admin">Owner</span></td>
+                    <td class="mono" style="color:var(--ink);">Now · session</td>
+                    <td><span style="color:var(--success); font-family:var(--font-mono); font-size:11px;">&#9679; Hardware</span></td>
+                    <td><span class="status-pill s-active">Active</span></td>
+                    <td><div class="row-actions" style="justify-content:flex-end;"><button type="button" class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11" cy="7" r="1.2"/></svg></button></div></td>
+                </tr>
+                <tr>
+                    <td><div class="user-cell"><span class="avatar" style="background:linear-gradient(135deg,#2a5d8c,#1c3e5d);">AK</span><div class="meta"><strong>Ahmed Khoury</strong><span>ahmed.k@@emiratesgold.ae</span></div></div></td>
+                    <td><span class="role-pill r-manager">Manager</span></td>
+                    <td class="mono">12 min ago</td>
+                    <td><span style="color:var(--success); font-family:var(--font-mono); font-size:11px;">&#9679; TOTP</span></td>
+                    <td><span class="status-pill s-active">Active</span></td>
+                    <td><div class="row-actions" style="justify-content:flex-end;"><button type="button" class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11" cy="7" r="1.2"/></svg></button></div></td>
+                </tr>
+                <tr>
+                    <td><div class="user-cell"><span class="avatar" style="background:linear-gradient(135deg,#2a7d4f,#1c5d3a);">FK</span><div class="meta"><strong>Fatima Karim</strong><span>fatima.k@@emiratesgold.ae</span></div></div></td>
+                    <td><span class="role-pill r-manager">Manager</span></td>
+                    <td class="mono">2 hours ago</td>
+                    <td><span style="color:var(--success); font-family:var(--font-mono); font-size:11px;">&#9679; TOTP</span></td>
+                    <td><span class="status-pill s-active">Active</span></td>
+                    <td><div class="row-actions" style="justify-content:flex-end;"><button type="button" class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11" cy="7" r="1.2"/></svg></button></div></td>
+                </tr>
+                <tr>
+                    <td><div class="user-cell"><span class="avatar" style="background:linear-gradient(135deg,#a83232,#7a2424);">RP</span><div class="meta"><strong>Rahul Pillai</strong><span>r.pillai@@emiratesgold.ae</span></div></div></td>
+                    <td><span class="role-pill r-operator">Operator</span></td>
+                    <td class="mono">38 min ago</td>
+                    <td><span style="color:var(--success); font-family:var(--font-mono); font-size:11px;">&#9679; TOTP</span></td>
+                    <td><span class="status-pill s-active">Active</span></td>
+                    <td><div class="row-actions" style="justify-content:flex-end;"><button type="button" class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11" cy="7" r="1.2"/></svg></button></div></td>
+                </tr>
+                <tr>
+                    <td><div class="user-cell"><span class="avatar" style="background:linear-gradient(135deg,#c47419,#8b520f);">PN</span><div class="meta"><strong>Priya Nair</strong><span>priya.n@@emiratesgold.ae</span></div></div></td>
+                    <td><span class="role-pill r-analyst">Analyst</span></td>
+                    <td class="mono">Yesterday</td>
+                    <td><span style="color:var(--success); font-family:var(--font-mono); font-size:11px;">&#9679; Hardware</span></td>
+                    <td><span class="status-pill s-active">Active</span></td>
+                    <td><div class="row-actions" style="justify-content:flex-end;"><button type="button" class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11" cy="7" r="1.2"/></svg></button></div></td>
+                </tr>
+                <tr>
+                    <td><div class="user-cell"><span class="avatar" style="background:linear-gradient(135deg,#2a5d8c,#1c3e5d);">HM</span><div class="meta"><strong>Hassan Maktoum</strong><span>hassan.m@@emiratesgold.ae</span></div></div></td>
+                    <td><span class="role-pill r-support">Support</span></td>
+                    <td class="mono">4 hours ago</td>
+                    <td><span style="color:var(--warning); font-family:var(--font-mono); font-size:11px;">&#9679; SMS</span></td>
+                    <td><span class="status-pill s-active">Active</span></td>
+                    <td><div class="row-actions" style="justify-content:flex-end;"><button type="button" class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11" cy="7" r="1.2"/></svg></button></div></td>
+                </tr>
+                <tr>
+                    <td><div class="user-cell"><span class="avatar" style="background:linear-gradient(135deg,#75716a,#4a4845);">NS</span><div class="meta"><strong>Nikita Sharma</strong><span>nikita.s@@emiratesgold.ae · invited 2 days ago</span></div></div></td>
+                    <td><span class="role-pill r-operator">Operator</span></td>
+                    <td class="mono" style="color:var(--ink-faint);">&mdash;</td>
+                    <td><span style="color:var(--ink-faint); font-family:var(--font-mono); font-size:11px;">&#9675; Pending</span></td>
+                    <td><span class="status-pill s-pending">Invite sent</span></td>
+                    <td><div class="row-actions" style="justify-content:flex-end;"><button type="button" class="icon-btn" title="Resend invite"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 4L7 8L12 4M2 4V11H12V4M2 4L2 3H12V4" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></button></div></td>
+                </tr>
+                <tr>
+                    <td><div class="user-cell"><span class="avatar" style="background:linear-gradient(135deg,#75716a,#4a4845);">YA</span><div class="meta"><strong>Yusuf Akhtar</strong><span>yusuf.a@@emiratesgold.ae · invited 4 days ago</span></div></div></td>
+                    <td><span class="role-pill r-analyst">Analyst</span></td>
+                    <td class="mono" style="color:var(--ink-faint);">&mdash;</td>
+                    <td><span style="color:var(--ink-faint); font-family:var(--font-mono); font-size:11px;">&#9675; Pending</span></td>
+                    <td><span class="status-pill s-pending">Invite sent</span></td>
+                    <td><div class="row-actions" style="justify-content:flex-end;"><button type="button" class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11" cy="7" r="1.2"/></svg></button></div></td>
+                </tr>
+                <tr>
+                    <td><div class="user-cell"><span class="avatar" style="background:linear-gradient(135deg,#b5b1a6,#807d75); color:var(--canvas);">DR</span><div class="meta"><strong>Diana Reyes</strong><span>d.reyes@@external-audit.com · time-boxed access until 2026-06-30</span></div></div></td>
+                    <td><span class="role-pill r-auditor">Auditor</span></td>
+                    <td class="mono">5 days ago</td>
+                    <td><span style="color:var(--success); font-family:var(--font-mono); font-size:11px;">&#9679; TOTP</span></td>
+                    <td><span class="status-pill s-active">Active · 37d</span></td>
+                    <td><div class="row-actions" style="justify-content:flex-end;"><button type="button" class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11" cy="7" r="1.2"/></svg></button></div></td>
+                </tr>
+                <tr>
+                    <td><div class="user-cell"><span class="avatar" style="background:linear-gradient(135deg,#807d75,#4a4845); opacity:0.7;">JD</span><div class="meta"><strong>Jamal Darwish</strong><span>jamal.d@@emiratesgold.ae · disabled by Sara · 12 May</span></div></div></td>
+                    <td><span class="role-pill r-operator">Operator</span></td>
+                    <td class="mono" style="color:var(--ink-faint);">12 days ago</td>
+                    <td><span style="color:var(--ink-faint); font-family:var(--font-mono); font-size:11px;">&mdash; Revoked</span></td>
+                    <td><span class="status-pill s-disabled">Disabled</span></td>
+                    <td><div class="row-actions" style="justify-content:flex-end;"><button type="button" class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11" cy="7" r="1.2"/></svg></button></div></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@* Hidden form to wire the Invite user button. *@
+<form method="post" style="display:none;" id="inviteUserForm">
+    @Html.AntiForgeryToken()
+</form>
+
+@* TODO promote: seg-tabs — same as Operations sub-nav. *@
+<style>
+    .seg.seg-tabs { display:inline-flex; border:1px solid var(--line-strong); border-radius:var(--radius-md); overflow:hidden; background:var(--canvas-elevated); flex-wrap:wrap; }
+    .seg.seg-tabs a { padding:8px 14px; font-size:13px; color:var(--ink-soft); border-right:1px solid var(--line); text-decoration:none; }
+    .seg.seg-tabs a:last-child { border-right:none; }
+    .seg.seg-tabs a.active { background: var(--ink); color: var(--canvas); }
+    .seg.seg-tabs a:hover:not(.active) { background: var(--canvas-sunken); color: var(--ink); }
+</style>

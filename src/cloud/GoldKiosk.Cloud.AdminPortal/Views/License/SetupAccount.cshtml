@@ -1,0 +1,138 @@
+@using GoldKiosk.Cloud.AdminPortal.Services.Licensing
+@model GoldKiosk.Cloud.AdminPortal.Models.Licensing.LicenseSetupAccountViewModel
+@{
+    Layout = "~/Views/Shared/_LoginLayout.cshtml";
+    ViewBag.Title = "Set up your owner account";
+    var lic = ViewData["License"] as License;
+}
+
+<div class="login-shell">
+
+    <!-- ============== LEFT: editorial hero ============== -->
+    <aside class="login-art">
+        <div class="filigree"></div>
+
+        <div class="corner-mark">
+            <span>Step 2 of 2 · provision the primary admin</span>
+        </div>
+
+        <div class="login-art-top">
+            <span class="brand-mark"></span>
+            <div class="wordmark">
+                Gold <em>Kiosk</em>
+                <span class="corp">Operator portal · @(lic?.LegalName ?? "your tenant")</span>
+            </div>
+        </div>
+
+        <div class="kiosk-hero">
+            <img src="~/img/kiosk-hero.png" alt="Gold Kiosk · precious-metals self-service terminal" />
+            <span class="shimmer"></span>
+        </div>
+
+        <div class="hero-tag t1"><span class="dot"></span><span class="line"></span><span>Licence verified</span></div>
+        <div class="hero-tag t2"><span>Tenant provisioning</span><span class="line"></span><span class="dot"></span></div>
+        <div class="hero-tag t3"><span class="dot"></span><span class="line"></span><span>Owner role assignment</span></div>
+
+        @if (lic is not null)
+        {
+            <div class="login-art-stats">
+                <div class="login-art-stat">
+                    <div class="num">@lic.KioskCap</div>
+                    <div class="lbl">Kiosk cap</div>
+                </div>
+                <div class="login-art-stat">
+                    <div class="num">@lic.PlanCode</div>
+                    <div class="lbl">Plan</div>
+                </div>
+                <div class="login-art-stat">
+                    <div class="num">@lic.ExpiresOn.ToString("MMM yyyy")</div>
+                    <div class="lbl">Expires</div>
+                </div>
+            </div>
+        }
+    </aside>
+
+    <!-- ============== RIGHT: setup form ============== -->
+    <main class="login-form-shell">
+        <div class="login-form">
+
+            <form class="auth-panel"
+                  asp-controller="License"
+                  asp-action="SetupAccount"
+                  method="post"
+                  autocomplete="off"
+                  novalidate>
+                @Html.AntiForgeryToken()
+
+                <div class="eyebrow">Step 2 · create your owner account</div>
+                <h1 style="font-family:var(--font-display); font-size:var(--fs-40); font-weight:400; letter-spacing:var(--tracking-tight); margin:12px 0 12px; line-height:1.04;">
+                    Welcome, <em style="font-style:italic; color:var(--accent); font-weight:400;">@(lic?.DisplayName ?? "partner").</em>
+                </h1>
+                <p class="lede" style="color:var(--ink-faint); margin-bottom:24px; font-size:var(--fs-15);">
+                    Your licence is verified. Choose a password to finish setting up the primary admin account
+                    for <strong style="color:var(--ink); font-weight:500;">@(lic?.LegalName ?? "your tenant")</strong>.
+                </p>
+
+                @if (ViewData.ModelState.ErrorCount > 0)
+                {
+                    <div class="validation-summary" role="alert">
+                        @Html.ValidationSummary(false)
+                    </div>
+                }
+
+                @if (lic is not null)
+                {
+                    <div class="callout" style="margin-bottom:20px;">
+                        <span class="ico">
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1L13 4V7C13 10.5 10.5 12.5 7 13C3.5 12.5 1 10.5 1 7V4L7 1Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M5 7L6.5 8.5L9 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </span>
+                        <div class="body">
+                            <div><strong>@lic.LegalName</strong> · plan <span class="mono">@lic.PlanCode</span> · @lic.KioskCap kiosks · @lic.RegionHint</div>
+                            <div style="margin-top:4px; color:var(--ink-faint);">Licence expires @lic.ExpiresOn.ToString("dd MMM yyyy") · @lic.Features.Length features enabled</div>
+                        </div>
+                    </div>
+                }
+
+                <div class="field">
+                    <label>Owner email <span style="text-transform:none; letter-spacing:0; color:var(--ink-ghost); font-weight:400;">· from licence</span></label>
+                    <input type="email" value="@(lic?.AdminEmail ?? "")" disabled readonly
+                           style="background:var(--surface-subtle); color:var(--ink-faint);" />
+                    <div class="field-help">
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.2"/><path d="M6 3.5V6.5M6 8V8.2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+                        <span>Email is baked into the licence and can't be changed here. Contact partner-success to re-issue.</span>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label asp-for="FullName">Full name</label>
+                    <input asp-for="FullName" type="text" placeholder="e.g. Sara Al Mansoori" />
+                    <span asp-validation-for="FullName" class="field-validation-error"></span>
+                </div>
+
+                <div class="field">
+                    <label asp-for="Password">Choose a password</label>
+                    <input asp-for="Password" type="password"
+                           placeholder="At least 12 characters · 1 number · 1 symbol" />
+                    <span asp-validation-for="Password" class="field-validation-error"></span>
+                </div>
+
+                <div style="display:flex; align-items:flex-start; gap:8px; font-size:var(--fs-12); color:var(--ink-faint); margin:18px 0 24px; line-height:1.5;">
+                    <input asp-for="AcceptsTerms" type="checkbox" style="margin-top:2px;" />
+                    <label asp-for="AcceptsTerms">I accept the Master Service Agreement and confirm I'm authorised to onboard @(lic?.LegalName ?? "this organisation").</label>
+                </div>
+                <span asp-validation-for="AcceptsTerms" class="field-validation-error"></span>
+
+                <button class="btn btn-gold btn-block" type="submit">
+                    Create owner &amp; sign in
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8H13M13 8L9 4M13 8L9 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                </button>
+
+                <div class="login-foot">
+                    <span>Need to re-paste the licence? <a asp-controller="License" asp-action="Activate" style="color:var(--accent);">Back to step 1</a></span>
+                </div>
+            </form>
+
+        </div>
+    </main>
+
+</div>

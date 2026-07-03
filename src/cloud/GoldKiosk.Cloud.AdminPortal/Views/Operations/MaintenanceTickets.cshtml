@@ -1,0 +1,106 @@
+@{
+    ViewBag.PageTitle = "Maintenance <em>queue.</em>";
+    ViewBag.Eyebrow   = "Operations · Field hardware";
+    ViewBag.Subtitle  = "Open and scheduled work orders for kiosk hardware — XRF analyzers, scales, dispensers, and printers. Distinct from customer-facing helpdesk tickets.";
+    ViewBag.ActiveNav = "operations";
+}
+
+@* ── Operations sub-nav + primary action ───────────────────────────── *@
+<div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin: -16px 0 22px;">
+    <div class="seg seg-tabs">
+        <a asp-controller="Operations" asp-action="CollectionTickets">Collections</a>
+        <a class="active" asp-controller="Operations" asp-action="MaintenanceTickets">Maintenance</a>
+        <a asp-controller="Operations" asp-action="TechnicianManagement">Technicians</a>
+        <a asp-controller="Operations" asp-action="SystemHealthCheck">System health</a>
+        <a asp-controller="Operations" asp-action="DeploymentTickets">Deployment</a>
+        <a asp-controller="Operations" asp-action="LocationConfiguration">Locations</a>
+    </div>
+    <span style="flex:1;"></span>
+    <button type="button" class="btn btn-primary btn-sm" data-action="open-modal" data-target="addWoModal">+ Work order</button>
+</div>
+
+@* ── KPI strip ──────────────────────────────────────────────────────── *@
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Open WOs<span class="dot" style="background:var(--warning);"></span></div>
+        <div class="kpi-value mono">14</div>
+        <div class="kpi-foot"><span class="delta delta-up">&#9650; 2</span><span class="label-suffix">vs yesterday</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Scheduled · this week<span class="dot"></span></div>
+        <div class="kpi-value mono">11</div>
+        <div class="kpi-foot"><span class="label-suffix">4 today · 7 later</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Overdue<span class="dot" style="background:var(--danger);"></span></div>
+        <div class="kpi-value mono">2</div>
+        <div class="kpi-foot"><span class="label-suffix">WO-2382 · WO-2391</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">MTTR<span class="dot"></span></div>
+        <div class="kpi-value mono">4.2<span class="unit">h</span></div>
+        <div class="kpi-foot"><span class="delta delta-down">&#9660; 0.8h</span><span class="label-suffix">vs 30d avg</span></div>
+    </div>
+</div>
+
+<section class="card" style="margin-bottom:32px;">
+    <div class="fleet-toolbar">
+        <span style="text-transform:uppercase; letter-spacing:0.08em;">Priority</span>
+        <div class="seg"><button type="button" class="active">All</button><button type="button">P1</button><button type="button">P2</button><button type="button">P3</button></div>
+        <span style="text-transform:uppercase; letter-spacing:0.08em;">Device</span>
+        <div class="seg"><button type="button" class="active">All</button><button type="button">XRF</button><button type="button">Scale</button><button type="button">Dispenser</button><button type="button">Printer</button><button type="button">ID</button></div>
+        <span style="text-transform:uppercase; letter-spacing:0.08em;">Status</span>
+        <div class="seg"><button type="button" class="active">Open</button><button type="button">Scheduled</button><button type="button">In progress</button><button type="button">Done · 7d</button></div>
+        <span style="flex:1;"></span>
+        <button type="button" class="btn btn-ghost btn-sm">Export</button>
+    </div>
+
+    <div style="overflow-x:auto;">
+        <table class="user-table">
+            <thead>
+                <tr><th>WO</th><th>Kiosk</th><th>Device</th><th>Issue</th><th>Priority</th><th>Assigned</th><th>Scheduled</th><th>ETA</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+                <tr><td class="mono" style="color:var(--accent);">WO-2401</td><td class="mono">K-DXB-02</td><td><span class="dev-pill d-xrf">XRF</span></td><td style="font-size:13px;">Calibration drift &gt; 0.15 on Au-L&alpha; line</td><td><span class="sev-pill s-p1">P1</span></td><td style="font-size:13px;">Hassan Al Naqbi</td><td class="mono" style="font-size:12px;">Today · 14:30</td><td class="mono" style="font-size:12px;">~ 90 min</td><td><span class="status-pill s-pending">Scheduled</span></td></tr>
+                <tr><td class="mono" style="color:var(--accent);">WO-2400</td><td class="mono">K-AUH-02</td><td><span class="dev-pill d-disp">Dispenser</span></td><td style="font-size:13px;">Cassette jam · Glory firmware error E14</td><td><span class="sev-pill s-p1">P1</span></td><td style="font-size:13px;">Khalid Mohammed</td><td class="mono" style="font-size:12px;">Today · 15:00</td><td class="mono" style="font-size:12px;">~ 2h</td><td><span class="status-pill" style="background:var(--info-soft); color:var(--info);">In progress</span></td></tr>
+                <tr><td class="mono" style="color:var(--accent);">WO-2399</td><td class="mono">K-DXB-04</td><td><span class="dev-pill d-id">ID scanner</span></td><td style="font-size:13px;">LED flicker · likely PSU degradation</td><td><span class="sev-pill s-p2">P2</span></td><td style="font-size:13px;">Raj Kumar</td><td class="mono" style="font-size:12px;">Today · 17:00</td><td class="mono" style="font-size:12px;">~ 45 min</td><td><span class="status-pill s-pending">Scheduled</span></td></tr>
+                <tr><td class="mono" style="color:var(--accent);">WO-2398</td><td class="mono">K-SHJ-01</td><td><span class="dev-pill d-xrf">XRF</span></td><td style="font-size:13px;">Quarterly calibration · reference foil set</td><td><span class="sev-pill s-p3">P3</span></td><td style="font-size:13px;">Hassan Al Naqbi</td><td class="mono" style="font-size:12px;">Tomorrow · 09:30</td><td class="mono" style="font-size:12px;">~ 2h</td><td><span class="status-pill s-pending">Scheduled</span></td></tr>
+                <tr><td class="mono" style="color:var(--accent);">WO-2397</td><td class="mono">K-RAK-01</td><td><span class="dev-pill d-scale">Scale</span></td><td style="font-size:13px;">&plusmn;0.05g drift after 8h continuous</td><td><span class="sev-pill s-p2">P2</span></td><td style="font-size:13px;">Vinod Sharma</td><td class="mono" style="font-size:12px;">May 25 · 11:00</td><td class="mono" style="font-size:12px;">~ 30 min</td><td><span class="status-pill s-pending">Scheduled</span></td></tr>
+                <tr><td class="mono" style="color:var(--accent);">WO-2396</td><td class="mono">K-DXB-01</td><td><span class="dev-pill d-prn">Printer</span></td><td style="font-size:13px;">Receipt paper feed misalignment</td><td><span class="sev-pill s-p3">P3</span></td><td style="font-size:13px;">Mohamed Ashraf</td><td class="mono" style="font-size:12px;">May 25 · 14:00</td><td class="mono" style="font-size:12px;">~ 30 min</td><td><span class="status-pill s-pending">Scheduled</span></td></tr>
+                <tr><td class="mono" style="color:var(--accent);">WO-2395</td><td class="mono">K-AUH-01</td><td><span class="dev-pill d-id">ID scanner</span></td><td style="font-size:13px;">Camera focus motor stuck at minimum</td><td><span class="sev-pill s-p2">P2</span></td><td style="font-size:13px;">Ali Hassan</td><td class="mono" style="font-size:12px;">May 25 · 15:30</td><td class="mono" style="font-size:12px;">~ 90 min</td><td><span class="status-pill s-pending">Scheduled</span></td></tr>
+                <tr><td class="mono" style="color:var(--accent);">WO-2394</td><td class="mono">K-FUJ-01</td><td><span class="dev-pill d-disp">Dispenser</span></td><td style="font-size:13px;">Cash sensor reporting empty when full</td><td><span class="sev-pill s-p1">P1</span></td><td style="font-size:13px;">Salim Al Mazroui</td><td class="mono" style="font-size:12px;">May 25 · 09:00</td><td class="mono" style="font-size:12px;">~ 2h</td><td><span class="status-pill s-pending">Scheduled</span></td></tr>
+                <tr><td class="mono" style="color:var(--accent);">WO-2393</td><td class="mono">K-AJM-01</td><td><span class="dev-pill d-xrf">XRF</span></td><td style="font-size:13px;">Spectrometer fan noise &gt; 55 dB</td><td><span class="sev-pill s-p3">P3</span></td><td style="font-size:13px;">Pradeep Nair</td><td class="mono" style="font-size:12px;">May 26 · 10:00</td><td class="mono" style="font-size:12px;">~ 45 min</td><td><span class="status-pill s-pending">Scheduled</span></td></tr>
+                <tr><td class="mono" style="color:var(--accent);">WO-2392</td><td class="mono">K-SHJ-03</td><td><span class="dev-pill d-prn">Printer</span></td><td style="font-size:13px;">Replace ribbon · estimated 4k receipts left</td><td><span class="sev-pill s-p3">P3</span></td><td style="font-size:13px;">Mohammed Yusuf</td><td class="mono" style="font-size:12px;">May 26 · 13:00</td><td class="mono" style="font-size:12px;">~ 15 min</td><td><span class="status-pill s-pending">Scheduled</span></td></tr>
+                <tr><td class="mono" style="color:var(--accent);">WO-2391</td><td class="mono">K-UAQ-01</td><td><span class="dev-pill d-scale">Scale</span></td><td style="font-size:13px;">Bi-annual recertification overdue · DLMS due</td><td><span class="sev-pill s-p2">P2</span></td><td style="font-size:13px;">Vinod Sharma</td><td class="mono" style="font-size:12px;">May 21 · 11:00</td><td class="mono" style="font-size:12px; color:var(--danger);">Overdue · 2d</td><td><span class="status-pill" style="background:var(--danger-soft); color:var(--danger);">Overdue</span></td></tr>
+                <tr><td class="mono" style="color:var(--accent);">WO-2390</td><td class="mono">K-DXB-03</td><td><span class="dev-pill d-disp">Dispenser</span></td><td style="font-size:13px;">Quarterly preventative service</td><td><span class="sev-pill s-p3">P3</span></td><td style="font-size:13px;">Ahmed Khalifa</td><td class="mono" style="font-size:12px;">May 27 · 09:00</td><td class="mono" style="font-size:12px;">~ 90 min</td><td><span class="status-pill s-pending">Scheduled</span></td></tr>
+                <tr><td class="mono" style="color:var(--accent);">WO-2389</td><td class="mono">K-DXB-05</td><td><span class="dev-pill d-id">ID scanner</span></td><td style="font-size:13px;">Glass cleaning · KYC photo quality degraded</td><td><span class="sev-pill s-p3">P3</span></td><td style="font-size:13px;">Mohamed Ashraf</td><td class="mono" style="font-size:12px;">May 27 · 14:00</td><td class="mono" style="font-size:12px;">~ 20 min</td><td><span class="status-pill s-pending">Scheduled</span></td></tr>
+                <tr><td class="mono" style="color:var(--accent);">WO-2382</td><td class="mono">K-AUH-03</td><td><span class="dev-pill d-xrf">XRF</span></td><td style="font-size:13px;">Awaiting reference foil shipment from Bruker</td><td><span class="sev-pill s-p2">P2</span></td><td style="font-size:13px;">Hassan Al Naqbi</td><td class="mono" style="font-size:12px;">May 18 · 10:00</td><td class="mono" style="font-size:12px; color:var(--danger);">Overdue · 5d · parts</td><td><span class="status-pill" style="background:var(--danger-soft); color:var(--danger);">Blocked</span></td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@* Hidden anti-forgery form to allow the Work order button to wire up later. *@
+<form asp-controller="Operations" asp-action="AddMaintenanceTicket" method="post" style="display:none;" id="addWoForm">
+    @Html.AntiForgeryToken()
+</form>
+
+@* TODO promote: seg-tabs, dev-pill, sev-pill — already exist in prototype CSS;
+    duplicated here so the page renders identically until they're lifted. *@
+<style>
+    .seg.seg-tabs { display:inline-flex; border:1px solid var(--line-strong); border-radius:var(--radius-md); overflow:hidden; background:var(--canvas-elevated); flex-wrap:wrap; }
+    .seg.seg-tabs a { padding:8px 14px; font-size:13px; color:var(--ink-soft); border-right:1px solid var(--line); text-decoration:none; }
+    .seg.seg-tabs a:last-child { border-right:none; }
+    .seg.seg-tabs a.active { background: var(--ink); color: var(--canvas); }
+    .seg.seg-tabs a:hover:not(.active) { background: var(--canvas-sunken); color: var(--ink); }
+    .sev-pill { display:inline-flex; align-items:center; gap:4px; font-family:var(--font-mono); font-size:11px; padding:2px 8px; border-radius:var(--radius-xs); font-weight:600; letter-spacing:0.06em; }
+    .sev-pill.s-p1 { background: var(--danger-soft); color: var(--danger); }
+    .sev-pill.s-p2 { background: var(--warning-soft); color: var(--warning); }
+    .sev-pill.s-p3 { background: var(--info-soft); color: var(--info); }
+    .dev-pill { display:inline-block; font-family: var(--font-mono); font-size: 11px; padding: 2px 8px; border-radius: var(--radius-xs); letter-spacing: 0.04em; border:1px solid var(--line-strong); color: var(--ink-soft); background: var(--canvas-elevated); }
+    .dev-pill.d-xrf   { color: var(--accent);  border-color: var(--accent); }
+    .dev-pill.d-scale { color: var(--info);    border-color: var(--info); }
+    .dev-pill.d-disp  { color: var(--danger);  border-color: var(--danger); }
+    .dev-pill.d-prn   { color: var(--ink-soft); }
+    .dev-pill.d-id    { color: var(--warning); border-color: var(--warning); }
+</style>

@@ -1,0 +1,53 @@
+@using GoldKiosk.Cloud.CRMPortal.Models.Domain
+@model Lead
+@{
+    var shortId      = Model.Id.ToString("N")[..8];
+    var pdfUrl       = Url.Action("ProposalPdf", new { id = Model.Id })!;
+    // ?download=1 makes the controller respond with Content-Disposition: attachment
+    // so the browser saves a real .pdf file instead of opening it inline.
+    var pdfDownload  = pdfUrl + (pdfUrl.Contains('?') ? "&" : "?") + "download=1";
+    var detailUrl    = Url.Action("Details", new { id = Model.Id })!;
+    ViewData["Title"]         = $"Proposal — {Model.CompanyName}";
+    ViewData["ActiveSection"] = "leads";
+}
+
+<div class="page-head">
+    <div class="page-title-block">
+        <div class="eyebrow">
+            <a href="@detailUrl" style="color:var(--ink-faint);">&#8592; @Model.CompanyName</a>
+            &#183; GK-PROP-@shortId.ToUpperInvariant()
+        </div>
+        <h1 class="page-title">Proposal preview <em>.</em></h1>
+        <p class="page-subtitle">
+            Generated for <strong>@Model.ContactName</strong> at @Model.CompanyName &#183;
+            valid for <span class="mono">@Model.ValidityDays</span> days
+        </p>
+    </div>
+    <div style="display:flex; gap:10px; align-items:center;">
+        <a href="@pdfDownload" download="proposal-@(shortId).pdf" class="btn btn-ghost btn-sm">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M7 1v8M4 6l3 3 3-3M2 11h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Download PDF
+        </a>
+        <a href="@pdfUrl" target="_blank" class="btn btn-gold btn-sm">Open in new tab</a>
+    </div>
+</div>
+
+<div style="padding: 0 0 32px 0;">
+    <iframe
+        src="@pdfUrl"
+        title="Proposal PDF — @Model.CompanyName"
+        style="width:100%; height:calc(100vh - 220px); border:1px solid var(--rule); border-radius:4px; background:var(--surface-raised);"
+        loading="lazy">
+        <p style="padding:24px; color:var(--ink-soft);">
+            Your browser does not support embedded PDFs.
+            <a href="@pdfDownload" download>Download the proposal PDF instead.</a>
+        </p>
+    </iframe>
+</div>
+
+<footer class="crm-foot">
+    <span>Gold Kiosk &#183; v0.1 &#183; &#169; AI Kiosks International Inc. 2026</span>
+    <span class="mono">lead_id: @Model.Id &#183; GK-PROP-@shortId.ToUpperInvariant()</span>
+</footer>

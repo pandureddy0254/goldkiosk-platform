@@ -1,0 +1,121 @@
+@model IReadOnlyList<AuditLogEntry>
+@{
+    var actors = ViewData["ActorLookup"] as Dictionary<Guid, Profile> ?? new Dictionary<Guid, Profile>();
+
+    string ActionPill(string a) => a switch
+    {
+        AuditAction.RevokeKey  => "status-pill s-disabled",
+        AuditAction.ReissueKey => "status-pill s-pending",
+        AuditAction.Delete     => "status-pill s-disabled",
+        _                       => "status-pill s-active"
+    };
+
+    string TruncateJson(Newtonsoft.Json.Linq.JObject? raw, int max = 80)
+    {
+        if (raw is null) return "—";
+        var s = raw.ToString(Newtonsoft.Json.Formatting.None);
+        return s.Length <= max ? s : s.Substring(0, max - 1) + "…";
+    }
+
+    var oldest = Model.Any() ? Model.Min(e => e.CreatedAt) : (DateTime?)null;
+    var newest = Model.Any() ? Model.Max(e => e.CreatedAt) : (DateTime?)null;
+}
+
+<div class="page-head">
+    <div class="page-title-block">
+        <div class="eyebrow">Administration · audit log · sales_manager only</div>
+        <h1 class="page-title">Audit <em>log.</em></h1>
+        <p class="page-subtitle">Append-only · immutable by trigger AND by RLS. Source of truth for who did what, when.</p>
+    </div>
+    <div style="display:flex; gap:10px;">
+        <button class="btn btn-ghost btn-sm">Export · last 30d</button>
+    </div>
+</div>
+
+<form method="get" class="filter-bar">
+    <input type="search" name="q" value="@(ViewBag.Q as string ?? "")" placeholder="Search entity ID, actor email…" style="flex:0 0 300px;" />
+    <span class="filter-label">Entity</span>
+    <select name="entity">
+        <option value="all"            selected="@(string.IsNullOrEmpty(ViewBag.Entity as string) || ViewBag.Entity == "all")">All</option>
+        <option value="lead"           selected="@(ViewBag.Entity == "lead")">lead</option>
+        <option value="partner"        selected="@(ViewBag.Entity == "partner")">partner</option>
+        <option value="tenant"         selected="@(ViewBag.Entity == "tenant")">tenant</option>
+        <option value="activation_key" selected="@(ViewBag.Entity == "activation_key")">activation_key</option>
+        <option value="contract"       selected="@(ViewBag.Entity == "contract")">contract</option>
+        <option value="profile"        selected="@(ViewBag.Entity == "profile")">profile</option>
+    </select>
+    <span class="filter-label">Action</span>
+    <select name="actionType">
+        <option value="all"         selected="@(string.IsNullOrEmpty(ViewBag.ActionType as string) || ViewBag.ActionType == "all")">All</option>
+        <option value="create"      selected="@(ViewBag.ActionType == "create")">create</option>
+        <option value="update"      selected="@(ViewBag.ActionType == "update")">update</option>
+        <option value="delete"      selected="@(ViewBag.ActionType == "delete")">delete</option>
+        <option value="provision"   selected="@(ViewBag.ActionType == "provision")">provision</option>
+        <option value="revoke_key"  selected="@(ViewBag.ActionType == "revoke_key")">revoke_key</option>
+        <option value="reissue_key" selected="@(ViewBag.ActionType == "reissue_key")">reissue_key</option>
+        <option value="sign_in"     selected="@(ViewBag.ActionType == "sign_in")">sign_in</option>
+        <option value="export"      selected="@(ViewBag.ActionType == "export")">export</option>
+    </select>
+    <button type="submit" class="btn btn-ghost btn-sm">Apply</button>
+</form>
+
+<section class="card">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Entries · most recent first</h2>
+            <div class="card-meta" style="margin-top:6px;">
+                <span>
+                    @Model.Count entries
+                    @if (oldest is not null && newest is not null)
+                    {
+                        <text> · oldest @oldest.Value.ToString("dd MMM HH:mm") · newest @newest.Value.ToString("dd MMM HH:mm")</text>
+                    }
+                </span>
+            </div>
+        </div>
+        <div style="font-size:13px; color:var(--ink-faint); font-family:var(--font-mono);">1–@Model.Count of @Model.Count</div>
+    </header>
+    <table class="data-table">
+        <thead>
+            <tr><th>When</th><th>Actor</th><th>Action</th><th>Entity</th><th>Target</th><th>Payload</th></tr>
+        </thead>
+        <tbody>
+        @if (!Model.Any())
+        {
+            <tr><td colspan="6" style="text-align:center; color:var(--ink-faint); padding:24px 0;">No audit entries in scope. (RLS blocks rows for non-manager roles.)</td></tr>
+        }
+        else
+        {
+            foreach (var e in Model)
+            {
+                Profile? actor = null;
+                if (e.ActorId.HasValue) actors.TryGetValue(e.ActorId.Value, out actor);
+                var initials = actor?.Initials ?? "SY";
+                var actorName = actor?.FullName ?? "System";
+                var target = e.EntityId?.ToString() ?? "—";
+                var targetShort = target.Length > 12 ? target.Substring(0, 8) + "…" + target[^4..] : target;
+                <tr>
+                    <td class="num-cell">@e.CreatedAt.ToString("dd MMM · HH:mm")</td>
+                    <td><span class="mini-avatar">@initials</span> @actorName</td>
+                    <td><span class="@ActionPill(e.Action)">@e.Action</span></td>
+                    <td>@e.EntityType</td>
+                    <td class="mono" style="color:var(--accent);">@targetShort</td>
+                    <td class="mono" style="font-size:11px; color:var(--ink-faint);">@TruncateJson(e.After ?? e.Before)</td>
+                </tr>
+            }
+        }
+        </tbody>
+    </table>
+</section>
+
+<div class="callout" style="margin-top:24px;">
+    <div class="ico">i</div>
+    <div class="body">
+        The <code>audit_log</code> table has triggers that refuse UPDATE and DELETE, plus a restrictive RLS policy that blocks all writes from the <code>authenticated</code> role. Rows arrive only via <code>SECURITY DEFINER</code> RPCs and <code>service_role</code> contexts.
+    </div>
+</div>
+
+<footer class="crm-foot">
+    <span>Gold Kiosk · CRM · © AI Kiosks International Inc. 2026</span>
+    <span class="mono">audit_log · append-only · @Model.Count entries · sales_manager scope</span>
+</footer>

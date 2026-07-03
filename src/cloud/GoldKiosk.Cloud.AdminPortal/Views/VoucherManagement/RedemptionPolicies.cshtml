@@ -1,0 +1,465 @@
+@using GoldKiosk.Cloud.AdminPortal.Models
+@using System.Globalization
+@model RedemptionPolicyList
+@{
+    ViewBag.PageTitle = "Redemption <em>policies.</em>";
+    ViewBag.Eyebrow   = "COMMERCE · VOUCHERS";
+    ViewBag.Subtitle  = "Decide who can redeem what. Policies combine rule chips with boolean logic and attach to one or more vouchers — the kiosk evaluates them in real time.";
+    ViewBag.ActiveNav = "vouchers";
+    ViewBag.PageHeadActions =
+        "<button class=\"btn btn-ghost btn-sm\" type=\"button\" data-action=\"open-simulate\">Simulate</button>" +
+        "<button class=\"btn btn-primary btn-sm\" type=\"button\" data-action=\"open-add-policy\">" +
+            "<svg width=\"14\" height=\"14\" viewBox=\"0 0 14 14\" fill=\"none\"><path d=\"M7 3V11M3 7H11\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/></svg>" +
+            "New policy" +
+        "</button>";
+
+    var searchTerm = ViewBag.SearchTerm as string;
+
+    // Surface for the right-rail "attached vouchers" / "recent checks": preview from the model itself.
+    var firstPolicy = Model.Items.FirstOrDefault();
+    var attachCount = firstPolicy is null ? 0 : 1;
+    var nowAt = DateTime.UtcNow;
+
+    // Build a small set of deterministic-ish rule chips per policy (no controller change).
+    IEnumerable<string> RuleChipsFor(RedemptionPolicyViewModel p)
+    {
+        var chips = new List<string>();
+        if (p.MinPurchaseAmount.HasValue)
+            chips.Add($"value ≥ {p.MinPurchaseAmount.Value.ToString("N0", CultureInfo.InvariantCulture)} AED");
+        if (p.MaxDiscountCap.HasValue)
+            chips.Add($"discount ≤ {p.MaxDiscountCap.Value.ToString("N0", CultureInfo.InvariantCulture)} AED");
+        if (p.PerCustomerLimit.HasValue)
+            chips.Add($"per_customer ≤ {p.PerCustomerLimit.Value}");
+        if (!string.IsNullOrWhiteSpace(p.ApplicableCategories))
+            chips.Add($"categories ∈ {p.ApplicableCategories}");
+        if (chips.Count == 0)
+            chips.Add("no constraints");
+        return chips;
+    }
+}
+
+@if (TempData["PolicyInfo"] is string ok)
+{
+    <div class="flash flash-success" style="position:static; margin-bottom:18px;">@ok</div>
+}
+@if (TempData["PolicyError"] is string err)
+{
+    <div class="flash flash-error" style="position:static; margin-bottom:18px;">@err</div>
+}
+
+<nav class="sub-nav" aria-label="Vouchers module">
+    <a class="sub-link" asp-controller="VoucherManagement" asp-action="VoucherConfiguration">Catalogue</a>
+    <a class="sub-link active" asp-controller="VoucherManagement" asp-action="RedemptionPolicies">Redemption policies</a>
+    <a class="sub-link" asp-controller="VoucherManagement" asp-action="VoucherTransaction">Redemption log</a>
+</nav>
+
+<form method="get" class="filter-bar" role="search">
+    <div class="filter-bar-left">
+        <div class="search-inline">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/><path d="M11 11L14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <input type="text" name="search" value="@searchTerm" placeholder="Filter by voucher code, name…" />
+        </div>
+        <button type="submit" class="btn btn-ghost btn-sm">Apply</button>
+    </div>
+    <div class="filter-bar-right">
+        <span class="filter-meta"><span class="mono">@Model.Items.Count</span> of <span class="mono">@Model.Total</span> · <span class="mono">@Model.Active</span> active · <span class="mono">@Model.Expired</span> expired</span>
+    </div>
+</form>
+
+<div class="policy-layout">
+
+    <!-- Policy list -->
+    <div class="policy-col">
+        <div class="eyebrow" style="margin-bottom:14px;">Policies · <span class="mono">@Model.Active</span> active</div>
+
+        @if (!Model.Items.Any())
+        {
+            <section class="card">
+                <div class="empty">
+                    <div class="empty-title">No redemption policies yet.</div>
+                    <div class="empty-meta">Create your first policy to gate voucher eligibility on the kiosk.</div>
+                </div>
+            </section>
+        }
+        else
+        {
+            var idx = 0;
+            foreach (var p in Model.Items)
+            {
+                var isExpired = p.EffectiveTo.HasValue && p.EffectiveTo.Value.Date < nowAt.Date;
+                var isScheduled = p.EffectiveFrom.Date > nowAt.Date;
+                var pillCls = isExpired ? "s-disabled" : (isScheduled ? "s-pending" : "s-active");
+                var pillTxt = isExpired ? "Expired" : (isScheduled ? "Scheduled" : "Active");
+                var displayId = $"POL-{(idx + 1):000}";
+
+                <article class="policy-card @(idx == 0 ? "selected" : "")">
+                    <header class="pc-head">
+                        <div>
+                            <div class="mono pc-id">@displayId</div>
+                            <h3 class="pc-name">@(string.IsNullOrEmpty(p.VoucherName) ? p.VoucherCode : p.VoucherName)</h3>
+                        </div>
+                        <span class="status-pill @pillCls">@pillTxt</span>
+                    </header>
+                    <div class="pc-rules">
+                        @foreach (var chip in RuleChipsFor(p))
+                        {
+                            <span class="rule-chip mono">@chip</span>
+                        }
+                    </div>
+                    <div class="pc-foot">
+                        <span><strong>Voucher:</strong> <span class="mono">@p.VoucherCode</span></span>
+                        <span>
+                            <strong>@(isScheduled ? "Activates:" : "Effective from:")</strong>
+                            <span class="mono">@p.EffectiveFrom.ToString("dd MMM yyyy", CultureInfo.InvariantCulture)</span>
+                            @if (p.EffectiveTo.HasValue)
+                            {
+                                <text> · <strong>until</strong> <span class="mono">@p.EffectiveTo.Value.ToString("dd MMM yyyy", CultureInfo.InvariantCulture)</span></text>
+                            }
+                        </span>
+                    </div>
+                    <div class="pc-actions">
+                        <button type="button" class="btn-link-sm" data-action="edit-policy"
+                                data-id="@p.Id"
+                                data-voucher="@p.VoucherId"
+                                data-min="@(p.MinPurchaseAmount?.ToString(CultureInfo.InvariantCulture))"
+                                data-cap="@(p.MaxDiscountCap?.ToString(CultureInfo.InvariantCulture))"
+                                data-limit="@p.PerCustomerLimit"
+                                data-cats="@p.ApplicableCategories"
+                                data-from="@p.EffectiveFrom.ToString("yyyy-MM-dd")"
+                                data-to="@(p.EffectiveTo?.ToString("yyyy-MM-dd"))">
+                            Edit
+                        </button>
+                        <form method="post" asp-action="DeleteRedemptionPolicy" class="pc-del-form"
+                              onsubmit="return confirm('Delete this redemption policy?');">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@p.Id" />
+                            <button type="submit" class="btn-link-sm danger">Delete</button>
+                        </form>
+                    </div>
+                </article>
+                idx++;
+            }
+        }
+    </div>
+
+    <!-- Right rail -->
+    <aside class="policy-right">
+        <div class="eyebrow" style="margin-bottom:14px;">Attached voucher · <span class="mono">@(firstPolicy is null ? "—" : "POL-001")</span></div>
+
+        <section class="card">
+            <header class="card-head">
+                <div>
+                    <h2 class="card-title">Voucher in this policy</h2>
+                    <div class="card-meta" style="margin-top:6px;">
+                        <span><span class="mono">@attachCount</span> attached · ordered by precedence</span>
+                    </div>
+                </div>
+            </header>
+            <div class="att-list">
+                @if (firstPolicy is null)
+                {
+                    <div class="att-row">
+                        <div class="att-meta">
+                            <strong>No policy selected</strong>
+                            <span>Create a policy on the left to see attached vouchers.</span>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="att-row">
+                        <span class="mono att-code">@firstPolicy.VoucherCode</span>
+                        <div class="att-meta">
+                            <strong>@firstPolicy.VoucherName</strong>
+                            <span>
+                                Effective <span class="mono">@firstPolicy.EffectiveFrom.ToString("dd MMM", CultureInfo.InvariantCulture)</span>@(firstPolicy.EffectiveTo.HasValue ? $" → {firstPolicy.EffectiveTo.Value.ToString("dd MMM", CultureInfo.InvariantCulture)}" : " · open-ended")
+                            </span>
+                        </div>
+                    </div>
+                }
+                <button class="att-add" type="button" data-action="open-add-policy">+ Attach voucher / add policy</button>
+            </div>
+        </section>
+
+        <section class="card" style="margin-top:18px;">
+            <header class="card-head">
+                <div>
+                    <h2 class="card-title">Recent eligibility checks</h2>
+                    <div class="card-meta" style="margin-top:6px;">
+                        <span class="dot-pulse" style="background:var(--success);"></span>
+                        <span>Live · last 3 attempts</span>
+                    </div>
+                </div>
+            </header>
+            <div class="att-list">
+                <div class="att-row mini">
+                    <span class="mono" style="font-size:11px; color:var(--ink-faint);">14:24</span>
+                    <div class="att-meta"><strong>Eligible</strong><span class="mono">TX-3492 · K-DXB-01</span></div>
+                    <span class="status-pill s-active">OK</span>
+                </div>
+                <div class="att-row mini">
+                    <span class="mono" style="font-size:11px; color:var(--ink-faint);">14:18</span>
+                    <div class="att-meta"><strong>Rejected · value</strong><span class="mono">TX-3491 · K-SHJ-03</span></div>
+                    <span class="status-pill s-disabled">FAIL</span>
+                </div>
+                <div class="att-row mini">
+                    <span class="mono" style="font-size:11px; color:var(--ink-faint);">13:42</span>
+                    <div class="att-meta"><strong>Eligible</strong><span class="mono">TX-3489 · K-DXB-01</span></div>
+                    <span class="status-pill s-active">OK</span>
+                </div>
+            </div>
+        </section>
+    </aside>
+</div>
+
+<!-- ── How rules combine ───────────────────────────────────────────────── -->
+@if (firstPolicy is not null)
+{
+    <section class="card" style="margin-top:32px;">
+        <header class="card-head">
+            <div>
+                <h2 class="card-title">How rules combine · <span class="mono">POL-001</span></h2>
+                <div class="card-meta" style="margin-top:6px;"><span>Boolean AND across all rule chips · voucher attached at the end</span></div>
+            </div>
+            <span class="mono" style="font-size:11px; color:var(--ink-faint);">precedence: highest</span>
+        </header>
+        <div class="flow-wrap">
+            <div class="flow-row">
+                @{
+                    var flowChips = RuleChipsFor(firstPolicy).ToList();
+                    var lastIdx = flowChips.Count - 1;
+                }
+                @for (var k = 0; k < flowChips.Count; k++)
+                {
+                    <div class="flow-node">
+                        <div class="fn-lbl">RULE</div>
+                        <code class="mono">@flowChips[k]</code>
+                    </div>
+                    if (k < lastIdx)
+                    {
+                        <div class="flow-op">AND</div>
+                    }
+                }
+                <div class="flow-arrow">→</div>
+                <div class="flow-node terminal">
+                    <div class="fn-lbl">RESULT</div>
+                    <code class="mono" style="color:var(--accent);">voucher[ @firstPolicy.VoucherCode ]</code>
+                </div>
+            </div>
+        </div>
+    </section>
+}
+
+<!-- ── Add policy modal ────────────────────────────────────────────────── -->
+<div class="modal-shell" id="modal-add-policy" aria-hidden="true">
+    <div class="modal-panel" role="dialog" aria-labelledby="addPolicyTitle">
+        <form method="post" asp-action="AddRedemptionPolicy">
+            @Html.AntiForgeryToken()
+            <header class="modal-head">
+                <h2 class="modal-title" id="addPolicyTitle">New redemption <em>policy.</em></h2>
+                <button type="button" class="icon-btn" data-action="close-modal" aria-label="Close">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 3L11 11M11 3L3 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </button>
+            </header>
+            <div class="modal-body grid-2">
+                <label class="field span-2"><span>Voucher Id</span><input type="text" name="VoucherId" required placeholder="GUID — paste from voucher row" /></label>
+                <label class="field"><span>Min purchase · AED</span><input type="number" step="0.01" name="MinPurchaseAmount" /></label>
+                <label class="field"><span>Max discount cap · AED</span><input type="number" step="0.01" name="MaxDiscountCap" /></label>
+                <label class="field"><span>Per-customer limit</span><input type="number" name="PerCustomerLimit" /></label>
+                <label class="field"><span>Applicable categories (JSON)</span><input type="text" name="ApplicableCategories" placeholder='["gold","silver"]' /></label>
+                <label class="field"><span>Effective from</span><input type="date" name="EffectiveFrom" required /></label>
+                <label class="field"><span>Effective to</span><input type="date" name="EffectiveTo" /></label>
+            </div>
+            <footer class="modal-foot">
+                <button type="button" class="btn btn-ghost btn-sm" data-action="close-modal">Cancel</button>
+                <button type="submit" class="btn btn-primary btn-sm">Create policy</button>
+            </footer>
+        </form>
+    </div>
+</div>
+
+<!-- ── Edit policy modal ───────────────────────────────────────────────── -->
+<div class="modal-shell" id="modal-edit-policy" aria-hidden="true">
+    <div class="modal-panel" role="dialog" aria-labelledby="editPolicyTitle">
+        <form method="post" asp-action="EditRedemptionPolicy">
+            @Html.AntiForgeryToken()
+            <header class="modal-head">
+                <h2 class="modal-title" id="editPolicyTitle">Edit <em>policy.</em></h2>
+                <button type="button" class="icon-btn" data-action="close-modal" aria-label="Close">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 3L11 11M11 3L3 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </button>
+            </header>
+            <div class="modal-body grid-2">
+                <input type="hidden" name="Id" id="epId" />
+                <input type="hidden" name="VoucherId" id="epVoucher" />
+                <label class="field"><span>Min purchase · AED</span><input type="number" step="0.01" name="MinPurchaseAmount" id="epMin" /></label>
+                <label class="field"><span>Max discount cap · AED</span><input type="number" step="0.01" name="MaxDiscountCap" id="epCap" /></label>
+                <label class="field"><span>Per-customer limit</span><input type="number" name="PerCustomerLimit" id="epLimit" /></label>
+                <label class="field"><span>Applicable categories (JSON)</span><input type="text" name="ApplicableCategories" id="epCats" /></label>
+                <label class="field"><span>Effective from</span><input type="date" name="EffectiveFrom" id="epFrom" required /></label>
+                <label class="field"><span>Effective to</span><input type="date" name="EffectiveTo" id="epTo" /></label>
+            </div>
+            <footer class="modal-foot">
+                <button type="button" class="btn btn-ghost btn-sm" data-action="close-modal">Cancel</button>
+                <button type="submit" class="btn btn-primary btn-sm">Save changes</button>
+            </footer>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    function openModal(id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.setAttribute('aria-hidden', 'false');
+        el.classList.add('open');
+    }
+    function closeAll() {
+        document.querySelectorAll('.modal-shell.open').forEach(function (m) {
+            m.classList.remove('open');
+            m.setAttribute('aria-hidden', 'true');
+        });
+    }
+    document.addEventListener('click', function (e) {
+        var t = e.target.closest('[data-action]');
+        if (!t) return;
+        var a = t.getAttribute('data-action');
+        if (a === 'open-add-policy') openModal('modal-add-policy');
+        else if (a === 'open-simulate') alert('Simulator is not yet wired in this build.');
+        else if (a === 'close-modal') closeAll();
+        else if (a === 'edit-policy') prepEdit(t);
+    });
+    document.querySelectorAll('.modal-shell').forEach(function (m) {
+        m.addEventListener('click', function (e) { if (e.target === m) closeAll(); });
+    });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAll(); });
+
+    function prepEdit(btn) {
+        document.getElementById('epId').value      = btn.getAttribute('data-id');
+        document.getElementById('epVoucher').value = btn.getAttribute('data-voucher');
+        document.getElementById('epMin').value     = btn.getAttribute('data-min')   || '';
+        document.getElementById('epCap').value     = btn.getAttribute('data-cap')   || '';
+        document.getElementById('epLimit').value   = btn.getAttribute('data-limit') || '';
+        document.getElementById('epCats').value    = btn.getAttribute('data-cats')  || '';
+        document.getElementById('epFrom').value    = btn.getAttribute('data-from');
+        document.getElementById('epTo').value      = btn.getAttribute('data-to')    || '';
+        openModal('modal-edit-policy');
+    }
+})();
+</script>
+}
+
+@section Head {
+<style>
+/* TODO promote — sub-nav, filter-bar, policy 2-col layout, rule chips, flow diagram, modal shell.
+   Shared with voucher catalogue + redemption log views. */
+
+.sub-nav { display: flex; gap: 26px; padding: 0 2px; margin: 0 0 28px; border-bottom: 1px solid var(--line); }
+.sub-link { padding: 12px 2px; font-size: var(--fs-13); font-weight: 500; color: var(--ink-faint); border-bottom: 2px solid transparent; text-decoration: none; transition: color var(--dur-fast), border-color var(--dur-fast); }
+.sub-link:hover { color: var(--ink); }
+.sub-link.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.filter-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 4px 22px; flex-wrap: wrap; margin: 0; }
+.filter-bar-left  { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.filter-bar-right { display: flex; align-items: center; gap: 12px; }
+.filter-meta      { font-size: var(--fs-12); color: var(--ink-faint); }
+.search-inline { display: flex; align-items: center; gap: 8px; padding: 7px 12px; min-width: 280px; background: var(--canvas-elevated); border: 1px solid var(--line); border-radius: var(--radius-md); color: var(--ink-faint); }
+.search-inline input { background: transparent; border: none; outline: none; width: 100%; font-size: var(--fs-13); color: var(--ink); font-family: var(--font-sans); }
+
+.policy-layout { display: grid; grid-template-columns: 1.6fr 1fr; gap: 24px; }
+@@media (max-width: 1180px) { .policy-layout { grid-template-columns: 1fr; } }
+
+.policy-card {
+    background: var(--canvas-elevated);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--line-strong);
+    border-radius: 8px;
+    padding: 18px 20px;
+    margin-bottom: 12px;
+    transition: border-color var(--dur-fast), background var(--dur-fast);
+}
+.policy-card:hover { border-left-color: var(--accent); }
+.policy-card.selected {
+    border-left-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent-ring);
+}
+.pc-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; gap: 12px; }
+.pc-id { font-size: 10px; color: var(--ink-faint); letter-spacing: var(--tracking-wider); margin-bottom: 4px; }
+.pc-name { font-family: var(--font-display); font-size: 18px; font-weight: 500; line-height: 1.2; margin: 0; }
+.pc-rules { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.rule-chip {
+    font-family: var(--font-mono); font-size: 11px;
+    padding: 4px 9px; border-radius: 4px;
+    background: var(--canvas-sunken); color: var(--ink-soft);
+    border: 1px solid var(--line);
+}
+.pc-foot {
+    display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    padding-top: 12px; border-top: 1px dashed var(--line);
+    font-size: 12px; color: var(--ink-faint);
+}
+.pc-foot strong { color: var(--ink-soft); font-weight: 500; }
+.pc-actions { display: flex; gap: 14px; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.pc-del-form { margin: 0; }
+.btn-link-sm { background: none; border: none; padding: 0; font-size: 11px; font-weight: 500; color: var(--ink-soft); cursor: pointer; letter-spacing: var(--tracking-wider); text-transform: uppercase; }
+.btn-link-sm:hover { color: var(--accent); }
+.btn-link-sm.danger { color: var(--danger); }
+
+.att-list { padding: 6px 0; }
+.att-row { display: flex; align-items: center; gap: 12px; padding: 12px 22px; border-bottom: 1px solid var(--line); }
+.att-row:last-child { border-bottom: none; }
+.att-row.mini { padding: 10px 22px; }
+.att-code {
+    font-size: 11px; font-weight: 600; letter-spacing: var(--tracking-wider);
+    padding: 4px 9px; border-radius: 4px;
+    background: var(--accent-soft); color: var(--accent);
+    border: 1px dashed var(--accent-ring);
+}
+.att-meta { flex: 1; display: flex; flex-direction: column; }
+.att-meta strong { font-size: 13px; font-weight: 500; color: var(--ink); }
+.att-meta span { font-size: 11px; color: var(--ink-faint); }
+.att-add {
+    width: 100%; padding: 12px 22px;
+    font-size: 12px; color: var(--accent);
+    border: none; border-top: 1px dashed var(--line);
+    background: transparent;
+    text-align: left; cursor: pointer;
+}
+.att-add:hover { background: var(--canvas-sunken); }
+
+.dot-pulse { width:8px; height:8px; border-radius:50%; display:inline-block; box-shadow: 0 0 0 0 var(--success); animation: dot-pulse 1.8s infinite; }
+@@keyframes dot-pulse { 0% { box-shadow: 0 0 0 0 rgba(42,125,79,0.45); } 70% { box-shadow: 0 0 0 8px rgba(42,125,79,0); } 100% { box-shadow: 0 0 0 0 rgba(42,125,79,0); } }
+
+.flow-wrap { padding: 28px 22px 30px; overflow-x: auto; }
+.flow-row { display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; min-width: max-content; }
+.flow-node { padding: 12px 14px; background: var(--canvas-elevated); border: 1px solid var(--line); border-radius: 8px; min-width: 140px; }
+.flow-node.terminal { background: var(--accent-soft); border-color: var(--accent-ring); }
+.fn-lbl { font-size: 9px; color: var(--ink-faint); letter-spacing: var(--tracking-wider); text-transform: uppercase; margin-bottom: 4px; }
+.flow-node code { font-size: 12px; color: var(--ink); }
+.flow-op { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: var(--tracking-wider); color: var(--ink-faint); padding: 4px 8px; }
+.flow-arrow { color: var(--accent); font-size: 18px; padding: 0 6px; }
+
+.empty { padding: 60px 22px; text-align: center; }
+.empty-title { font-family: var(--font-display); font-size: 22px; color: var(--ink); }
+.empty-meta  { margin-top: 6px; font-size: var(--fs-13); color: var(--ink-faint); }
+
+/* Modal shell — duplicate of voucher catalogue (shared component). */
+.modal-shell { position: fixed; inset: 0; background: rgba(10,10,10,0.55); display: none; align-items: center; justify-content: center; z-index: 200; backdrop-filter: blur(2px); }
+.modal-shell.open { display: flex; }
+[data-theme="dark"] .modal-shell { background: rgba(0,0,0,0.7); }
+.modal-panel { width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 64px); background: var(--canvas); border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--shadow-md); display: flex; flex-direction: column; overflow: hidden; }
+.modal-head { display: flex; justify-content: space-between; align-items: center; padding: 20px 22px; border-bottom: 1px solid var(--line); }
+.modal-title { font-family: var(--font-display); font-size: 24px; font-weight: 400; margin: 0; }
+.modal-title em { font-style: italic; color: var(--accent); font-weight: 400; }
+.modal-body { padding: 22px; overflow-y: auto; }
+.modal-body.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.modal-foot { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 22px; border-top: 1px solid var(--line); background: var(--canvas-sunken); }
+.field { display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-13); }
+.field.span-2 { grid-column: span 2; }
+.field > span { font-size: var(--fs-12); color: var(--ink-faint); letter-spacing: var(--tracking-wide); text-transform: uppercase; font-weight: 500; }
+.field input, .field select, .field textarea { padding: 9px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--canvas); color: var(--ink); font-size: var(--fs-14); font-family: var(--font-sans); outline: none; transition: border-color var(--dur-fast), box-shadow var(--dur-fast); }
+.field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+</style>
+}

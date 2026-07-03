@@ -1,0 +1,18 @@
+# Ported portal tier (AdminPortal / CRMPortal) — naming-rule relaxations for the platform2
+# migration. These ~280k lines were ported faithfully; the legacy code predates our naming
+# rules in three categories that are churn-heavy and behavior-risky to mass-rename:
+#   1. MVC controller actions omit the Async suffix (ASP.NET Core strips it from action
+#      names; mass renames break nameof()-based RedirectToAction sites).
+#   2. Model-bound action parameters use PascalCase (binding is case-insensitive, but the
+#      names appear in views/query strings).
+#   3. Scattered legacy field/parameter casing.
+# Naming rules are relaxed to suggestion FOR THIS TIER ONLY; formatting, usings, and all
+# other analyzers remain fully enforced. New code should follow the standards regardless.
+# Follow-up ticket GK-STYLE-1 tracks incremental renames as files are touched.
+[*.cs]
+dotnet_naming_rule.async_methods_end_in_async.severity = suggestion
+dotnet_naming_rule.locals_camel.severity = suggestion
+dotnet_naming_rule.private_fields_underscore_camel.severity = suggestion
+dotnet_naming_rule.constants_pascal.severity = suggestion
+dotnet_naming_rule.types_and_members_pascal.severity = suggestion
+dotnet_naming_rule.interfaces_begin_with_i.severity = suggestion

@@ -1,0 +1,134 @@
+@using GoldKiosk.Cloud.AdminPortal.Services.Invitations
+@model GoldKiosk.Cloud.AdminPortal.Models.Invitations.AcceptInviteViewModel
+@{
+    Layout = "~/Views/Shared/_LoginLayout.cshtml";
+    ViewBag.Title = "Accept your invitation";
+    var invite = ViewData["Invite"] as InvitationDetails;
+}
+
+<div class="login-shell">
+
+    <!-- ============== LEFT: editorial hero ============== -->
+    <aside class="login-art">
+        <div class="filigree"></div>
+
+        <div class="corner-mark">
+            <span>Invitation · one-time link</span>
+        </div>
+
+        <div class="login-art-top">
+            <span class="brand-mark"></span>
+            <div class="wordmark">
+                Gold <em>Kiosk</em>
+                <span class="corp">Operator portal · @(invite?.TenantLegalName ?? "partner tenant")</span>
+            </div>
+        </div>
+
+        <div class="kiosk-hero">
+            <img src="~/img/kiosk-hero.png" alt="Gold Kiosk · precious-metals self-service terminal" />
+            <span class="shimmer"></span>
+        </div>
+
+        <div class="hero-tag t1"><span class="dot"></span><span class="line"></span><span>Argon2id · password hashing</span></div>
+        <div class="hero-tag t2"><span>One-time invite token</span><span class="line"></span><span class="dot"></span></div>
+        <div class="hero-tag t3"><span class="dot"></span><span class="line"></span><span>Tenant-scoped account</span></div>
+
+        @if (invite is not null)
+        {
+            <div class="login-art-stats">
+                <div class="login-art-stat">
+                    <div class="num">@invite.RoleName</div>
+                    <div class="lbl">Role on join</div>
+                </div>
+                <div class="login-art-stat">
+                    <div class="num">7d</div>
+                    <div class="lbl">Token lifetime</div>
+                </div>
+                <div class="login-art-stat">
+                    <div class="num">@(((int)(invite.ExpiresAt - DateTimeOffset.UtcNow).TotalHours))h</div>
+                    <div class="lbl">Until expiry</div>
+                </div>
+            </div>
+        }
+    </aside>
+
+    <!-- ============== RIGHT: accept form ============== -->
+    <main class="login-form-shell">
+        <div class="login-form">
+
+            <form class="auth-panel"
+                  asp-controller="Account"
+                  asp-action="AcceptInvite"
+                  asp-route-token="@Model.Token"
+                  method="post"
+                  autocomplete="off"
+                  novalidate>
+                @Html.AntiForgeryToken()
+                <input type="hidden" asp-for="Token" />
+
+                <div class="eyebrow">Accept invitation</div>
+                <h1 style="font-family:var(--font-display); font-size:var(--fs-40); font-weight:400; letter-spacing:var(--tracking-tight); margin:12px 0 12px; line-height:1.04;">
+                    Welcome to <em style="font-style:italic; color:var(--accent); font-weight:400;">Gold Kiosk.</em>
+                </h1>
+                <p class="lede" style="color:var(--ink-faint); margin-bottom:24px; font-size:var(--fs-15);">
+                    @if (invite is not null)
+                    {
+                        <text>You've been invited to <strong style="color:var(--ink); font-weight:500;">@invite.TenantLegalName</strong>
+                        as <strong style="color:var(--ink); font-weight:500;">@invite.RoleName</strong>.
+                        Choose a password to finish setting up your account.</text>
+                    }
+                </p>
+
+                @if (ViewData.ModelState.ErrorCount > 0)
+                {
+                    <div class="validation-summary" role="alert">
+                        @Html.ValidationSummary(false)
+                    </div>
+                }
+
+                <div class="field">
+                    <label>Email <span style="text-transform:none; letter-spacing:0; color:var(--ink-ghost); font-weight:400;">· from invitation</span></label>
+                    <input type="email" value="@(invite?.InviteeEmail ?? "")" disabled readonly
+                           style="background:var(--surface-subtle); color:var(--ink-faint);" />
+                </div>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:18px;">
+                    <div class="field">
+                        <label asp-for="FirstName">First name</label>
+                        <input asp-for="FirstName" type="text" placeholder="Sara" />
+                        <span asp-validation-for="FirstName" class="field-validation-error"></span>
+                    </div>
+                    <div class="field">
+                        <label asp-for="LastName">Last name</label>
+                        <input asp-for="LastName" type="text" placeholder="Al Mansoori" />
+                        <span asp-validation-for="LastName" class="field-validation-error"></span>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label asp-for="Password">Choose a password</label>
+                    <input asp-for="Password" type="password"
+                           placeholder="At least 12 characters · 1 number · 1 symbol" />
+                    <span asp-validation-for="Password" class="field-validation-error"></span>
+                </div>
+
+                <div style="display:flex; align-items:flex-start; gap:8px; font-size:var(--fs-12); color:var(--ink-faint); margin:18px 0 24px; line-height:1.5;">
+                    <input asp-for="AcceptsTerms" type="checkbox" style="margin-top:2px;" />
+                    <label asp-for="AcceptsTerms">I accept the Master Service Agreement.</label>
+                </div>
+                <span asp-validation-for="AcceptsTerms" class="field-validation-error"></span>
+
+                <button class="btn btn-gold btn-block" type="submit">
+                    Create account &amp; sign in
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8H13M13 8L9 4M13 8L9 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                </button>
+
+                <div class="login-foot">
+                    <span>Already have an account? <a asp-controller="Account" asp-action="Login" style="color:var(--accent);">Sign in</a></span>
+                </div>
+            </form>
+
+        </div>
+    </main>
+
+</div>

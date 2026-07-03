@@ -1,0 +1,105 @@
+@model GoldKiosk.Cloud.AdminPortal.Models.Invitations.InviteUserViewModel
+@{
+    ViewBag.PageTitle = "Invite a <em>teammate.</em>";
+    ViewBag.Eyebrow   = "Administration · Identity · Invite";
+    ViewBag.Subtitle  = "Send a one-time link by email. The invitee picks their password on accept — you never see it. Invitations expire in 7 days.";
+    ViewBag.ActiveNav = "user-management";
+}
+
+<div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin: -16px 0 22px;">
+    <div class="seg seg-tabs">
+        <a asp-controller="UserManagement" asp-action="ProfileRoles">Users</a>
+        <a asp-controller="UserManagement" asp-action="RoleMaster">Role master</a>
+        <a asp-controller="UserManagement" asp-action="AccessControl">Access control</a>
+        <a class="active">Invite</a>
+    </div>
+</div>
+
+@if (ViewData.ModelState.ErrorCount > 0)
+{
+    <section class="card" style="margin-bottom:18px; border-color:var(--danger);">
+        <div class="card-head"><h2 class="card-title" style="color:var(--danger);">Couldn't send invite</h2></div>
+        <div style="padding:12px 22px 18px;">
+            @Html.ValidationSummary(false)
+        </div>
+    </section>
+}
+
+<section class="card">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">New invitation</h2>
+            <div class="card-meta" style="margin-top:6px;">
+                <span>The invitee's role and tenant are locked at invite time. To change them later, revoke and re-invite.</span>
+            </div>
+        </div>
+    </header>
+
+    <form asp-controller="UserManagement" asp-action="Invite" method="post" autocomplete="off" novalidate
+          style="padding:18px 22px 22px; display:grid; gap:18px; max-width:720px;">
+        @Html.AntiForgeryToken()
+
+        <div class="field">
+            <label asp-for="Email">Work email</label>
+            <input asp-for="Email" type="email" placeholder="teammate@yourbank.ae" />
+            <span asp-validation-for="Email" class="field-validation-error"></span>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:18px;">
+            <div class="field">
+                <label asp-for="FirstName">First name <span style="text-transform:none; letter-spacing:0; color:var(--ink-ghost); font-weight:400;">· optional</span></label>
+                <input asp-for="FirstName" type="text" placeholder="Sara" />
+                <span asp-validation-for="FirstName" class="field-validation-error"></span>
+            </div>
+            <div class="field">
+                <label asp-for="LastName">Last name <span style="text-transform:none; letter-spacing:0; color:var(--ink-ghost); font-weight:400;">· optional</span></label>
+                <input asp-for="LastName" type="text" placeholder="Al Mansoori" />
+                <span asp-validation-for="LastName" class="field-validation-error"></span>
+            </div>
+        </div>
+
+        <div class="field">
+            <label asp-for="RoleId">Role on join</label>
+            <select asp-for="RoleId"
+                    asp-items="@(new SelectList(Model.AvailableRoles, "Id", "Name"))"
+                    style="width:100%; padding:12px 14px; font-family:var(--font-body); font-size:var(--fs-14); border:1px solid var(--ink-ghost); border-radius:8px; background:var(--surface); color:var(--ink);">
+                <option value="">— pick a role —</option>
+            </select>
+            <span asp-validation-for="RoleId" class="field-validation-error"></span>
+
+            @if (Model.AvailableRoles.Count > 0)
+            {
+                <div class="field-help" style="margin-top:10px;">
+                    <strong style="color:var(--ink);">Available roles:</strong>
+                    @foreach (var r in Model.AvailableRoles)
+                    {
+                        <span style="display:inline-block; margin:6px 8px 0 0;">
+                            <span class="role-pill">@r.Name</span>
+                            @if (!string.IsNullOrWhiteSpace(r.Description))
+                            {
+                                <span style="color:var(--ink-faint); margin-left:4px;">@r.Description</span>
+                            }
+                        </span>
+                    }
+                </div>
+            }
+        </div>
+
+        <div class="callout">
+            <span class="ico">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1L13 4V7C13 10.5 10.5 12.5 7 13C3.5 12.5 1 10.5 1 7V4L7 1Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+            </span>
+            <div class="body">
+                <strong>How this works:</strong> we generate a one-time URL with a 256-bit random token, hash it server-side, and email the cleartext link to the invitee. They click the link, set a password, and are signed in as a member of this tenant.
+            </div>
+        </div>
+
+        <div style="display:flex; gap:10px;">
+            <button type="submit" class="btn btn-primary">
+                Send invitation
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 7H11M11 7L7 3M11 7L7 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            </button>
+            <a class="btn btn-ghost" asp-controller="UserManagement" asp-action="ProfileRoles">Cancel</a>
+        </div>
+    </form>
+</section>

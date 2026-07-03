@@ -1,0 +1,93 @@
+@model UserRoleMapVM;
+@{
+    Layout = "~/Views/Shared/_LoginLayout.cshtml";
+    ViewBag.Title = "Role Selection";
+}
+
+<div class="auth-page-wrapper pt-5">
+    <!-- auth page content -->
+    <div class="auth-page-content">
+        <div class="container">
+            <!-- Logo Row -->
+            <div class="row">
+                <div class="col-lg-12">
+                    <div class="text-center mt-sm-5 mb-4 text-white-50">
+                        <a href="#" class="d-inline-block auth-logo">
+                            <img src="@Url.Content("~/assets/images/logo.png")" alt="Logo" width="300" />
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row justify-content-center">
+                <div class="col-md-12 col-lg-12 col-xl-12">
+                    <div class="card mt-4">
+                        <div class="card-body p-4 text-center">
+                            <h4 class="mb-4">Select Your Role</h4>
+                            <div class="row row-cols-xxl-4 row-cols-lg-4 row-cols-1 g-3 mt-4 justify-content-center">
+                                @foreach (var role in Model.List)
+                                {
+                                    <div class="col">
+                                        <div class="btn p-0 w-100 border-0" style="background: none;" onclick="submitRoleForm(this)">
+                                            <div class="card card-body card-bg-lng">
+                                                <div class="mb-4 align-items-center text-center">
+                                                    <div class="flex-grow-1 mb-4">
+                                                        <h5 class="card-title mb-1 text-white">@role.RoleName</h5>
+                                                    </div>
+                                                    <div class="flex-shrink-0 avatar-sm mx-auto">
+                                                        <span class="avatar-title bg-light rounded-5 text-info fs-22">
+                                                            <i class="ri-user-3-line rounded"></i>
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <span class="btn btn-light btn-sm">Click Here</span>
+                                            </div>
+                                        </div>
+                                        <form action="@Url.Action("Role", "Account")" method="post" class="hidden-form">
+                                            <input type="hidden" name="selectedRole" value="@role.RoleCode" />
+                                        </form>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- end card body -->
+                    </div>
+                    <!-- end card -->
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="container-fluid footer py-3 mt-5">
+                <div class="row align-items-center">
+                    <div class="col-md-1"></div>
+                    <div class="col-md-5 text-start text-white-50">
+                        &copy; King Khalid International Airport – All Rights Reserved <script>document.write(new Date().getFullYear())</script>
+                    </div>
+                    <div class="col-md-6 text-center">
+                        <ul class="list-inline mb-0">
+                            <li class="list-inline-item">
+                                <a href="https://www.kkia.sa/en/Privacy-Policy" class="text-white-50">Privacy Policy</a>
+                            </li>
+                            <li class="list-inline-item">
+                                <a href="https://www.kkia.sa/en/Terms-and-Conditions" class="text-white-50">Terms & Conditions</a>
+                            </li>
+                            <li class="list-inline-item">
+                                <a href="https://www.kkia.sa/en/Terms-of-Use" class="text-white-50">Terms of Use</a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <!-- end footer -->
+        </div>
+        <!-- end container -->
+    </div>
+    <!-- end auth page content -->
+</div>
+
+<script>
+    function submitRoleForm(element) {
+        element.nextElementSibling.submit();
+    }
+</script>

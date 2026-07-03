@@ -1,0 +1,418 @@
+@{
+    ViewData["Title"] = "Precious Metal Monitoring";
+}
+<div class="row">
+    <div class="col-12">
+        <div class="page-title-box d-sm-flex align-items-center justify-content-between">
+            <h4 class="mb-sm-0">@ViewData["Title"]</h4>
+
+            <div class="page-title-right">
+                <ol class="breadcrumb m-0">
+                    <li class="breadcrumb-item"><a href="~/Home/Index">Dashboard</a></li>
+                    <li class="breadcrumb-item">Operations</li>
+                    <li class="breadcrumb-item">Health Check</li>
+                    <li class="breadcrumb-item active">Maintenance Tickets</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-xl-4 col-md-3">
+        <div class="card card-animate card-blue-d">
+
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1 overflow-hidden">
+                        <h5 class="text-uppercase fw-medium text-truncate mb-0 text-white">Total</h5>
+                    </div>
+                </div>
+                <div class="d-flex align-items-end justify-content-between mt-4">
+                    <div>
+                        <h4 class="fs-22 fw-semibold ff-secondary text-white">
+                            <span class="counter-value" data-target="2">0</span>
+                        </h4>
+                    </div>
+                    <div class="avatar-sm flex-shrink-0">
+                        <span class="avatar-title rounded fs-3">
+                            <i class="las la-money-bill-wave-alt text-white"></i>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-4 col-md-3">
+        <div class="card card-animate card-green-d">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1 overflow-hidden">
+                        <h5 class="text-uppercase fw-medium text-truncate mb-0 text-white">Active</h5>
+                    </div>
+                </div>
+                <div class="d-flex align-items-end justify-content-between mt-4">
+                    <div>
+                        <h4 class="fs-22 fw-semibold ff-secondary text-white">
+                            <span class="counter-value" data-target="1">0</span>
+                        </div>
+                        <div class="avatar-sm flex-shrink-0">
+                            <span class="avatar-title rounded fs-3">
+                                <i class="ri-checkbox-circle-fill text-white"></i>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+
+        <div class="col-xl-4 col-md-3">
+            <div class="card card-animate bg-danger">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-grow-1 overflow-hidden">
+                            <h5 class="text-uppercase fw-medium text-truncate mb-0 text-white">InActive</h5>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-end justify-content-between mt-4">
+                        <div>
+                            <h4 class="fs-22 fw-semibold ff-secondary text-white">
+                                <span class="counter-value" data-target="1">0</span>
+                            </h4>
+                        </div>
+                        <div class="avatar-sm flex-shrink-0">
+                            <span class="avatar-title rounded fs-3">
+                                <i class="ri-forbid-line text-white"></i>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="card" id="customerList">
+                <div class="card-header border-bottom-dashed">
+
+                    <div class="row g-4 align-items-center">
+                        <div class="col-sm">
+                            <div>
+                                <h5 class="card-title mb-0">Maintenance Tickets</h5>
+                            </div>
+                        </div>
+
+                        <div class="col-sm-auto">
+                            <div class="d-flex flex-wrap align-items-start gap-2">
+                                <a href="#" class="btn btn-success add-btn" data-bs-toggle="modal" data-bs-target="#raiseTopUpModal">
+                                    <i class="ri-add-line align-bottom me-1"></i>Raise Ticket
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body border-bottom-dashed border-bottom">
+                    <div class="row g-4">
+                        <div class="col-xl-2">
+                            <label for="dropdown2" class="form-label">Terminal Code</label>
+                            <select class="form-select" id="dropdown2" aria-label="Dropdown 2">
+                                <option selected>ALL</option>
+                                <option value="1">Globe Store</option>
+                                <option value="2">Ever Plus</option>
+                                <option value="3">BTI Hub</option>
+                            </select>
+                        </div>
+                        <div class="col-xl-2">
+                            <label for="dropdown1" class="form-label">Cluster</label>
+                            <select class="form-select" id="dropdown1" aria-label="Dropdown 1">
+                                <option selected>ALL</option>
+                                <option value="1">EMMO</option>
+                                <option value="2">WMM4</option>
+                                @* <option value="3">South</option>  *@
+                            </select>
+                        </div>
+                        <div class="col-xl-2">
+                            <label for="dropdown2" class="form-label">Technician Code</label>
+                            <select class="form-select" id="dropdown2" aria-label="Dropdown 2">
+                                <option selected>ALL</option>
+                                <option value="1">Tech1</option>
+                                <option value="2">Tech2</option>
+                                <option value="3">Tech3</option>
+                            </select>
+                        </div>
+                        <div class="col-xl-2">
+                            <label for="dropdown2" class="form-label">Status</label>
+                            <select class="form-select" id="dropdown2" aria-label="Dropdown 2">
+                                <option selected>ALL</option>
+                                <option value="1">Resolved</option>
+                                <option value="2">Pending</option>
+                                <option value="3">Closed</option>
+                            </select>
+                        </div>
+                        <div class="col-xl-2">
+                            <label for="datepicker" class="form-label">Date </label>
+                            <div class="d-flex flex-wrap align-items-start gap-2">
+                                <input type="date" id="datepicker" class="form-control" aria-label="Date Picker">
+                            </div>
+                        </div>
+                        <div class="col-xl-2 align-self-end">
+                            <div class="d-flex flex-wrap align-items-start gap-2">
+                                <a href="~/operation/maintenanceticket" class="btn btn-primary" onclick="SearchData();">
+                                    <i class=" me-2 align-bottom"></i>Search Ticket
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-body">
+                    <div>
+                        <div class="table-responsive table-card mb-1">
+                            <table class="table align-middle" id="customerTable">
+                                <thead class="table-light text-muted">
+                                    <tr>
+                                        <th class="sort" data-sort="f_name" style="width: 50px;">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="checkAll" value="option">
+                                            </div>
+                                        </th>
+                                        <th class="sort" scope="col">Code</th>
+                                        <th class="sort" scope="col">Cluster</th>
+                                        <th class="sort" scope="col">Technician</th>
+                                        <th class="sort" scope="col">Terminal</th>
+
+
+                                        @* <th class="sort" scope="col">Issue Title</th>
+                                    <th class="sort" scope="col">Issue Detail</th> *@
+
+                                        <th class="sort" scope="col">isProtocol Authorized</th>
+                                        @* <th class="sort" scope="col">Closed On</th>
+                                    <th class="sort" scope="col">Resolved On</th>
+                                    <th class="sort" scope="col">Closed By</th>*@
+                                        <th class="sort" scope="col">Resolved By</th>
+                                        @* <th class="sort" scope="col">Closing Remarks</th> *@
+                                        <th class="sort" scope="col">Status</th>
+                                        <th class="sort" scope="col">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="list form-check-all">
+                                    <!-- Row 1 -->
+                                    <tr>
+                                        <th scope="row">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" value="" id="responsivetableCheck01">
+                                                <label class="form-check-label" for="responsivetableCheck01"></label>
+                                            </div>
+                                        </th>
+                                        <td>MT001</td>
+                                        <td>EMMNO4</td>
+                                        <td>Tech001</td>
+                                        <td>BTI0110</td>
+                                        <td>Yes</td>
+                                        <td>John Doe</td>
+                                        <td>
+                                            <span class="badge rounded-pill border border-success text-success fs-13">Closed</span>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center position-relative">
+                                                <a href="~/operation/viewmaintenanceticket"
+                                                   class="ri-eye-fill fs-16">
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" value="option2">
+                                            </div>
+                                        </td>
+                                        <td>MT002</td>
+                                        <td>C002</td>
+                                        <td>Tech002</td>
+                                        <td>T002</td>
+                                        <td>No</td>
+                                        <td>John Doe</td>
+                                        <td>
+                                            <span class="badge rounded-pill border border-warning text-warning fs-13">Resolved</span>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center position-relative">
+                                                <a href="~/operation/viewmaintenanceticket"
+                                                   class="ri-eye-fill fs-16">
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="d-flex justify-content-end mt-3">
+                            <div class="pagination-wrap hstack gap-2" style="display: flex;">
+                                <a class="page-item pagination-prev disabled" href="#"> Previous </a>
+                                <ul class="pagination listjs-pagination mb-0">
+                                    <li class="active">
+                                        <a class="page" href="#" data-i="1" data-page="8">1</a>
+                                    </li>
+                                    <li>
+                                        <a class="page" href="#" data-i="2" data-page="8">2</a>
+                                    </li>
+                                    <li>
+                                        <a class="page" href="#" data-i="3" data-page="8">3</a>
+                                    </li>
+                                    <li>
+                                        <a class="page" href="#" data-i="4" data-page="8">4</a>
+                                    </li>
+                                    <li>
+                                        <a class="page" href="#" data-i="5" data-page="8">5</a>
+                                    </li>
+                                </ul>
+                                <a class="page-item pagination-next" href="#"> Next </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+<!-- Raise TopUp Modal -->
+<div class="modal fade" id="raiseTopUpModal" tabindex="-1" aria-labelledby="raiseTopUpModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-light p-3">
+                <h5 class="modal-title" id="openModalLabel">Maintenance Tickets </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3">
+
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="cluster">Cluster</label>
+                            <select class="form-select">
+                                <option selected>Select Cluster</option>
+                                <option value="1">EMMNO4</option>
+                                <option value="2">WMM4 </option>
+                            </select>
+                        </div>
+                    </div>
+
+                 
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="terminal">Terminal</label>
+                            <select class="form-select">
+                                <option selected>Select Terminal</option>
+                                <option value="1">BTI0110</option>
+                                <option value="2">T002 </option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="terminal">Technician</label>
+                            <select class="form-select">
+                                <option selected>Select Technician</option>
+                                <option value="1">Primary Technician</option>
+                                <option value="2">Secondary Technician </option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="terminal">Reason</label>
+                            <select class="form-select">
+                                <option selected>Select Reason</option>
+                                <option value="1">Incorrect Configuration</option>
+                                <option value="2">Network Issues </option>
+                                <option value="1">Incorrect Configuration</option>
+                                <option value="2">Network Issues </option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#SuccessModal" data-bs-dismiss="modal"> Raise Ticket</button>
+
+            </div>
+
+        </div>
+    </div>
+</div>
+</div>
+<!-- Success Modal -->
+<div class="modal fade zoomIn" id="SuccessModal" tabindex="-1" style="display: none;" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="btn-close" id="deleteRecord-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mt-2 text-center">
+                    <lord-icon src="https://media.lordicon.com/icons/wired/outline/24-approved-checked.json" trigger="loop" style="width:100px;height:100px; color: #4BB543;"></lord-icon>
+                    <div class="mt-4 pt-2 fs-15 mx-4 mx-sm-5">
+                        <div class="col-md-12" id="SuccessMessage"><p></p><h4> Ticket Raised Successfully </h4><p></p></div>
+                    </div>
+                </div>
+                <div class="d-flex gap-2 justify-content-center mt-4 mb-2">
+
+                    <div class="modal-footer" id="footersuccess"><button type="button" class="btn w-sm btn-primary" data-bs-dismiss="modal">Okay</button></div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!--View Success Modal -->
+<div class="modal fade zoomIn" id="ViewSuccessModal" tabindex="-1" style="display: none;" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="btn-close" id="deleteRecord-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mt-2 text-center">
+                    <lord-icon src="https://media.lordicon.com/icons/wired/outline/24-approved-checked.json" trigger="loop" style="width:100px;height:100px; color: #4BB543;">
+
+                    </lord-icon>
+                    <div class="mt-4 pt-2 fs-15 mx-4 mx-sm-5">
+                        <div class="col-md-12" id="SuccessMessage"><p></p><h4>Submitted Successfully</h4><p></p></div>
+                    </div>
+                </div>
+                <div class="d-flex gap-2 justify-content-center mt-4 mb-2">
+
+                    <div class="modal-footer" id="footersuccess"><button type="button" class="btn w-sm btn-primary" data-bs-dismiss="modal">Okay</button></div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    $(document).ready(function () {
+
+    function getQueryParam(param) {
+    var urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get(param);
+    }
+
+    if (getQueryParam('showModal') === 'true') {
+    $('#ViewSuccessModal').modal('show');
+
+    var newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+    window.history.replaceState({}, document.title, newUrl);
+    }
+    });
+</script>
+

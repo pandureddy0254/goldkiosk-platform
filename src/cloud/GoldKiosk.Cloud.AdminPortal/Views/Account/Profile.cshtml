@@ -1,0 +1,110 @@
+@using GoldKiosk.Cloud.AdminPortal.Services.Licensing
+@inject ILicenseService Licenses
+@model GoldKiosk.Infrastructure.Identity.AppUser
+@{
+    ViewBag.PageTitle = "Your <em>profile.</em>";
+    ViewBag.Eyebrow   = "ACCOUNT · PROFILE";
+    ViewBag.Subtitle  = "The account you're signed in as, plus the licence bound to this dashboard.";
+    ViewBag.ActiveNav = "";
+
+    var initials = string.Concat(
+        (Model.FirstName?.Length > 0 ? Model.FirstName[0].ToString() : ""),
+        (Model.LastName?.Length  > 0 ? Model.LastName[0].ToString()  : "")
+    ).ToUpperInvariant();
+    if (string.IsNullOrWhiteSpace(initials))
+        initials = (Model.Email?.Length > 0 ? Model.Email[0].ToString() : "?").ToUpperInvariant();
+
+    var stored = await Licenses.GetActiveAsync(Context.RequestAborted);
+    var lic = stored?.License;
+}
+
+<section class="card" style="padding:28px; display:grid; grid-template-columns:96px 1fr; gap:24px; align-items:center;">
+    <div style="width:96px; height:96px; border-radius:50%; background:var(--accent-soft); color:var(--accent); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-size:36px; font-weight:500; letter-spacing:-0.02em;">
+        @initials
+    </div>
+    <div>
+        <h2 style="font-family:var(--font-display); font-size:var(--fs-28); font-weight:400; margin:0 0 4px; letter-spacing:var(--tracking-tight);">
+            @(string.IsNullOrWhiteSpace(Model.FirstName) ? Model.Email : $"{Model.FirstName} {Model.LastName}".Trim())
+        </h2>
+        <div style="color:var(--ink-faint); font-size:var(--fs-14); margin-bottom:8px;">
+            <span class="mono">@Model.Email</span>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <span class="status-pill status-pill--active">@Model.Status</span>
+            @if (Model.EmailConfirmed) { <span class="status-pill">email verified</span> }
+            <span class="status-pill">@Model.Locale</span>
+        </div>
+    </div>
+</section>
+
+<section class="card" style="padding:24px; margin-top:24px;">
+    <h3 style="font-family:var(--font-display); font-size:var(--fs-20); font-weight:400; margin:0 0 16px; letter-spacing:var(--tracking-tight);">Account details</h3>
+    <table class="user-table" style="width:100%;">
+        <tbody>
+            <tr><th style="text-align:left; color:var(--ink-faint); font-weight:400; padding:8px 0; width:200px;">User ID</th>
+                <td class="mono">@Model.Id</td></tr>
+            <tr><th style="text-align:left; color:var(--ink-faint); font-weight:400; padding:8px 0;">Tenant ID</th>
+                <td class="mono">@Model.TenantId</td></tr>
+            <tr><th style="text-align:left; color:var(--ink-faint); font-weight:400; padding:8px 0;">First name</th>
+                <td>@Model.FirstName</td></tr>
+            <tr><th style="text-align:left; color:var(--ink-faint); font-weight:400; padding:8px 0;">Last name</th>
+                <td>@Model.LastName</td></tr>
+            <tr><th style="text-align:left; color:var(--ink-faint); font-weight:400; padding:8px 0;">OTP mode</th>
+                <td><span class="mono">@Model.OtpMode</span></td></tr>
+            <tr><th style="text-align:left; color:var(--ink-faint); font-weight:400; padding:8px 0;">Created</th>
+                <td class="mono">@Model.CreatedAt.ToString("dd MMM yyyy · HH:mm")</td></tr>
+            <tr><th style="text-align:left; color:var(--ink-faint); font-weight:400; padding:8px 0;">Last signed in</th>
+                <td class="mono">@(Model.LastSignedInAt?.ToString("dd MMM yyyy · HH:mm") ?? "—")</td></tr>
+        </tbody>
+    </table>
+</section>
+
+@if (lic is not null)
+{
+    <section class="card" style="padding:24px; margin-top:24px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+            <h3 style="font-family:var(--font-display); font-size:var(--fs-20); font-weight:400; margin:0; letter-spacing:var(--tracking-tight);">
+                Tenant licence
+            </h3>
+            <a asp-controller="License" asp-action="Activate" class="btn btn-ghost btn-sm">Re-paste token</a>
+        </div>
+        <table class="user-table" style="width:100%;">
+            <tbody>
+                <tr><th style="text-align:left; color:var(--ink-faint); font-weight:400; padding:8px 0; width:200px;">Legal name</th>
+                    <td>@lic.LegalName</td></tr>
+                <tr><th style="text-align:left; color:var(--ink-faint); font-weight:400; padding:8px 0;">Display name</th>
+                    <td>@lic.DisplayName</td></tr>
+                <tr><th style="text-align:left; color:var(--ink-faint); font-weight:400; padding:8px 0;">Plan</th>
+                    <td><span class="mono">@lic.PlanCode</span></td></tr>
+                <tr><th style="text-align:left; color:var(--ink-faint); font-weight:400; padding:8px 0;">Kiosk cap</th>
+                    <td class="mono">@lic.KioskCap</td></tr>
+                <tr><th style="text-align:left; color:var(--ink-faint); font-weight:400; padding:8px 0;">Features</th>
+                    <td>
+                        @foreach (var f in lic.Features)
+                        {
+                            <span class="role-pill" style="margin-right:6px;">@f</span>
+                        }
+                    </td></tr>
+                <tr><th style="text-align:left; color:var(--ink-faint); font-weight:400; padding:8px 0;">Region hint</th>
+                    <td>@lic.RegionHint</td></tr>
+                <tr><th style="text-align:left; color:var(--ink-faint); font-weight:400; padding:8px 0;">Admin email</th>
+                    <td class="mono">@lic.AdminEmail</td></tr>
+                <tr><th style="text-align:left; color:var(--ink-faint); font-weight:400; padding:8px 0;">Issued</th>
+                    <td class="mono">@lic.IssuedOn.ToString("dd MMM yyyy")</td></tr>
+                <tr><th style="text-align:left; color:var(--ink-faint); font-weight:400; padding:8px 0;">Expires</th>
+                    <td class="mono">@lic.ExpiresOn.ToString("dd MMM yyyy")</td></tr>
+                <tr><th style="text-align:left; color:var(--ink-faint); font-weight:400; padding:8px 0;">Signing key id</th>
+                    <td class="mono">@lic.Kid</td></tr>
+                <tr><th style="text-align:left; color:var(--ink-faint); font-weight:400; padding:8px 0;">Activated locally</th>
+                    <td class="mono">@stored!.ActivatedAt.ToString("dd MMM yyyy · HH:mm")</td></tr>
+            </tbody>
+        </table>
+    </section>
+}
+
+<section style="margin-top:32px; display:flex; gap:12px;">
+    <form asp-controller="Account" asp-action="Logout" method="post">
+        @Html.AntiForgeryToken()
+        <button type="submit" class="btn btn-ghost">Sign out</button>
+    </form>
+</section>

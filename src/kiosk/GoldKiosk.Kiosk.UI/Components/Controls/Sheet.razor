@@ -1,0 +1,11 @@
+@if (Visible)
+{
+    <div class="sheet-backdrop" @onclick="CloseAsync">
+        <div class="sheet-panel glass" @onclick:stopPropagation="true">
+            <div class="sheet-grip"></div>
+            <h3 class="sheet-title serif-hero">@Title</h3>
+            <div class="sheet-body">@ChildContent</div>
+            <button class="btn-glass sheet-close" @onclick="CloseAsync">@CloseLabel</button>
+        </div>
+    </div>
+}

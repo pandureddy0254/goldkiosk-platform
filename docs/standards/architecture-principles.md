@@ -8,7 +8,7 @@ ports and is composed only in hosts.
 - **GoldKiosk.Application**: one use case per handler, validators, ports (`IGoldPriceProvider`, `ITransactionRepository`, `IKycService`, `IStaticConfigStore`, `IImageStore`), pipeline behaviors (validation/logging/transaction).
 - **GoldKiosk.Infrastructure**: EF Core + Npgsql, Key Vault, Blob storage, GoldAPI/Claude API clients, App Insights plumbing. One adapter per port.
 - **GoldKiosk.Contracts**: versioned wire DTOs + ProblemDetails type codes + SignalR contracts shared edge↔cloud. References nothing; additive changes only within a version.
-- **Hosts** (Cloud.Api, Cloud.AdminPortal, Cloud.CrmPortal, Kiosk.Api, Kiosk.UI): composition roots, thin. A host file with an `if` on business state is a smell.
+- **Hosts** (Cloud.Api, Cloud.AdminPortal, Cloud.CRMPortal, Kiosk.Api, Kiosk.UI): composition roots, thin. A host file with an `if` on business state is a smell.
 - **Kiosk.Core**: edge-local domain — durable transaction queue/outbox, price-staleness policy, session state machine. No cloud types.
 - **Kiosk.Devices**: hardware ports + adapters (dispenser, scale, printer, camera, UPS) with **simulator implementations** selected by config so the full platform runs on dev laptops.
 

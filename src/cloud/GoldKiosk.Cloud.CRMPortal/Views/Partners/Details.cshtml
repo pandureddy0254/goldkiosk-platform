@@ -1,0 +1,231 @@
+@model GoldKiosk.Cloud.CRMPortal.Models.ViewModels.PartnerDetailViewModel
+@{
+    var p = Model.Partner;
+    var t = Model.Tenant;
+    var s = Model.Subscription;
+    string Money(decimal v) => v.ToString("N0");
+    string Curr(string c) => string.IsNullOrWhiteSpace(c) ? "USD" : c;
+    string TitleCase(string st) => string.IsNullOrEmpty(st) ? "" : char.ToUpper(st[0]) + st[1..];
+    string Pill(string st) => st switch {
+        "active"       => "t-active",
+        "provisioning" => "t-provisioning",
+        "suspended"    => "t-suspended",
+        "churned"      => "t-churned",
+        _              => "t-provisioning"
+    };
+    string KeyPill(string st) => st switch {
+        "consumed" => "s-active",
+        "pending"  => "s-pending",
+        "revoked"  => "s-disabled",
+        "expired"  => "s-disabled",
+        _          => "s-pending"
+    };
+
+    var revealKey     = TempData["RevealKey"]     as string;
+    var revealPrefix  = TempData["RevealPrefix"]  as string;
+    var revealExpires = TempData["RevealExpires"] as string;
+    var revealPartner = TempData["RevealPartner"] as string;
+    var showReveal    = !string.IsNullOrWhiteSpace(revealKey) && revealPartner == p.Id.ToString();
+    var reissueErr    = TempData["ReissueError"]  as string;
+}
+
+<div class="page-head">
+    <div class="page-title-block">
+        <div class="eyebrow">
+            <a asp-action="Index" style="color:var(--ink-faint);">← Partners</a>
+            @if (t is not null) { <text> · tenant <span class="mono" style="color:var(--accent);">@t.Id.ToString().Substring(0,8)</span> · @t.RegionCode</text> }
+        </div>
+        <h1 class="page-title">@p.LegalName<em>.</em></h1>
+        <p class="page-subtitle">
+            @TitleCase(p.TenantStatus) · @p.InitialKioskCount kiosks ·
+            <span class="mono">@Curr(p.CurrencyCode) @Money(p.MrrAmount)</span> MRR · admin · @p.PrimaryAdminName.
+        </p>
+    </div>
+    <div style="display:flex; gap:10px;">
+        <button class="btn btn-ghost btn-sm">View as admin</button>
+        <a class="btn btn-ghost btn-sm" href="#reissue" style="color:var(--danger); border-color:rgba(168,50,50,0.22);">Re-issue activation key</a>
+    </div>
+</div>
+
+@if (showReveal)
+{
+    <section class="card" style="margin-bottom:16px;">
+        <header class="card-head">
+            <div><h2 class="card-title">Activation key · <em>one-time reveal</em></h2>
+                <div class="card-meta" style="margin-top:6px;"><span>Copy now — the cleartext will not be shown again.</span></div>
+            </div>
+        </header>
+        <div class="card-body">
+            <div class="warn-callout">
+                <div class="ico">!</div>
+                <div class="body"><strong>This is the only time the activation key is displayed.</strong> The CRM stores only a SHA-256 hash. Copy to a password manager or rely on the email below.</div>
+            </div>
+            <div class="activation-reveal">
+                <div class="ar-label">Activation key · expires @(DateTime.TryParse(revealExpires, out var rex) ? rex.ToString("dd MMM yyyy") : "in 30 days")</div>
+                <div class="ar-key">@revealKey</div>
+                <div class="ar-meta">
+                    <span>Issued to · <strong>@p.PrimaryAdminEmail</strong></span>
+                    <span>Prefix · <strong>@revealPrefix</strong></span>
+                </div>
+                <div class="ar-actions">
+                    <button class="btn btn-gold btn-sm" type="button" data-copy-key data-key="@revealKey">Copy to clipboard</button>
+                </div>
+            </div>
+        </div>
+    </section>
+}
+@if (!string.IsNullOrEmpty(reissueErr))
+{
+    <div class="warn-callout" style="margin-bottom:16px;"><div class="ico">!</div><div class="body">@reissueErr</div></div>
+}
+
+<div class="kpi-strip">
+    <div class="kpi-cell"><div class="kpi-label">Kiosks · live<span class="dot" style="background:var(--success);"></span></div><div class="kpi-value">@p.InitialKioskCount<span class="unit">/ @p.InitialKioskCount</span></div><div class="kpi-foot"><span class="delta delta-flat">@(p.Region ?? "—")</span></div></div>
+    <div class="kpi-cell"><div class="kpi-label">Transactions · 30d<span class="dot"></span></div><div class="kpi-value">—</div><div class="kpi-foot"><span class="delta delta-flat">wire from admin DB</span></div></div>
+    <div class="kpi-cell"><div class="kpi-label">Volume · 30d<span class="dot"></span></div><div class="kpi-value">—</div><div class="kpi-foot"><span class="delta delta-flat">wire from admin DB</span></div></div>
+    <div class="kpi-cell"><div class="kpi-label">Open tickets<span class="dot" style="background:var(--warning);"></span></div><div class="kpi-value">—</div><div class="kpi-foot"><span class="delta delta-flat">wire from support</span></div></div>
+</div>
+
+<div class="detail-rail">
+    <section class="card">
+        <header class="card-head">
+            <div><h2 class="card-title">Kiosks · partner fleet</h2><div class="card-meta" style="margin-top:6px;"><span>Read-only · managed in the Admin Dashboard</span></div></div>
+            <a href="#" style="font-size:13px; color:var(--accent);">Open in admin →</a>
+        </header>
+        <table class="data-table">
+            <thead><tr><th>Code</th><th>Site</th><th>Status</th><th style="text-align:right;">Tx · 30d</th><th>Last tx</th></tr></thead>
+            <tbody>
+                <tr><td colspan="5" style="text-align:center; padding:24px; color:var(--ink-faint);">Kiosk fleet detail lives in the Admin Dashboard. Cross-product link via <span class="mono">tenant.admin_tenant_id</span>.</td></tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section style="display:flex; flex-direction:column; gap:16px;">
+        <div class="card">
+            <header class="card-head">
+                <div><h2 class="card-title">Subscription</h2><div class="card-meta" style="margin-top:6px;"><span>Stripe-managed · auto-renew when on</span></div></div>
+                <a asp-controller="Home" asp-action="Index" style="font-size:13px; color:var(--accent);">Manage →</a>
+            </header>
+            @if (s is null)
+            {
+                <div class="card-body"><p style="color:var(--ink-faint);">No subscription on file yet for this partner.</p></div>
+            }
+            else
+            {
+                <div class="info-list">
+                    <div class="info-row"><div class="info-label">Plan</div><div class="info-value"><span class="role-pill r-admin">@s.PlanCode</span> · @s.BillingCycle</div></div>
+                    <div class="info-row"><div class="info-label">Status</div><div class="info-value"><span class="t-pill @Pill(s.Status == "active" ? "active" : "provisioning")">@TitleCase(s.Status)</span></div></div>
+                    <div class="info-row"><div class="info-label">Annual</div><div class="info-value mono">@Curr(s.CurrencyCode) @Money(s.AnnualAmount) · MRR @Money(s.MrrAmount)</div></div>
+                    <div class="info-row"><div class="info-label">Current period</div><div class="info-value mono">@s.CurrentPeriodStart.ToString("dd MMM yyyy") → @s.CurrentPeriodEnd.ToString("dd MMM yyyy")</div></div>
+                    <div class="info-row"><div class="info-label">Next renewal</div><div class="info-value"><strong>in @s.DaysUntilRenewal days</strong> · @s.CurrentPeriodEnd.ToString("dd MMM yyyy")</div></div>
+                    <div class="info-row"><div class="info-label">Auto-renew</div><div class="info-value"><span class="status-pill @(s.AutoRenew ? "s-active" : "s-disabled")">@(s.AutoRenew ? "On" : "Off")</span> · @s.PaymentMethod</div></div>
+                    @if (!string.IsNullOrEmpty(s.ExternalCustomerId))
+                    { <div class="info-row"><div class="info-label">Stripe customer</div><div class="info-value mono" style="color:var(--ink-faint);">@s.ExternalCustomerId</div></div> }
+                    @if (!string.IsNullOrEmpty(s.ExternalSubscriptionId))
+                    { <div class="info-row"><div class="info-label">Stripe subscription</div><div class="info-value mono" style="color:var(--ink-faint);">@s.ExternalSubscriptionId</div></div> }
+                </div>
+            }
+        </div>
+
+        <div class="card">
+            <header class="card-head"><div><h2 class="card-title">Activation key history</h2><div class="card-meta" style="margin-top:6px;"><span>Hashes stored · cleartext unrecoverable</span></div></div></header>
+            <table class="data-table">
+                <thead><tr><th>Key prefix</th><th>Issued</th><th>State</th><th></th></tr></thead>
+                <tbody>
+                @if (!Model.KeyHistory.Any())
+                {
+                    <tr><td colspan="4" style="text-align:center; padding:24px; color:var(--ink-faint);">No activation keys yet — provision the tenant via Onboard.</td></tr>
+                }
+                @{
+                    bool isManagerView = ViewBag.IsManager == true;
+                }
+                @foreach (var k in Model.KeyHistory)
+                {
+                    var dim = k.ConsumedAt.HasValue || k.RevokedAt.HasValue || k.ExpiresAt < DateTime.UtcNow;
+                    var canRevoke = isManagerView && !k.RevokedAt.HasValue && k.ExpiresAt > DateTime.UtcNow;
+                    <tr style="@(dim ? "opacity:0.6;" : "")">
+                        <td class="num-cell">@k.KeyPrefix</td>
+                        <td>@k.IssuedAt.ToString("dd MMM") · @k.IssuedToEmail</td>
+                        <td><span class="status-pill @KeyPill(k.State)">@TitleCase(k.State)</span></td>
+                        <td style="white-space:nowrap; text-align:right;">
+                            @if (canRevoke)
+                            {
+                                <details>
+                                    <summary style="cursor:pointer; color:var(--danger); font-size:12px;">Revoke</summary>
+                                    <form asp-action="RevokeKey" method="post" style="margin-top:8px; padding:10px; border:1px solid var(--line); border-radius:8px; background:var(--bg-elev); min-width:280px;">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="keyPrefix" value="@k.KeyPrefix" />
+                                        <input type="hidden" name="partnerId" value="@p.Id" />
+                                        <div class="field" style="margin-bottom:8px;">
+                                            <label style="font-size:11px; display:block; margin-bottom:4px;">Reason</label>
+                                            <textarea name="reason" required rows="2" placeholder="e.g. credential leaked" style="width:100%; font-size:12px;"></textarea>
+                                        </div>
+                                        <div style="display:flex; gap:6px; justify-content:flex-end;">
+                                            <button type="reset" class="btn btn-ghost btn-sm">Cancel</button>
+                                            <button type="submit" class="btn btn-sm" style="background:var(--danger); color:#fff;">Confirm revoke</button>
+                                        </div>
+                                    </form>
+                                </details>
+                            }
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card">
+            <header class="card-head"><div><h2 class="card-title">Contract documents</h2></div><button class="btn btn-ghost btn-sm">Upload</button></header>
+            <div class="info-list">
+                <div class="info-row"><div class="info-label">MSA</div><div class="info-value" style="color:var(--ink-faint);">Wire from contracts table</div></div>
+                <div class="info-row"><div class="info-label">SOW</div><div class="info-value" style="color:var(--ink-faint);">Wire from contracts table</div></div>
+                <div class="info-row"><div class="info-label">DPA</div><div class="info-value" style="color:var(--ink-faint);">Wire from contracts table</div></div>
+                <div class="info-row"><div class="info-label">SLA</div><div class="info-value" style="color:var(--ink-faint);">Wire from contracts table</div></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <header class="card-head"><div><h2 class="card-title">Activity log</h2></div><a href="#" style="font-size:13px; color:var(--accent);">All →</a></header>
+            <div class="feed">
+                <div class="feed-row"><span class="feed-code">EV-—</span><div class="feed-meta"><strong>System</strong> · partner created @p.CreatedAt.ToString("dd MMM HH:mm")</div><span class="feed-amount" style="font-size:11px; color:var(--ink-faint);">@p.CreatedAt.ToString("dd MMM")</span><span class="feed-status ok">✓</span></div>
+                @if (p.ProvisionedAt.HasValue)
+                {
+                    <div class="feed-row"><span class="feed-code">EV-—</span><div class="feed-meta"><strong>System</strong> · tenant provisioned</div><span class="feed-amount" style="font-size:11px; color:var(--ink-faint);">@p.ProvisionedAt.Value.ToString("dd MMM")</span><span class="feed-status ok">✓</span></div>
+                }
+            </div>
+        </div>
+    </section>
+</div>
+
+<details class="card" id="reissue" style="margin-bottom:32px;">
+    <summary style="padding:18px 22px; cursor:pointer; font-family:var(--font-display); font-size:var(--fs-18); border-bottom:1px solid var(--line);">⚠ Re-issue activation key · confirmation</summary>
+    <div class="card-body">
+        @if (t is null)
+        {
+            <p style="color:var(--ink-faint);">No tenant has been provisioned yet for this partner. Use Onboard to generate the first key.</p>
+        }
+        else
+        {
+            <form asp-action="ReissueKey" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="tenantId" value="@t.Id" />
+                <input type="hidden" name="partnerId" value="@p.Id" />
+                <div class="warn-callout">
+                    <div class="ico">!</div>
+                    <div class="body">Re-issuing the activation key will <strong>revoke the current key</strong> and generate a new one. The previous key will be unusable. The new cleartext is shown once. Manager-only action.</div>
+                </div>
+                <div class="field" style="margin-top:16px;"><label>Reason</label><textarea name="reason" required placeholder="e.g. admin lost the welcome email"></textarea></div>
+                <div class="field"><label>Confirm by typing the partner name (<span class="mono">@p.LegalName</span>)</label><input type="text" pattern="@p.LegalName" required /></div>
+                <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:12px;">
+                    <button class="btn btn-ghost btn-sm" type="reset">Cancel</button>
+                    <button class="btn btn-gold btn-sm" type="submit">Revoke &amp; re-issue</button>
+                </div>
+            </form>
+        }
+    </div>
+</details>
+
+<footer class="crm-foot">
+    <span>Gold Kiosk · CRM · © AI Kiosks International Inc. 2026</span>
+    <span class="mono">partner_id: @p.Id.ToString().Substring(0,8) · @(t is null ? "no tenant" : "tenant: " + t.Id.ToString().Substring(0,8))</span>
+</footer>

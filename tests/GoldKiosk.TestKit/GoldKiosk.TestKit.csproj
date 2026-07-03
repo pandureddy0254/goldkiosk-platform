@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Bogus" />
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <PackageReference Include="Moq" />
+    <PackageReference Include="NUnit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\shared\GoldKiosk.Domain\GoldKiosk.Domain.csproj" />
+    <ProjectReference Include="..\..\src\shared\GoldKiosk.Contracts\GoldKiosk.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\kiosk\GoldKiosk.Kiosk.Core\GoldKiosk.Kiosk.Core.csproj" />
+    <ProjectReference Include="..\..\src\kiosk\GoldKiosk.Kiosk.Devices\GoldKiosk.Kiosk.Devices.csproj" />
+  </ItemGroup>
+
+</Project>

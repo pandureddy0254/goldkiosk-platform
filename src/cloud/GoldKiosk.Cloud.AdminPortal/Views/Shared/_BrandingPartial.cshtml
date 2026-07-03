@@ -1,0 +1,10 @@
+@inject GoldKiosk.Cloud.AdminPortal.Services.Licensing.ILicenseService Licenses
+@inject GoldKiosk.Cloud.AdminPortal.Services.Licensing.IBrandingService Branding
+@{
+    var active = await Licenses.GetActiveAsync(Context.RequestAborted);
+    if (active is not null && Branding.HasBrandingFor(active.License))
+    {
+        var tid = active.License.TenantId.ToString("D");
+        <link rel="stylesheet" href="~/branding/@tid/brand.css" asp-append-version="true" />
+    }
+}

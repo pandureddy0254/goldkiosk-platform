@@ -1,0 +1,365 @@
+@model GoldKiosk.Cloud.AdminPortal.Models.RoleMasterList
+@{
+    ViewBag.PageTitle = "Role <em>master.</em>";
+    ViewBag.Eyebrow   = "Administration · Access control";
+    ViewBag.Subtitle  = "Six predefined system roles + your own custom roles. The Owner role is special &mdash; it cannot be deleted or stripped of permissions.";
+    ViewBag.ActiveNav = "user-management";
+
+    var total    = Model?.Total    ?? 8;
+    var active   = Model?.Active   ?? 8;
+    var inactive = Model?.InActive ?? 0;
+}
+
+<div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin: -16px 0 22px;">
+    <div class="seg seg-tabs">
+        <a asp-controller="UserManagement" asp-action="ProfileRoles">Users</a>
+        <a class="active" asp-controller="UserManagement" asp-action="RoleMaster">Role master</a>
+        <a asp-controller="UserManagement" asp-action="AccessControl">Access control</a>
+    </div>
+    <span style="flex:1;"></span>
+    <button type="button" class="btn btn-ghost btn-sm">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7H12M7 2V12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Import role
+    </button>
+    <button type="button" class="btn btn-primary btn-sm" data-action="open-modal" data-target="addRoleModal" id="openAddRole">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 3V11M3 7H11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Create custom role
+    </button>
+</div>
+
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Total roles<span class="dot"></span></div>
+        <div class="kpi-value mono">@total</div>
+        <div class="kpi-foot"><span class="label-suffix">6 system · 2 custom</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Total permissions<span class="dot"></span></div>
+        <div class="kpi-value mono">38</div>
+        <div class="kpi-foot"><span class="label-suffix">across 14 modules</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Active<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value mono">@active</div>
+        <div class="kpi-foot"><span class="label-suffix">in use right now</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Inactive<span class="dot" style="background:var(--warning);"></span></div>
+        <div class="kpi-value mono">@inactive</div>
+        <div class="kpi-foot"><span class="label-suffix">archived</span></div>
+    </div>
+</div>
+
+@* ── Role-card grid (six system + two custom) ────────────────────── *@
+<div class="eyebrow" style="margin-bottom:14px;">Roles · select a card to inspect permissions</div>
+<div class="role-grid">
+
+    <div class="role-card">
+        <span class="role-pill r-admin">Primary admin</span>
+        <h4>Owner</h4>
+        <p class="role-desc">Full access. Bound to the activation key. Cannot be deleted or stripped.</p>
+        <div class="role-stats"><span>1 user</span><span><strong>38</strong> / 38 perms</span></div>
+    </div>
+    <div class="role-card">
+        <span class="role-pill r-manager">Manager</span>
+        <h4>Branch manager</h4>
+        <p class="role-desc">Approves payouts, manages kiosks, reviews tickets. Cannot edit roles.</p>
+        <div class="role-stats"><span>3 users</span><span><strong>27</strong> / 38 perms</span></div>
+    </div>
+    <div class="role-card">
+        <span class="role-pill r-operator">Operator</span>
+        <h4>Kiosk operator</h4>
+        <p class="role-desc">Day-to-day floor staff. Reads + writes tickets and feedback only.</p>
+        <div class="role-stats"><span>6 users</span><span><strong>8</strong> / 38 perms</span></div>
+    </div>
+    <div class="role-card">
+        <span class="role-pill r-analyst">Analyst</span>
+        <h4>Finance &amp; ops analyst</h4>
+        <p class="role-desc">Reads everything, exports CSV. No write. Suitable for finance + compliance.</p>
+        <div class="role-stats"><span>2 users</span><span><strong>20</strong> / 38 perms</span></div>
+    </div>
+    <div class="role-card">
+        <span class="role-pill r-support">Support</span>
+        <h4>Helpdesk agent</h4>
+        <p class="role-desc">Owns tickets, SOS, feedback. Can unmask PII with reason logged.</p>
+        <div class="role-stats"><span>2 users</span><span><strong>10</strong> / 38 perms</span></div>
+    </div>
+    <div class="role-card">
+        <span class="role-pill r-auditor">Auditor</span>
+        <h4>External auditor</h4>
+        <p class="role-desc">Time-boxed audit log + reports. Cannot see PII. Auto-revokes on expiry.</p>
+        <div class="role-stats"><span>0 users</span><span><strong>5</strong> / 38 perms</span></div>
+    </div>
+    <div class="role-card role-custom">
+        <span class="role-pill" style="background:rgba(42,93,140,0.10); color:var(--info); border-color:rgba(42,93,140,0.22);">Custom</span>
+        <h4>Treasury · daily ops</h4>
+        <p class="role-desc">Reports + payouts read/export, no PII. Created by Sara · 18 days ago.</p>
+        <div class="role-stats"><span>2 users</span><span><strong>9</strong> / 38 perms</span></div>
+    </div>
+    <div class="role-card role-custom">
+        <span class="role-pill" style="background:rgba(42,93,140,0.10); color:var(--info); border-color:rgba(42,93,140,0.22);">Custom</span>
+        <h4>AML reviewer</h4>
+        <p class="role-desc">PII unmask + audit read + customer read. Created by Sara · 31 days ago.</p>
+        <div class="role-stats"><span>1 user</span><span><strong>6</strong> / 38 perms</span></div>
+    </div>
+
+    @if (Model?.roleMasterList != null)
+    {
+        foreach (var item in Model.roleMasterList)
+        {
+            <div class="role-card role-custom">
+                <span class="role-pill" style="background:rgba(42,93,140,0.10); color:var(--info); border-color:rgba(42,93,140,0.22);">Custom</span>
+                <h4>@item.Name</h4>
+                <p class="role-desc"><span class="mono" style="font-size:11px; color:var(--accent);">@item.Code</span> &middot; created @item.CreatedOn.ToString("dd MMM yyyy")</p>
+                <div class="role-stats">
+                    <span>
+                        @if (item.IsActive)
+                        {
+                            <span class="status-pill s-active">Active</span>
+                        }
+                        else
+                        {
+                            <span class="status-pill s-disabled">Inactive</span>
+                        }
+                    </span>
+                    <span><strong>custom</strong> · editable</span>
+                </div>
+            </div>
+        }
+    }
+
+</div>
+
+@* ── List view (paginated) ───────────────────────────────────────── *@
+<section class="card" style="margin-bottom:32px;">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Roles &middot; list view</h2>
+            <div class="card-meta" style="margin-top:6px;"><span>Filter and search across system + custom roles</span></div>
+        </div>
+    </header>
+    <div class="card-body">
+        <form asp-controller="UserManagement" asp-action="RoleManagement" method="get" autocomplete="off">
+            <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px;">
+                <input type="text" name="search" class="input" placeholder="Search by code or name&hellip;" value="@ViewBag.SearchTerm" style="flex:1; min-width:220px;" />
+                @if (ViewBag.StatusDropdown is List<SelectListItem> statusList)
+                {
+                    @Html.DropDownList("stat", statusList, "All statuses", new { @class = "input", style = "min-width:160px;" })
+                }
+                <button type="submit" class="btn btn-ghost btn-sm">Search</button>
+            </div>
+        </form>
+
+        <div style="overflow-x:auto;">
+            <table class="user-table">
+                <thead>
+                    <tr><th>Code</th><th>Role name</th><th>Created</th><th>Status</th><th style="text-align:right; padding-right:22px;">Actions</th></tr>
+                </thead>
+                <tbody>
+                    @if (Model?.roleMasterList != null && Model.roleMasterList.Any())
+                    {
+                        foreach (var item in Model.roleMasterList)
+                        {
+                            <tr>
+                                <td><span class="mono" style="color:var(--accent);">@item.Code</span></td>
+                                <td>@item.Name</td>
+                                <td class="mono" style="font-size:12px;">@item.CreatedOn.ToString("dd MMM yyyy · HH:mm")</td>
+                                <td>
+                                    @if (item.IsActive)
+                                    {
+                                        <span class="status-pill s-active">Active</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="status-pill s-disabled">Inactive</span>
+                                    }
+                                </td>
+                                <td>
+                                    <div class="row-actions" style="justify-content:flex-end;">
+                                        <button type="button" class="icon-btn" title="Edit"
+                                                onclick="editRole('@item.Code','@item.Name','@(item.IsActive ? "true" : "false")')">
+                                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9 2L12 5L5 12H2V9L9 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+                                        </button>
+                                        <button type="button" class="icon-btn" title="Delete"
+                                                onclick="confirmDelete('@item.Code')">
+                                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 4H11M5 4V2H9V4M4 4V12H10V4" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr><td colspan="5" style="text-align:center; padding:32px; color:var(--ink-faint);">No custom roles defined. Use <em>Create custom role</em> above.</td></tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (Model != null && Model.TotalPage > 1)
+        {
+            <div style="display:flex; justify-content:flex-end; gap:6px; margin-top:18px;">
+                @for (int i = 1; i <= Model.TotalPage; i++)
+                {
+                    if (i == Model.PageNo)
+                    {
+                        <span class="btn btn-ghost btn-sm" style="border-color:var(--accent); color:var(--accent);">@i</span>
+                    }
+                    else
+                    {
+                        <a class="btn btn-ghost btn-sm" asp-action="RoleManagement"
+                           asp-route-PageNo="@i" asp-route-search="@ViewBag.SearchTerm" asp-route-stat="@ViewBag.Stat">@i</a>
+                    }
+                }
+            </div>
+        }
+    </div>
+</section>
+
+@* ── Add Role modal (visual stub, posts to AddRole) ───────────────── *@
+<div class="modal-scrim" id="addRoleScrim" onclick="closeRoleModal()"></div>
+<div class="modal-dialog" id="addRoleModal" role="dialog" aria-labelledby="addRoleTitle" aria-hidden="true">
+    <header class="modal-head">
+        <h3 id="addRoleTitle">Create custom role</h3>
+        <button type="button" class="icon-btn" onclick="closeRoleModal()" aria-label="Close">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 2L12 12M12 2L2 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+    </header>
+    <form asp-controller="UserManagement" asp-action="AddRole" method="post" autocomplete="off">
+        @Html.AntiForgeryToken()
+        <div class="modal-body">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+                <div>
+                    <label class="form-label" for="addCode">Code <span style="color:var(--danger);">*</span></label>
+                    <input type="text" class="input" id="addCode" name="Code" placeholder="e.g. TREASURY-OPS" required maxlength="32" />
+                </div>
+                <div>
+                    <label class="form-label" for="addName">Role name <span style="color:var(--danger);">*</span></label>
+                    <input type="text" class="input" id="addName" name="Name" placeholder="e.g. Treasury · daily ops" required maxlength="64" />
+                </div>
+            </div>
+            <p class="card-meta" style="margin-top:14px;">Once created, configure permissions on the <a asp-action="AccessControl">Access control</a> tab.</p>
+        </div>
+        <div class="modal-foot">
+            <button type="button" class="btn btn-ghost btn-sm" onclick="closeRoleModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary btn-sm">Create role</button>
+        </div>
+    </form>
+</div>
+
+@* Edit Role hidden form (wired by editRole). *@
+<div class="modal-dialog" id="editRoleModal" role="dialog" aria-hidden="true" style="display:none;">
+    <header class="modal-head">
+        <h3>Edit role</h3>
+        <button type="button" class="icon-btn" onclick="closeRoleModal()" aria-label="Close">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 2L12 12M12 2L2 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+    </header>
+    <form asp-controller="UserManagement" asp-action="EditRole" method="post" autocomplete="off">
+        @Html.AntiForgeryToken()
+        <div class="modal-body">
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+                <div>
+                    <label class="form-label" for="editCode">Code</label>
+                    <input type="text" class="input" id="editCode" name="Code" readonly />
+                </div>
+                <div>
+                    <label class="form-label" for="editName">Role name</label>
+                    <input type="text" class="input" id="editName" name="Name" required />
+                </div>
+                <div>
+                    <label class="form-label" for="editStatus">Status</label>
+                    @if (ViewBag.StatusDropdown is List<SelectListItem> stat)
+                    {
+                        @Html.DropDownList("IsActive", stat, new { @class = "input", id = "editStatus" })
+                    }
+                </div>
+            </div>
+        </div>
+        <div class="modal-foot">
+            <button type="button" class="btn btn-ghost btn-sm" onclick="closeRoleModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary btn-sm">Save</button>
+        </div>
+    </form>
+</div>
+
+@* Delete confirmation hidden form. *@
+<div class="modal-dialog" id="deleteRoleModal" role="dialog" aria-hidden="true" style="display:none;">
+    <header class="modal-head">
+        <h3>Delete role</h3>
+        <button type="button" class="icon-btn" onclick="closeRoleModal()" aria-label="Close">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 2L12 12M12 2L2 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+    </header>
+    <form asp-controller="UserManagement" asp-action="DeleteRole" method="post" autocomplete="off">
+        @Html.AntiForgeryToken()
+        <div class="modal-body">
+            <p>Are you sure you want to delete role <strong id="delDisplay" class="mono" style="color:var(--accent);"></strong>? Users assigned to this role will lose its permissions.</p>
+            <input type="hidden" id="delCode" name="Code" value="" />
+        </div>
+        <div class="modal-foot">
+            <button type="button" class="btn btn-ghost btn-sm" onclick="closeRoleModal()">Cancel</button>
+            <button type="submit" class="btn btn-primary btn-sm" style="background:var(--danger); border-color:var(--danger);">Delete</button>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+        function openModal(id) {
+            document.getElementById('addRoleScrim').classList.add('open');
+            var m = document.getElementById(id);
+            m.style.display = 'flex';
+            m.classList.add('open');
+            m.setAttribute('aria-hidden', 'false');
+        }
+        function closeRoleModal() {
+            document.getElementById('addRoleScrim').classList.remove('open');
+            ['addRoleModal','editRoleModal','deleteRoleModal'].forEach(function (id) {
+                var m = document.getElementById(id);
+                m.classList.remove('open');
+                m.style.display = 'none';
+                m.setAttribute('aria-hidden', 'true');
+            });
+        }
+        function editRole(code, name, isActive) {
+            document.getElementById('editCode').value   = code;
+            document.getElementById('editName').value   = name;
+            var sel = document.getElementById('editStatus');
+            if (sel) sel.value = isActive;
+            openModal('editRoleModal');
+        }
+        function confirmDelete(code) {
+            document.getElementById('delDisplay').textContent = code;
+            document.getElementById('delCode').value          = code;
+            openModal('deleteRoleModal');
+        }
+        document.getElementById('openAddRole')?.addEventListener('click', function () {
+            openModal('addRoleModal');
+        });
+    </script>
+}
+
+@* TODO promote: modal + form-label + seg-tabs — modal is reused several places,
+    lift on next pass. *@
+<style>
+    .seg.seg-tabs { display:inline-flex; border:1px solid var(--line-strong); border-radius:var(--radius-md); overflow:hidden; background:var(--canvas-elevated); flex-wrap:wrap; }
+    .seg.seg-tabs a { padding:8px 14px; font-size:13px; color:var(--ink-soft); border-right:1px solid var(--line); text-decoration:none; }
+    .seg.seg-tabs a:last-child { border-right:none; }
+    .seg.seg-tabs a.active { background: var(--ink); color: var(--canvas); }
+    .seg.seg-tabs a:hover:not(.active) { background: var(--canvas-sunken); color: var(--ink); }
+    .input { width:100%; padding:9px 12px; background:var(--canvas-sunken); border:1px solid var(--line-strong); border-radius:var(--radius-md); font-family:var(--font-sans); font-size:13px; color:var(--ink); }
+    .input:focus { outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-ring); }
+    .form-label { display:block; font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--ink-faint); margin-bottom:4px; }
+    .role-custom h4::after { content:" \270E"; font-size:13px; color:var(--ink-faint); }
+
+    .modal-scrim { position:fixed; inset:0; background:rgba(0,0,0,0.45); opacity:0; pointer-events:none; transition:opacity var(--dur-med); z-index:90; }
+    .modal-scrim.open { opacity:1; pointer-events:auto; }
+    .modal-dialog { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%) scale(0.96); opacity:0; pointer-events:none; z-index:91; width:560px; max-width:92vw; background:var(--canvas); border:1px solid var(--line); border-radius:var(--radius-lg); flex-direction:column; box-shadow:var(--shadow-md); transition:opacity var(--dur-fast), transform var(--dur-fast); }
+    .modal-dialog.open { opacity:1; pointer-events:auto; transform:translate(-50%,-50%) scale(1); }
+    .modal-head { display:flex; justify-content:space-between; align-items:center; padding:18px 22px; border-bottom:1px solid var(--line); }
+    .modal-head h3 { font-family:var(--font-display); font-size:20px; font-weight:400; margin:0; }
+    .modal-body { padding:22px; }
+    .modal-foot { padding:14px 22px; display:flex; justify-content:flex-end; gap:8px; border-top:1px solid var(--line); }
+</style>

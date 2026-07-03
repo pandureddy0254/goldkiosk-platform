@@ -1,0 +1,175 @@
+@using GoldKiosk.Cloud.AdminPortal.Models
+@using System.Globalization
+@model VoucherRedemptionList
+@{
+    ViewBag.PageTitle = "Redemption <em>log.</em>";
+    ViewBag.Eyebrow   = "COMMERCE · VOUCHERS";
+    ViewBag.Subtitle  = "Every voucher redemption — settled, pending, and rejected — with link-throughs to the underlying transaction and the policy that gated it.";
+    ViewBag.ActiveNav = "vouchers";
+    ViewBag.PageHeadActions =
+        "<button class=\"btn btn-ghost btn-sm\" type=\"button\">Export CSV</button>" +
+        "<button class=\"btn btn-ghost btn-sm\" type=\"button\">Settings</button>";
+
+    var searchTerm = ViewBag.SearchTerm as string;
+    var totalValue = Model.Items.Sum(r => r.RedeemedAmount);
+    var avgValue   = Model.Items.Count > 0 ? totalValue / Model.Items.Count : 0m;
+    var topCode    = Model.Items
+                          .GroupBy(r => r.VoucherCode)
+                          .OrderByDescending(g => g.Count())
+                          .Select(g => g.Key)
+                          .FirstOrDefault() ?? "—";
+    var topCodeCount = Model.Items
+                            .Where(r => r.VoucherCode == topCode)
+                            .Count();
+
+    // Deterministic avatar palette + initials from a Guid (no PII exposed in mock).
+    static (string color, string initials) AvatarFor(Guid g)
+    {
+        var palettes = new[] {
+            "linear-gradient(135deg,#b8941f,#7a610f)",
+            "linear-gradient(135deg,#2a5d8c,#1c3e5d)",
+            "linear-gradient(135deg,#a83232,#7a2424)",
+            "linear-gradient(135deg,#c47419,#8b520f)",
+            "linear-gradient(135deg,#2a7d4f,#1c5d3a)",
+            "linear-gradient(135deg,#75716a,#4a4845)",
+        };
+        var hex   = g.ToString("N");
+        var idx   = (hex[0] - '0' + hex[1]) % palettes.Length;
+        if (idx < 0) idx = -idx;
+        var inits = $"{char.ToUpper(hex[0])}{char.ToUpper(hex[2])}";
+        return (palettes[idx], inits);
+    }
+}
+
+<nav class="sub-nav" aria-label="Vouchers module">
+    <a class="sub-link" asp-controller="VoucherManagement" asp-action="VoucherConfiguration">Catalogue</a>
+    <a class="sub-link" asp-controller="VoucherManagement" asp-action="RedemptionPolicies">Redemption policies</a>
+    <a class="sub-link active" asp-controller="VoucherManagement" asp-action="VoucherTransaction">Redemption log</a>
+</nav>
+
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Redemptions in view<span class="dot"></span></div>
+        <div class="kpi-value mono">@Model.Items.Count</div>
+        <div class="kpi-foot"><span class="label-suffix">of <span class="mono">@Model.Total</span> total</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Value redeemed<span class="dot" style="background:var(--accent);"></span></div>
+        <div class="kpi-value mono">@totalValue.ToString("N0", CultureInfo.InvariantCulture)<span class="unit">AED</span></div>
+        <div class="kpi-foot"><span class="label-suffix">avg · <span class="mono">@avgValue.ToString("N2", CultureInfo.InvariantCulture)</span> AED</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Catalogue depth<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value mono">@Model.Items.Select(r => r.VoucherCode).Distinct().Count()</div>
+        <div class="kpi-foot"><span class="label-suffix">distinct vouchers in view</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Top voucher<span class="dot" style="background:var(--accent);"></span></div>
+        <div class="kpi-value" style="font-family:var(--font-display); font-size:26px;">@topCode</div>
+        <div class="kpi-foot"><span class="label-suffix"><span class="mono">@topCodeCount</span> redemptions in view</span></div>
+    </div>
+</div>
+
+<form method="get" class="filter-bar" role="search">
+    <div class="filter-bar-left">
+        <div class="search-inline">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/><path d="M11 11L14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <input type="text" name="search" value="@searchTerm" placeholder="Filter by code, TX-ID, kiosk…" />
+        </div>
+        <button type="submit" class="btn btn-ghost btn-sm">Apply</button>
+    </div>
+    <div class="filter-bar-right">
+        <span class="filter-meta"><span class="mono">@Model.Items.Count</span> of <span class="mono">@Model.Total</span> shown</span>
+    </div>
+</form>
+
+<section class="card">
+    <div style="overflow-x:auto;">
+        <table class="user-table">
+            <thead>
+                <tr>
+                    <th>Redemption</th>
+                    <th>Voucher</th>
+                    <th>Customer</th>
+                    <th>Kiosk</th>
+                    <th>Tx ref</th>
+                    <th class="num-th">Discount · AED</th>
+                    <th>Redeemed at</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Items.Any())
+                {
+                    <tr><td colspan="7"><div class="empty-row">No voucher redemptions in this filter.</div></td></tr>
+                }
+                else
+                {
+                    var ix = 1428 - 1;
+                    foreach (var r in Model.Items)
+                    {
+                        ix++;
+                        var av = AvatarFor(r.CustomerId);
+                        <tr>
+                            <td class="mono">R-@ix</td>
+                            <td><span class="att-code mono">@r.VoucherCode</span></td>
+                            <td>
+                                <div class="user-cell">
+                                    <span class="avatar" style="background:@av.color; color:#fff;">@av.initials</span>
+                                    <div class="meta">
+                                        <strong>@(string.IsNullOrEmpty(r.VoucherName) ? "Customer" : r.VoucherName)</strong>
+                                        <span class="mono">@r.CustomerId.ToString().Substring(0, 8)</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="mono">@r.KioskId.ToString().Substring(0, 8)</td>
+                            <td class="mono"><a href="#" style="color:var(--accent);">@r.TransactionId.ToString().Substring(0, 8)</a></td>
+                            <td class="mono num-td">@r.RedeemedAmount.ToString("N2", CultureInfo.InvariantCulture)</td>
+                            <td class="mono">@r.RedeemedOn.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)</td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+    @if (Model.Items.Any())
+    {
+        <div class="table-foot">
+            <span>Showing <span class="mono">@Model.Items.Count</span> of <span class="mono">@Model.Total</span> · sorted by redeemed_at, descending</span>
+        </div>
+    }
+</section>
+
+@section Head {
+<style>
+/* TODO promote — sub-nav, filter-bar, redemption-code chip, table-foot variant. */
+
+.sub-nav { display: flex; gap: 26px; padding: 0 2px; margin: 0 0 28px; border-bottom: 1px solid var(--line); }
+.sub-link { padding: 12px 2px; font-size: var(--fs-13); font-weight: 500; color: var(--ink-faint); border-bottom: 2px solid transparent; text-decoration: none; transition: color var(--dur-fast), border-color var(--dur-fast); }
+.sub-link:hover { color: var(--ink); }
+.sub-link.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.filter-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 22px 4px 22px; flex-wrap: wrap; margin: 0; }
+.filter-bar-left  { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.filter-bar-right { display: flex; align-items: center; gap: 12px; }
+.filter-meta      { font-size: var(--fs-12); color: var(--ink-faint); }
+.search-inline { display: flex; align-items: center; gap: 8px; padding: 7px 12px; min-width: 280px; background: var(--canvas-elevated); border: 1px solid var(--line); border-radius: var(--radius-md); color: var(--ink-faint); }
+.search-inline input { background: transparent; border: none; outline: none; width: 100%; font-size: var(--fs-13); color: var(--ink); font-family: var(--font-sans); }
+
+.num-th, .num-td { text-align: right; padding-right: 14px !important; }
+
+.att-code {
+    font-size: 11px; font-weight: 600; letter-spacing: var(--tracking-wider);
+    padding: 3px 8px; border-radius: 4px;
+    background: var(--accent-soft); color: var(--accent);
+    border: 1px dashed var(--accent-ring);
+}
+
+.table-foot {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 22px; border-top: 1px solid var(--line);
+    font-size: 12px; color: var(--ink-faint);
+}
+
+.empty-row { padding: 48px 22px; text-align: center; color: var(--ink-faint); font-size: var(--fs-14); }
+</style>
+}

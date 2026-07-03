@@ -50,6 +50,10 @@ appsettings.*.local.json
 # Scratch logs (not source)
 logs/
 
+# Kiosk edge dev data — per-transaction folders written by Kiosk.Api local runs
+# (ADR 0002 store; may contain contact details — never committed)
+src/kiosk/GoldKiosk.Kiosk.Api/data/
+
 # NuGet
 *.nupkg
 *.snupkg

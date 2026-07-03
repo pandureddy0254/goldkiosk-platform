@@ -1,0 +1,171 @@
+@{
+    ViewBag.PageTitle = "Access <em>control.</em>";
+    ViewBag.Eyebrow   = "Administration · Access control";
+    ViewBag.Subtitle  = "Modules &times; roles permission matrix. Grants are inspected on every API call and every UI action. The Owner role cannot be stripped.";
+    ViewBag.ActiveNav = "user-management";
+}
+
+<div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin: -16px 0 22px;">
+    <div class="seg seg-tabs">
+        <a asp-controller="UserManagement" asp-action="ProfileRoles">Users</a>
+        <a asp-controller="UserManagement" asp-action="RoleMaster">Role master</a>
+        <a class="active" asp-controller="UserManagement" asp-action="AccessControl">Access control</a>
+    </div>
+    <span style="flex:1;"></span>
+    <button type="button" class="btn btn-ghost btn-sm">Export JSON</button>
+    <button type="button" class="btn btn-primary btn-sm" id="savePermsBtn" disabled>
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 7L6 10L11 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Save changes
+    </button>
+</div>
+
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Total roles<span class="dot"></span></div>
+        <div class="kpi-value mono">8</div>
+        <div class="kpi-foot"><span class="label-suffix">6 system · 2 custom</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Permissions<span class="dot"></span></div>
+        <div class="kpi-value mono">38</div>
+        <div class="kpi-foot"><span class="label-suffix">across 14 modules</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Users assigned<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value mono">14</div>
+        <div class="kpi-foot"><span class="label-suffix">100% coverage</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Perm changes · 7d<span class="dot" style="background:var(--warning);"></span></div>
+        <div class="kpi-value mono">4</div>
+        <div class="kpi-foot"><span class="label-suffix">all by Sara · audited</span></div>
+    </div>
+</div>
+
+@* ── Role selector tiles ──────────────────────────────────────────── *@
+<div class="eyebrow" style="margin-bottom:14px;">Select a role to inspect or edit</div>
+<div class="role-grid">
+    <div class="role-card role-tile active" data-role="owner" onclick="selectRole(this, 'owner')">
+        <span class="role-pill r-admin">Primary admin</span>
+        <h4>Owner</h4>
+        <p class="role-desc">Bound to the activation key. Cannot be edited or stripped.</p>
+        <div class="role-stats"><span>1 user</span><span><strong>38</strong> / 38 perms</span></div>
+    </div>
+    <div class="role-card role-tile" data-role="manager" onclick="selectRole(this, 'manager')">
+        <span class="role-pill r-manager">Manager</span>
+        <h4>Branch manager</h4>
+        <p class="role-desc">Approves payouts, manages kiosks, reviews tickets.</p>
+        <div class="role-stats"><span>3 users</span><span><strong>27</strong> / 38 perms</span></div>
+    </div>
+    <div class="role-card role-tile" data-role="operator" onclick="selectRole(this, 'operator')">
+        <span class="role-pill r-operator">Operator</span>
+        <h4>Kiosk operator</h4>
+        <p class="role-desc">Reads + writes tickets and feedback only.</p>
+        <div class="role-stats"><span>6 users</span><span><strong>8</strong> / 38 perms</span></div>
+    </div>
+    <div class="role-card role-tile" data-role="analyst" onclick="selectRole(this, 'analyst')">
+        <span class="role-pill r-analyst">Analyst</span>
+        <h4>Finance &amp; ops analyst</h4>
+        <p class="role-desc">Reads everything, exports CSV. No write.</p>
+        <div class="role-stats"><span>2 users</span><span><strong>20</strong> / 38 perms</span></div>
+    </div>
+    <div class="role-card role-tile" data-role="support" onclick="selectRole(this, 'support')">
+        <span class="role-pill r-support">Support</span>
+        <h4>Helpdesk agent</h4>
+        <p class="role-desc">Owns tickets, SOS, feedback. Can unmask PII with reason.</p>
+        <div class="role-stats"><span>2 users</span><span><strong>10</strong> / 38 perms</span></div>
+    </div>
+    <div class="role-card role-tile" data-role="auditor" onclick="selectRole(this, 'auditor')">
+        <span class="role-pill r-auditor">Auditor</span>
+        <h4>External auditor</h4>
+        <p class="role-desc">Time-boxed audit log + reports. Cannot see PII.</p>
+        <div class="role-stats"><span>0 users</span><span><strong>5</strong> / 38 perms</span></div>
+    </div>
+</div>
+
+@* ── Permission matrix (modules × roles) ────────────────────────── *@
+<section class="card" style="margin-bottom:32px;">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Permissions &middot; <span id="activeRoleName" style="font-family:var(--font-display); color:var(--accent); font-style:italic;">Owner</span></h2>
+            <div class="card-meta" style="margin-top:6px;">
+                <span id="activeRoleMeta">Primary admin · 1 user · cannot be edited (system role)</span>
+            </div>
+        </div>
+        <div class="card-meta" style="display:flex; gap:12px;">
+            <span><span class="perm full" style="width:14px; height:14px;"></span> Read &amp; write</span>
+            <span><span class="perm read" style="width:14px; height:14px;"></span> Read only</span>
+            <span><span class="perm partial" style="width:14px; height:14px;"></span> Conditional</span>
+            <span><span class="perm none" style="width:14px; height:14px; border:1px dashed var(--line-strong); border-radius:50%;"></span> No access</span>
+        </div>
+    </header>
+    <div style="overflow-x:auto;">
+        <table class="rbac-matrix">
+            <thead>
+                <tr>
+                    <th>Module &middot; permission code</th>
+                    <th>Owner</th><th>Manager</th><th>Operator</th><th>Analyst</th><th>Support</th><th>Auditor</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>Dashboard <span class="sub">dashboard:read</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm read">R</span></td><td><span class="perm read">R</span></td><td><span class="perm read">R</span></td><td><span class="perm read">R</span></td></tr>
+                <tr><td>Kiosks · view <span class="sub">kiosks:read</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm read">R</span></td><td><span class="perm read">R</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td></tr>
+                <tr><td>Kiosks · manage <span class="sub">kiosks:write</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td></tr>
+                <tr><td>Kiosks · decommission <span class="sub">kiosks:admin</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td></tr>
+                <tr><td>Customers · view <span class="sub">customers:read</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm read">R</span></td><td><span class="perm read">R</span></td><td><span class="perm read">R</span></td><td><span class="perm read">R</span></td><td><span class="perm none">&mdash;</span></td></tr>
+                <tr><td>Customers · PII unmask <span class="sub">customers:unmask &middot; audited</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm partial">P</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm partial">P</span></td><td><span class="perm none">&mdash;</span></td></tr>
+                <tr><td>Sales <span class="sub">sales:read · sales:write</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm partial">P</span></td><td><span class="perm read">R</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td></tr>
+                <tr><td>Vouchers <span class="sub">vouchers:read · vouchers:write</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm read">R</span></td><td><span class="perm read">R</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td></tr>
+                <tr><td>Reports <span class="sub">reports:read · reports:export</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm read">R</span></td></tr>
+                <tr><td>Helpdesk <span class="sub">helpdesk:read · helpdesk:write</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm partial">P</span></td><td><span class="perm read">R</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm none">&mdash;</span></td></tr>
+                <tr><td>SOS <span class="sub">sos:write</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm none">&mdash;</span></td></tr>
+                <tr><td>Audit log <span class="sub">audit:read · audit:export</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm read">R</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm read">R</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm read">R</span></td></tr>
+                <tr><td>Monitoring <span class="sub">monitoring:read</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm read">R</span></td><td><span class="perm read">R</span></td><td><span class="perm read">R</span></td><td><span class="perm none">&mdash;</span></td></tr>
+                <tr><td>Operations <span class="sub">operations:write</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm partial">P</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td></tr>
+                <tr><td>User management <span class="sub">users:admin &middot; sensitive</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm partial">P</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td></tr>
+                <tr><td>Roles &middot; manage <span class="sub">roles:write</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td></tr>
+                <tr><td>Tenant admin <span class="sub">tenant:admin &middot; sensitive</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td></tr>
+                <tr><td>API credentials <span class="sub">api_credentials:admin</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td></tr>
+                <tr><td>Webhooks <span class="sub">webhooks:write</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm full">&#10003;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td><td><span class="perm none">&mdash;</span></td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@* Save form (visual stub; wire to UpdateRolePermissions when ready). *@
+<form method="post" style="display:none;" id="savePermsForm">
+    @Html.AntiForgeryToken()
+</form>
+
+@section Scripts {
+    <script>
+        var roleData = {
+            owner:    { name: 'Owner',                 meta: 'Primary admin · 1 user · cannot be edited (system role)', editable: false },
+            manager:  { name: 'Branch manager',        meta: 'Manager · 3 users · system role (read-only template)',    editable: false },
+            operator: { name: 'Kiosk operator',        meta: 'Operator · 6 users · system role (read-only template)',   editable: false },
+            analyst:  { name: 'Finance & ops analyst', meta: 'Analyst · 2 users · system role (read-only template)',    editable: false },
+            support:  { name: 'Helpdesk agent',        meta: 'Support · 2 users · system role (read-only template)',    editable: false },
+            auditor:  { name: 'External auditor',      meta: 'Auditor · 0 users · system role · time-boxed access',     editable: false }
+        };
+        function selectRole(el, key) {
+            document.querySelectorAll('.role-tile').forEach(function (t) { t.classList.remove('active'); });
+            el.classList.add('active');
+            var d = roleData[key];
+            if (!d) return;
+            document.getElementById('activeRoleName').textContent = d.name;
+            document.getElementById('activeRoleMeta').textContent = d.meta;
+            document.getElementById('savePermsBtn').disabled      = !d.editable;
+        }
+    </script>
+}
+
+@* TODO promote: seg-tabs + role-tile active state — already established. *@
+<style>
+    .seg.seg-tabs { display:inline-flex; border:1px solid var(--line-strong); border-radius:var(--radius-md); overflow:hidden; background:var(--canvas-elevated); flex-wrap:wrap; }
+    .seg.seg-tabs a { padding:8px 14px; font-size:13px; color:var(--ink-soft); border-right:1px solid var(--line); text-decoration:none; }
+    .seg.seg-tabs a:last-child { border-right:none; }
+    .seg.seg-tabs a.active { background: var(--ink); color: var(--canvas); }
+    .seg.seg-tabs a:hover:not(.active) { background: var(--canvas-sunken); color: var(--ink); }
+    .role-tile { cursor:pointer; }
+    .role-tile.active { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-ring); }
+</style>

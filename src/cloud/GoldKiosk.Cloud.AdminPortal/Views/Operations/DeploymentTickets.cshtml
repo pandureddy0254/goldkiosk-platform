@@ -1,0 +1,97 @@
+@{
+    ViewBag.PageTitle = "Deployment <em>tickets.</em>";
+    ViewBag.Eyebrow   = "Operations · Rollout";
+    ViewBag.Subtitle  = "New-kiosk install jobs and software-version rollouts. Each ticket tracks shipment, on-site install, commissioning, and sign-off.";
+    ViewBag.ActiveNav = "operations";
+}
+
+<div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin: -16px 0 22px;">
+    <div class="seg seg-tabs">
+        <a asp-controller="Operations" asp-action="CollectionTickets">Collections</a>
+        <a asp-controller="Operations" asp-action="MaintenanceTickets">Maintenance</a>
+        <a asp-controller="Operations" asp-action="TechnicianManagement">Technicians</a>
+        <a asp-controller="Operations" asp-action="SystemHealthCheck">System health</a>
+        <a class="active" asp-controller="Operations" asp-action="DeploymentTickets">Deployment</a>
+        <a asp-controller="Operations" asp-action="LocationConfiguration">Locations</a>
+    </div>
+    <span style="flex:1;"></span>
+    <button type="button" class="btn btn-primary btn-sm" data-action="open-modal" data-target="addDeployModal">+ Deployment</button>
+</div>
+
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Open<span class="dot" style="background:var(--warning);"></span></div>
+        <div class="kpi-value mono">6</div>
+        <div class="kpi-foot"><span class="label-suffix">2 shipped · 4 scheduled</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">In progress<span class="dot" style="background:var(--info);"></span></div>
+        <div class="kpi-value mono">3</div>
+        <div class="kpi-foot"><span class="label-suffix">DXB · AUH · RAK</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Closed · 30d<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value mono">11</div>
+        <div class="kpi-foot"><span class="delta delta-up">&#9650; 4</span><span class="label-suffix">vs prior 30d</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Avg. install<span class="dot"></span></div>
+        <div class="kpi-value mono">6.8<span class="unit">h</span></div>
+        <div class="kpi-foot"><span class="delta delta-down">&#9660; 0.4h</span><span class="label-suffix">target 8h</span></div>
+    </div>
+</div>
+
+<section class="card" style="margin-bottom:32px;">
+    <div class="fleet-toolbar">
+        <span style="text-transform:uppercase; letter-spacing:0.08em;">Stage</span>
+        <div class="seg">
+            <button type="button" class="active">All</button>
+            <button type="button">Shipping</button>
+            <button type="button">Install</button>
+            <button type="button">Commission</button>
+            <button type="button">Sign-off</button>
+        </div>
+        <span style="text-transform:uppercase; letter-spacing:0.08em;">Region</span>
+        <div class="seg">
+            <button type="button" class="active">All</button>
+            <button type="button">DXB</button><button type="button">AUH</button><button type="button">SHJ</button><button type="button">RAK</button>
+        </div>
+        <span style="flex:1;"></span>
+        <button type="button" class="btn btn-ghost btn-sm">Export</button>
+    </div>
+
+    <div style="overflow-x:auto;">
+        <table class="user-table">
+            <thead>
+                <tr>
+                    <th>Ticket</th><th>Site</th><th>Kiosk SN</th><th>Stage</th><th>Owner</th>
+                    <th>Created</th><th>Target install</th><th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td class="mono" style="color:var(--accent);">DP-1042</td><td>Dubai Mall · North Wing</td><td class="mono">GK-K-DXB-09</td><td><span class="dev-pill" style="color:var(--info); border-color:var(--info);">Commission</span></td><td>Hassan Al Naqbi</td><td class="mono" style="font-size:12px;">14 May 2026</td><td class="mono" style="font-size:12px;">24 May 2026</td><td><span class="status-pill" style="background:var(--info-soft); color:var(--info);">In progress</span></td></tr>
+                <tr><td class="mono" style="color:var(--accent);">DP-1041</td><td>Yas Mall · West Wing</td><td class="mono">GK-K-AUH-11</td><td><span class="dev-pill" style="color:var(--warning); border-color:var(--warning);">Install</span></td><td>Khalid Mohammed</td><td class="mono" style="font-size:12px;">12 May 2026</td><td class="mono" style="font-size:12px;">25 May 2026</td><td><span class="status-pill s-pending">Scheduled</span></td></tr>
+                <tr><td class="mono" style="color:var(--accent);">DP-1040</td><td>RAK City Centre</td><td class="mono">GK-K-RAK-03</td><td><span class="dev-pill" style="color:var(--accent); border-color:var(--accent);">Shipping</span></td><td>Salim Al Mazroui</td><td class="mono" style="font-size:12px;">10 May 2026</td><td class="mono" style="font-size:12px;">27 May 2026</td><td><span class="status-pill s-pending">In transit</span></td></tr>
+                <tr><td class="mono" style="color:var(--accent);">DP-1039</td><td>Souk Saqr · Al Majaz</td><td class="mono">GK-K-SHJ-04</td><td><span class="dev-pill" style="color:var(--warning); border-color:var(--warning);">Install</span></td><td>Ahmed Khalifa</td><td class="mono" style="font-size:12px;">08 May 2026</td><td class="mono" style="font-size:12px;">26 May 2026</td><td><span class="status-pill s-pending">Scheduled</span></td></tr>
+                <tr><td class="mono" style="color:var(--accent);">DP-1038</td><td>BurJuman Centre</td><td class="mono">GK-K-DXB-08</td><td><span class="dev-pill" style="color:var(--success); border-color:var(--success);">Sign-off</span></td><td>Sara Al Mansoori</td><td class="mono" style="font-size:12px;">04 May 2026</td><td class="mono" style="font-size:12px;">18 May 2026</td><td><span class="status-pill s-active">Closed</span></td></tr>
+                <tr><td class="mono" style="color:var(--accent);">DP-1037</td><td>Ajman City Centre</td><td class="mono">GK-K-AJM-02</td><td><span class="dev-pill" style="color:var(--accent); border-color:var(--accent);">Shipping</span></td><td>Pradeep Nair</td><td class="mono" style="font-size:12px;">02 May 2026</td><td class="mono" style="font-size:12px;">30 May 2026</td><td><span class="status-pill s-pending">In transit</span></td></tr>
+                <tr><td class="mono" style="color:var(--accent);">DP-1036</td><td>Fujairah City Centre</td><td class="mono">GK-K-FUJ-02</td><td><span class="dev-pill" style="color:var(--success); border-color:var(--success);">Sign-off</span></td><td>Salim Al Mazroui</td><td class="mono" style="font-size:12px;">28 Apr 2026</td><td class="mono" style="font-size:12px;">12 May 2026</td><td><span class="status-pill s-active">Closed</span></td></tr>
+                <tr><td class="mono" style="color:var(--accent);">DP-1035</td><td>Marina Mall · Breakwater</td><td class="mono">GK-K-AUH-10</td><td><span class="dev-pill" style="color:var(--info); border-color:var(--info);">Commission</span></td><td>Ali Hassan</td><td class="mono" style="font-size:12px;">26 Apr 2026</td><td class="mono" style="font-size:12px;">15 May 2026</td><td><span class="status-pill" style="background:var(--danger-soft); color:var(--danger);">Overdue</span></td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<form asp-controller="Operations" asp-action="AddDeploymentTicket" method="post" style="display:none;" id="addDeployForm">
+    @Html.AntiForgeryToken()
+</form>
+
+@* TODO promote: seg-tabs + dev-pill — proven elsewhere; scoped here. *@
+<style>
+    .seg.seg-tabs { display:inline-flex; border:1px solid var(--line-strong); border-radius:var(--radius-md); overflow:hidden; background:var(--canvas-elevated); flex-wrap:wrap; }
+    .seg.seg-tabs a { padding:8px 14px; font-size:13px; color:var(--ink-soft); border-right:1px solid var(--line); text-decoration:none; }
+    .seg.seg-tabs a:last-child { border-right:none; }
+    .seg.seg-tabs a.active { background: var(--ink); color: var(--canvas); }
+    .seg.seg-tabs a:hover:not(.active) { background: var(--canvas-sunken); color: var(--ink); }
+    .dev-pill { display:inline-block; font-family: var(--font-mono); font-size: 11px; padding: 2px 8px; border-radius: var(--radius-xs); letter-spacing: 0.04em; border:1px solid var(--line-strong); color: var(--ink-soft); background: var(--canvas-elevated); }
+</style>

@@ -1,0 +1,484 @@
+@using GoldKiosk.Cloud.AdminPortal.Models
+@using System.Globalization
+@model MerchantList
+@{
+    var kycDropdown = ViewBag.KycStatusDropdown as List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>
+                      ?? PortalHelpers.GetKycStatusDropdown();
+    var statTerm    = ViewBag.Stat as string;
+    var searchTerm  = ViewBag.SearchTerm as string;
+    var pageSize    = (int?)ViewBag.PageSize ?? 10;
+    var pageNo      = (int?)ViewBag.PageNo   ?? 1;
+
+    ViewBag.PageTitle = "Merchant <em>directory.</em>";
+    ViewBag.Eyebrow   = "Commerce · Network";
+    ViewBag.Subtitle  = $"{Model.Total:N0} franchise partners across the GCC — bank-tier merchants, jewellers, and independent kiosk hosts. Wallet balances settle nightly at 23:00 GST.";
+    ViewBag.ActiveNav = "merchants";
+    ViewBag.PageHeadActions =
+        "<button type=\"button\" class=\"btn btn-ghost btn-sm\">" +
+        "<svg width=\"14\" height=\"14\" viewBox=\"0 0 14 14\" fill=\"none\"><path d=\"M2 7H12M2 4H12M2 10H8\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/></svg>" +
+        "Export CSV</button>" +
+        "<button type=\"button\" class=\"btn btn-primary btn-sm\" data-action=\"open-add-merchant\">" +
+        "<svg width=\"14\" height=\"14\" viewBox=\"0 0 14 14\" fill=\"none\"><path d=\"M7 3V11M3 7H11\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/></svg>" +
+        "Onboard merchant</button>";
+
+    string[] avatarGradients = new[]
+    {
+        "linear-gradient(135deg,#b8941f,#7a610f)",
+        "linear-gradient(135deg,#a83232,#7a2424)",
+        "linear-gradient(135deg,#2a5d8c,#1c3e5d)",
+        "linear-gradient(135deg,#c47419,#8b520f)",
+        "linear-gradient(135deg,#2a7d4f,#1c5d3a)",
+        "linear-gradient(135deg,#75716a,#4a4845)"
+    };
+
+    string Initials(string? code, string? name)
+    {
+        var src = !string.IsNullOrWhiteSpace(name) ? name : (code ?? "");
+        var parts = src.Split(new[] { ' ', '-', '_' }, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2) return (parts[0][0].ToString() + parts[1][0]).ToUpperInvariant();
+        if (parts.Length == 1 && parts[0].Length >= 2) return parts[0].Substring(0, 2).ToUpperInvariant();
+        return "M";
+    }
+
+    string KycPillClass(string? k) => (k ?? "").ToLowerInvariant() switch
+    {
+        "approved" or "verified" => "s-active",
+        "pending"  or "review"   or "in_review" or "in review" => "s-pending",
+        "rejected"               => "s-disabled",
+        _                        => "s-pending"
+    };
+    string KycLabel(string? k) => string.IsNullOrWhiteSpace(k)
+        ? "Pending"
+        : char.ToUpperInvariant(k[0]) + k.Substring(1).ToLowerInvariant();
+}
+
+@* KPI strip *@
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Total merchants<span class="dot"></span></div>
+        <div class="kpi-value mono">@Model.Total.ToString("N0", CultureInfo.InvariantCulture)</div>
+        <div class="kpi-foot"><span class="label-suffix">in directory</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Approved<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value mono">@Model.Approved.ToString("N0", CultureInfo.InvariantCulture)</div>
+        <div class="kpi-foot">
+            @if (Model.Total > 0)
+            {
+                var pct = (decimal)Model.Approved / Model.Total * 100m;
+                <span class="label-suffix">@pct.ToString("F1", CultureInfo.InvariantCulture)% coverage</span>
+            }
+            else
+            {
+                <span class="label-suffix">No merchants yet</span>
+            }
+        </div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Pending KYC<span class="dot" style="background:var(--warning);"></span></div>
+        <div class="kpi-value mono">@Model.Pending.ToString("N0", CultureInfo.InvariantCulture)</div>
+        <div class="kpi-foot"><span class="label-suffix">awaiting review</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Rejected<span class="dot" style="background:var(--danger);"></span></div>
+        <div class="kpi-value mono">@Model.Rejected.ToString("N0", CultureInfo.InvariantCulture)</div>
+        <div class="kpi-foot"><span class="label-suffix">requires re-submission</span></div>
+    </div>
+</div>
+
+@* Filter toolbar *@
+<form method="get" asp-action="ManageMerchants" class="merch-filter-bar">
+    <div class="merch-filter-left">
+        <div class="search inline-search" style="min-width:280px;">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M11 11L14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <input type="text" name="search" value="@searchTerm" placeholder="Filter by code, name, city…" />
+        </div>
+        <select name="stat" class="merch-filter-select" onchange="this.form.submit();">
+            <option value="" selected="@(string.IsNullOrEmpty(statTerm))">All KYC statuses</option>
+            @foreach (var s in kycDropdown)
+            {
+                if (statTerm == s.Value)
+                {
+                    <option value="@s.Value" selected>@s.Text</option>
+                }
+                else
+                {
+                    <option value="@s.Value">@s.Text</option>
+                }
+            }
+        </select>
+        <button type="submit" class="btn btn-primary btn-sm">Search</button>
+    </div>
+    <div class="merch-filter-right">
+        <span class="filter-meta mono">@Model.Total of @Model.Total shown</span>
+    </div>
+</form>
+
+@* Merchant table *@
+<section class="card">
+    <div style="overflow-x:auto;">
+        <table class="user-table merch-table">
+            <thead>
+                <tr>
+                    <th style="width:12%;">Code</th>
+                    <th style="width:30%;">Merchant</th>
+                    <th style="width:12%;">KYC</th>
+                    <th style="width:9%;">Active</th>
+                    <th style="width:12%;">Onboarded</th>
+                    <th style="width:13%;">Status</th>
+                    <th style="width:12%; text-align:right; padding-right:22px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.Items != null && Model.Items.Any())
+                {
+                    var idx = 0;
+                    foreach (var m in Model.Items)
+                    {
+                        var gradient = avatarGradients[idx % avatarGradients.Length];
+                        var initials = Initials(m.Code, m.Name);
+                        idx++;
+                        <tr>
+                            <td class="mono">@m.Code</td>
+                            <td>
+                                <div class="user-cell">
+                                    <span class="avatar" style="background:@gradient; color:#fff;">@initials</span>
+                                    <div class="meta">
+                                        <strong>@m.Name</strong>
+                                        @if (!string.IsNullOrWhiteSpace(m.Email))
+                                        {
+                                            <span class="mono">@m.Email</span>
+                                        }
+                                        else if (!string.IsNullOrWhiteSpace(m.Mobile))
+                                        {
+                                            <span class="mono">@m.Mobile</span>
+                                        }
+                                    </div>
+                                </div>
+                            </td>
+                            <td><span class="status-pill @KycPillClass(m.KycStatus)">@KycLabel(m.KycStatus)</span></td>
+                            <td>
+                                @if (m.IsActive)
+                                {
+                                    <span class="mono" style="color:var(--success); font-size:12px;">✓ yes</span>
+                                }
+                                else
+                                {
+                                    <span class="mono" style="color:var(--ink-faint); font-size:12px;">— no</span>
+                                }
+                            </td>
+                            <td class="mono">@m.CreatedOn.ToString("dd MMM yy", CultureInfo.InvariantCulture)</td>
+                            <td>
+                                @if (m.IsActive)
+                                {
+                                    <span class="status-pill s-active">Active</span>
+                                }
+                                else
+                                {
+                                    <span class="status-pill s-disabled">Inactive</span>
+                                }
+                            </td>
+                            <td style="text-align:right; padding-right:22px;">
+                                <div class="row-actions" style="justify-content:flex-end;">
+                                    <button type="button"
+                                            class="icon-btn"
+                                            data-action="open-edit-merchant"
+                                            data-id="@m.Id"
+                                            data-code="@m.Code"
+                                            data-name="@m.Name"
+                                            data-kyc="@m.KycStatus"
+                                            data-active="@(m.IsActive ? "true" : "false")"
+                                            title="Edit merchant">
+                                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                                            <path d="M9 2L12 5L4 13H1V10L9 2Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+                                        </svg>
+                                    </button>
+                                    <form method="post" asp-action="DeleteMerchant" style="display:inline;"
+                                          onsubmit="return confirm('Delete merchant @m.Code? Their wallet history is retained.');">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@m.Id" />
+                                        <button type="submit"
+                                                class="icon-btn"
+                                                style="color:var(--danger);"
+                                                title="Delete merchant">
+                                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                                                <path d="M2 4H12M5 4V2H9V4M3 4L4 12H10L11 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                                            </svg>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="7" style="text-align:center; padding:36px 0; color:var(--ink-faint);">
+                            No merchants in this window.
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="table-foot">
+        <span>Showing <strong class="mono">@(Model.Items?.Count ?? 0)</strong> of <strong class="mono">@Model.Total.ToString("N0", CultureInfo.InvariantCulture)</strong> · sorted by created date</span>
+        <div class="pager">
+            <a class="btn btn-ghost btn-sm @(pageNo <= 1 ? "disabled" : null)"
+               asp-action="ManageMerchants"
+               asp-route-search="@searchTerm"
+               asp-route-stat="@statTerm"
+               asp-route-pageNo="@(pageNo - 1)"
+               asp-route-pageSize="@pageSize">◀</a>
+            <button type="button" class="btn btn-ghost btn-sm active">@pageNo</button>
+            <a class="btn btn-ghost btn-sm"
+               asp-action="ManageMerchants"
+               asp-route-search="@searchTerm"
+               asp-route-stat="@statTerm"
+               asp-route-pageNo="@(pageNo + 1)"
+               asp-route-pageSize="@pageSize">▶</a>
+        </div>
+    </div>
+</section>
+
+@* ───── Add merchant modal ───── *@
+<div class="modal-backdrop" id="addMerchantModal" role="dialog" aria-modal="true" aria-labelledby="addMerchantTitle">
+    <form class="modal-card modal-lg" method="post" asp-action="AddMerchant">
+        @Html.AntiForgeryToken()
+        <div class="modal-head">
+            <div class="eyebrow">Commerce · onboarding</div>
+            <h3 id="addMerchantTitle">Onboard <em>merchant.</em></h3>
+            <p>Capture the merchant's code, legal name and current KYC status. A wallet is provisioned automatically on save.</p>
+        </div>
+        <div class="modal-body">
+            <div class="field-grid">
+                <div class="field">
+                    <label for="addCode">Merchant code</label>
+                    <input type="text" id="addCode" name="Code" required class="mono" placeholder="M-DXB-NNN" />
+                </div>
+                <div class="field">
+                    <label for="addName">Legal name</label>
+                    <input type="text" id="addName" name="Name" required placeholder="Acme Jewellers LLC" />
+                </div>
+                <div class="field">
+                    <label for="addKyc">KYC status</label>
+                    <select id="addKyc" name="KycStatus" class="merch-filter-select" style="width:100%;">
+                        @foreach (var s in kycDropdown)
+                        {
+                            <option value="@s.Value">@s.Text</option>
+                        }
+                    </select>
+                </div>
+                <div class="field">
+                    <label>Activation</label>
+                    <div class="checkbox-row">
+                        <input type="hidden" name="IsActive" value="false" />
+                        <input type="checkbox" id="addActive" name="IsActive" value="true" checked />
+                        <label for="addActive" style="margin-bottom:0; text-transform:none; letter-spacing:normal; font-size:var(--fs-13); color:var(--ink);">Activate immediately</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-foot">
+            <button type="button" class="btn btn-ghost btn-sm" data-action="close-modal">Cancel</button>
+            <button type="submit" class="btn btn-primary btn-sm">Create merchant</button>
+        </div>
+    </form>
+</div>
+
+@* ───── Edit merchant modal ───── *@
+<div class="modal-backdrop" id="editMerchantModal" role="dialog" aria-modal="true" aria-labelledby="editMerchantTitle">
+    <form class="modal-card modal-lg" method="post" asp-action="EditMerchant">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="Id" id="editId" />
+        <div class="modal-head">
+            <div class="eyebrow">Commerce · update</div>
+            <h3 id="editMerchantTitle">Edit <em>merchant.</em></h3>
+            <p>The merchant code is immutable once assigned. All other changes are recorded in the audit ledger.</p>
+        </div>
+        <div class="modal-body">
+            <div class="field-grid">
+                <div class="field">
+                    <label for="editCode">Merchant code</label>
+                    <input type="text" id="editCode" name="Code" readonly class="mono" />
+                </div>
+                <div class="field">
+                    <label for="editName">Legal name</label>
+                    <input type="text" id="editName" name="Name" required />
+                </div>
+                <div class="field">
+                    <label for="editKyc">KYC status</label>
+                    <select id="editKyc" name="KycStatus" class="merch-filter-select" style="width:100%;">
+                        @foreach (var s in kycDropdown)
+                        {
+                            <option value="@s.Value">@s.Text</option>
+                        }
+                    </select>
+                </div>
+                <div class="field">
+                    <label>Activation</label>
+                    <div class="checkbox-row">
+                        <input type="hidden" name="IsActive" value="false" />
+                        <input type="checkbox" id="editActive" name="IsActive" value="true" />
+                        <label for="editActive" style="margin-bottom:0; text-transform:none; letter-spacing:normal; font-size:var(--fs-13); color:var(--ink);">Active</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-foot">
+            <button type="button" class="btn btn-ghost btn-sm" data-action="close-modal">Cancel</button>
+            <button type="submit" class="btn btn-primary btn-sm">Save changes</button>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            function open(id) { var el = document.getElementById(id); if (el) el.classList.add('open'); }
+            function close(el) { if (el) el.classList.remove('open'); }
+
+            document.body.addEventListener('click', function (e) {
+                var t = e.target.closest('[data-action]');
+                if (!t) return;
+                var a = t.getAttribute('data-action');
+
+                if (a === 'open-add-merchant') {
+                    e.preventDefault();
+                    open('addMerchantModal');
+                } else if (a === 'open-edit-merchant') {
+                    e.preventDefault();
+                    document.getElementById('editId').value      = t.getAttribute('data-id')   || '';
+                    document.getElementById('editCode').value    = t.getAttribute('data-code') || '';
+                    document.getElementById('editName').value    = t.getAttribute('data-name') || '';
+                    document.getElementById('editKyc').value     = t.getAttribute('data-kyc')  || '';
+                    document.getElementById('editActive').checked = t.getAttribute('data-active') === 'true';
+                    open('editMerchantModal');
+                } else if (a === 'close-modal') {
+                    e.preventDefault();
+                    close(t.closest('.modal-backdrop'));
+                }
+            });
+
+            document.querySelectorAll('.modal-backdrop').forEach(function (m) {
+                m.addEventListener('click', function (e) {
+                    if (e.target === m) close(m);
+                });
+            });
+        })();
+    </script>
+}
+
+@* TODO promote: merch-filter / merch-table / modal styles into main.css *@
+<style>
+    .merch-filter-bar {
+        display:flex; align-items:center; justify-content:space-between; gap:16px;
+        padding: 14px 4px 22px; margin-bottom: 4px;
+        flex-wrap: wrap;
+    }
+    .merch-filter-left { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .merch-filter-right { display:flex; align-items:center; gap:12px; }
+    .filter-meta { font-size:12px; color:var(--ink-faint); }
+
+    .search.inline-search {
+        display:flex; align-items:center; gap:8px;
+        padding: 7px 12px;
+        background: var(--canvas-elevated);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        color: var(--ink-faint);
+    }
+    .search.inline-search input {
+        background: transparent; border: none; outline: none; width: 100%;
+        font-size: 13px; color: var(--ink);
+    }
+
+    .merch-filter-select {
+        appearance:none; -webkit-appearance:none;
+        background: var(--canvas-elevated);
+        border: 1px solid var(--line);
+        color: var(--ink);
+        padding: 8px 28px 8px 12px;
+        font-family: var(--font-sans);
+        font-size: var(--fs-13);
+        border-radius: var(--radius-md);
+        background-image: linear-gradient(45deg, transparent 50%, var(--ink-faint) 50%), linear-gradient(135deg, var(--ink-faint) 50%, transparent 50%);
+        background-position: calc(100% - 14px) 50%, calc(100% - 9px) 50%;
+        background-size: 5px 5px, 5px 5px;
+        background-repeat: no-repeat;
+        min-width: 200px;
+    }
+    .merch-filter-select:focus { outline:none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+
+    .merch-table .row-actions { display:flex; gap:4px; align-items:center; }
+
+    .table-foot {
+        display:flex; justify-content:space-between; align-items:center;
+        padding: 16px 22px; border-top:1px solid var(--line);
+        font-size: 12px; color: var(--ink-faint);
+    }
+    .table-foot strong { color: var(--ink); font-weight: 500; }
+    .pager { display:flex; gap:4px; align-items:center; }
+    .pager .btn-sm { padding: 4px 10px; min-width: 30px; }
+    .pager .btn-sm.active { border-color: var(--accent); color: var(--accent); }
+    .pager .disabled { pointer-events: none; opacity: 0.4; }
+
+    /* Modal */
+    .modal-backdrop {
+        position: fixed; inset: 0; background: rgba(10,10,10,0.55);
+        display: none; align-items: center; justify-content: center;
+        z-index: 100;
+        backdrop-filter: blur(4px);
+    }
+    .modal-backdrop.open { display:flex; }
+    .modal-card {
+        width: 480px; max-width: 92vw;
+        background: var(--canvas);
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-md);
+        overflow: hidden;
+    }
+    .modal-card.modal-lg { width: 640px; }
+    .modal-head { padding: 22px 24px 14px; border-bottom: 1px solid var(--line); }
+    .modal-head h3 { font-family: var(--font-display); font-size: 24px; font-weight: 400; margin: 8px 0 6px; }
+    .modal-head h3 em { font-style: italic; color: var(--accent); }
+    .modal-head p { font-size: var(--fs-13); color: var(--ink-faint); margin: 0; line-height: 1.5; }
+    .modal-body { padding: 18px 24px; }
+    .modal-body .field { margin-bottom: 14px; }
+    .modal-body label { display:block; font-size: 11px; letter-spacing: var(--tracking-wider); text-transform: uppercase; color: var(--ink-faint); margin-bottom: 6px; }
+    .modal-body input[type="text"] {
+        width:100%;
+        background: var(--canvas-sunken); border: 1px solid var(--line-strong);
+        border-radius: var(--radius-md); padding: 10px 12px;
+        font-family: var(--font-sans); font-size: var(--fs-13); color: var(--ink);
+    }
+    .modal-body input.mono { font-family: var(--font-mono); }
+    .modal-body input:focus { outline:none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+    .modal-body input[readonly] { color: var(--ink-faint); background: var(--canvas-sunken); }
+    .modal-foot { padding: 14px 24px 18px; display:flex; justify-content:flex-end; gap:8px; border-top: 1px solid var(--line); background: var(--canvas-sunken); }
+
+    .field-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 14px;
+    }
+    .field-grid .field { margin-bottom: 0; }
+    .checkbox-row {
+        display: flex; align-items: center; gap: 8px;
+        padding: 10px 12px;
+        background: var(--canvas-sunken);
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius-md);
+    }
+    .checkbox-row input[type="checkbox"] {
+        width: 16px; height: 16px;
+        accent-color: var(--accent);
+        cursor: pointer;
+    }
+</style>

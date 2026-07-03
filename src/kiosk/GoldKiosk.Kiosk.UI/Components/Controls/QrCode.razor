@@ -1,0 +1,10 @@
+@if (_path is not null)
+{
+    <svg class="qr-svg" viewBox="0 0 @_viewBox @_viewBox" shape-rendering="crispEdges" role="img">
+        <path d="@_path" />
+    </svg>
+}
+else
+{
+    <div class="qr-fallback mono-label">@Payload</div>
+}

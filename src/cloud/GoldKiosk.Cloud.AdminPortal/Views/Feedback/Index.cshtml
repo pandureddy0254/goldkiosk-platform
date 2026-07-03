@@ -1,0 +1,420 @@
+@model GoldKiosk.Cloud.AdminPortal.Models.FeedbackMasterVM
+@using System.Globalization
+@{
+    var inv = CultureInfo.InvariantCulture;
+    ViewBag.PageTitle = "Customer <em>feedback.</em>";
+    ViewBag.Eyebrow   = "SUPPORT & OPS · VOICE OF CUSTOMER";
+    ViewBag.Subtitle  = "Post-transaction feedback from every kiosk. Star ratings, written notes, optional voice memos. Sentiment-tagged and threaded for reply.";
+    ViewBag.ActiveNav = "feedback";
+
+    var searchTerm = ViewBag.SearchTerm as string;
+    var stat       = ViewBag.Stat as string;
+    var startDate  = ViewBag.StartDate as DateTime?;
+    var endDate    = ViewBag.EndDate as DateTime?;
+    var statusDD   = ViewBag.StatusDropdown as List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem> ?? new();
+
+    var avgRating  = 4.3m;  // model has no rating yet — keep brand-credible mock
+
+    ViewBag.PageHeadActions =
+        "<a href=\"" + Url.Action("ExportCsv", "Feedback", new { search = searchTerm, stat, StartDate = startDate, EndDate = endDate }) +
+        "\" class=\"btn btn-ghost btn-sm\">Export CSV</a>" +
+        "<a href=\"" + Url.Action("Index", "Feedback") + "\" class=\"btn btn-primary btn-sm\">Refresh</a>";
+
+    string Initials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "—";
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 1) return parts[0][..Math.Min(2, parts[0].Length)].ToUpperInvariant();
+        return ($"{parts[0][0]}{parts[1][0]}").ToUpperInvariant();
+    }
+
+    string Relative(DateTime when)
+    {
+        var d = DateTime.UtcNow - when;
+        if (d.TotalDays >= 2) return $"{(int)d.TotalDays}d ago";
+        if (d.TotalDays >= 1) return "Yesterday";
+        return when.ToString("HH:mm", inv);
+    }
+
+    string Sentiment(GoldKiosk.Cloud.AdminPortal.Models.FeedbackListViewModel f)
+    {
+        var t = (f.Type ?? string.Empty).ToLowerInvariant();
+        if (t.Contains("complaint") || t.Contains("negative") || t.Contains("issue")) return "negative";
+        if (t.Contains("suggestion") || t.Contains("neutral")) return "neutral";
+        return "positive";
+    }
+}
+
+@if (TempData["FeedbackInfo"] is string okMsg)
+{
+    <div class="alert alert-success">@okMsg</div>
+}
+
+<!-- KPI strip -->
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Total feedback<span class="dot"></span></div>
+        <div class="kpi-value"><span class="mono">@Model.Total.ToString("N0", inv)</span></div>
+        <div class="kpi-foot"><span class="delta delta-up">&#9650; 22</span><span class="label-suffix">vs prior 7d</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Read<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value"><span class="mono">@Model.Read.ToString("N0", inv)</span><span class="unit">/ @Model.Total.ToString("N0", inv)</span></div>
+        <div class="kpi-foot"><span class="label-suffix">read rate</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Unread<span class="dot" style="background:var(--danger);"></span></div>
+        <div class="kpi-value"><span class="mono">@Model.Unread.ToString("N0", inv)</span></div>
+        <div class="kpi-foot"><span class="label-suffix">awaiting triage</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Avg rating<span class="dot" style="background:var(--accent);"></span></div>
+        <div class="kpi-value"><span class="mono">@avgRating.ToString("0.0", inv)</span><span class="unit">/ 5</span></div>
+        <div class="kpi-foot"><span class="delta delta-up">&#9650; 0.2</span><span class="label-suffix">trending up</span></div>
+    </div>
+</div>
+
+<!-- Filter bar (GET form) -->
+<form method="get" action="@Url.Action("Index", "Feedback")" autocomplete="off">
+    <div class="filter-bar">
+        <div class="filter-group">
+            <label>Search</label>
+            <input type="text" name="search" placeholder="Code, name…" value="@searchTerm" />
+        </div>
+        <div class="filter-group">
+            <label>Status</label>
+            @Html.DropDownList("stat", statusDD, "All", new { @class = "filter-select" })
+        </div>
+        <div class="filter-group">
+            <label>From</label>
+            <input type="date" name="StartDate" value="@(startDate?.ToString("yyyy-MM-dd"))" />
+        </div>
+        <div class="filter-group">
+            <label>To</label>
+            <input type="date" name="EndDate" value="@(endDate?.ToString("yyyy-MM-dd"))" />
+        </div>
+        <span style="flex:1;"></span>
+        <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+        <a href="@Url.Action("Index", "Feedback")" class="btn btn-ghost btn-sm">Clear</a>
+    </div>
+</form>
+
+<!-- Inbox layout -->
+<section class="inbox card">
+    <div class="inbox-left">
+        <div class="inbox-filter">
+            <div class="filter-row">
+                <label class="sr-only">Rating</label>
+                <select disabled><option>All ratings</option></select>
+                <label class="sr-only">Status</label>
+                <select disabled><option>All</option><option>Unread</option><option>Read</option></select>
+            </div>
+        </div>
+
+        <ul class="msg-list" id="msgList">
+            @if (Model is not null && Model.FeedbackItems is not null && Model.FeedbackItems.Any())
+            {
+                var first = true;
+                foreach (var f in Model.FeedbackItems)
+                {
+                    var displayName = string.IsNullOrWhiteSpace(f.Type) ? "Customer" : f.Type;
+                    var unread = !f.Isread;
+                    var preview = f.Description?.Length > 90
+                        ? f.Description[..90]
+                        : (f.Description ?? string.Empty);
+                    var classes = new List<string> { "msg-item" };
+                    if (unread) classes.Add("unread");
+                    if (first) classes.Add("selected");
+
+                    <li class="@string.Join(' ', classes)"
+                        data-code="@f.Code"
+                        data-name="@displayName"
+                        data-type="@f.Type"
+                        data-img="@f.ImgUrl"
+                        data-audio="@f.AudioUrl"
+                        data-when="@f.CreatedOn.ToString("dd MMM yyyy · HH:mm", inv)"
+                        data-sentiment="@Sentiment(f)"
+                        data-body="@(f.Description ?? string.Empty)"
+                        data-location="@(f.Location ?? "")">
+                        <span class="avatar md">@Initials(displayName)</span>
+                        <div class="msg-info">
+                            <div class="msg-info-top">
+                                <strong>@displayName</strong>
+                                <span class="ts mono">@Relative(f.CreatedOn)</span>
+                            </div>
+                            <div class="msg-preview">@preview</div>
+                            <div class="msg-info-bot">
+                                <span class="stars">&#9733;&#9733;&#9733;&#9733;</span>
+                                @if (unread)
+                                {
+                                    <span class="dot-unread"></span>
+                                }
+                            </div>
+                        </div>
+                    </li>
+                    first = false;
+                }
+            }
+            else
+            {
+                <li class="msg-empty"><p>No feedback in this window.</p></li>
+            }
+        </ul>
+    </div>
+
+    <div class="inbox-right">
+        <div class="msg-detail-head" id="msgDetailHead">
+            <div style="display:flex; align-items:center; gap:14px;">
+                <span class="avatar md" id="detailInitials">—</span>
+                <div>
+                    <strong style="font-size:var(--fs-15); font-weight:500;" id="detailName">Select a message</strong>
+                    <div style="font-size:12px; color:var(--ink-faint);" id="detailMeta"></div>
+                </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <span class="stars" id="detailStars" style="font-size:16px; color:var(--accent);"></span>
+                <span class="sentiment-pill" id="detailSentiment" hidden></span>
+            </div>
+        </div>
+
+        <div class="msg-detail-meta" id="detailWhen"></div>
+
+        <div class="msg-detail-body">
+            <p id="detailBody">No message selected. Choose a feedback item from the list to read the full note, see attached media, and reply.</p>
+            <div id="detailMedia" class="detail-media"></div>
+        </div>
+
+        <div class="composer">
+            <div class="composer-tabs">
+                <button type="button" class="active">Reply via SMS</button>
+                <button type="button">Reply via email</button>
+                <button type="button">Internal note</button>
+            </div>
+            <textarea id="composerText" placeholder="Acknowledge and thank the customer. Personalise the response. Note any follow-up actions."></textarea>
+            <div class="composer-foot">
+                <div style="display:flex; gap:6px; align-items:center; font-size:11px; color:var(--ink-faint);">
+                    <span class="mono" id="composerCount">0 of 160 chars · 1 segment</span>
+                </div>
+                <div style="display:flex; gap:8px;">
+                    <button type="button" class="btn btn-ghost btn-sm">Save draft</button>
+                    <button type="button" class="btn btn-primary btn-sm">Send reply</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+@if (Model is not null && Model.TotalPage > 1)
+{
+    <div class="pager">
+        @if (Model.PageNo > 1)
+        {
+            <a class="btn btn-ghost btn-sm" href="@Url.Action("Index", new { PageNo = Model.PageNo - 1, PageSize = Model.PageSize, search = searchTerm, stat, StartDate = startDate, EndDate = endDate })">&lsaquo; Prev</a>
+        }
+        else
+        {
+            <button type="button" class="btn btn-ghost btn-sm" disabled>&lsaquo; Prev</button>
+        }
+        @for (var i = 1; i <= Math.Min(Model.TotalPage, 5); i++)
+        {
+            var isActive = i == Model.PageNo;
+            <a class="btn btn-ghost btn-sm" style="@(isActive ? "border-color:var(--accent); color:var(--accent);" : "")"
+               href="@Url.Action("Index", new { PageNo = i, PageSize = Model.PageSize, search = searchTerm, stat, StartDate = startDate, EndDate = endDate })">@i</a>
+        }
+        @if (Model.PageNo < Model.TotalPage)
+        {
+            <a class="btn btn-ghost btn-sm" href="@Url.Action("Index", new { PageNo = Model.PageNo + 1, PageSize = Model.PageSize, search = searchTerm, stat, StartDate = startDate, EndDate = endDate })">Next &rsaquo;</a>
+        }
+        else
+        {
+            <button type="button" class="btn btn-ghost btn-sm" disabled>Next &rsaquo;</button>
+        }
+    </div>
+}
+
+@section Scripts {
+    <script>
+        (function () {
+            const list = document.getElementById('msgList');
+            if (!list) return;
+
+            const detailInitials  = document.getElementById('detailInitials');
+            const detailName      = document.getElementById('detailName');
+            const detailMeta      = document.getElementById('detailMeta');
+            const detailStars     = document.getElementById('detailStars');
+            const detailSentiment = document.getElementById('detailSentiment');
+            const detailWhen      = document.getElementById('detailWhen');
+            const detailBody      = document.getElementById('detailBody');
+            const detailMedia     = document.getElementById('detailMedia');
+            const composerText    = document.getElementById('composerText');
+            const composerCount   = document.getElementById('composerCount');
+
+            function escapeHtml(s) {
+                return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]));
+            }
+
+            function render(el) {
+                if (!el) return;
+                const d = el.dataset;
+                detailInitials.textContent = (el.querySelector('.avatar.md')?.textContent || '—').trim();
+                detailName.textContent     = d.name || 'Customer';
+                detailMeta.innerHTML       = d.code ? '<span class="mono">' + escapeHtml(d.code) + '</span> · ' + escapeHtml(d.location || 'kiosk') : escapeHtml(d.location || 'kiosk');
+                detailStars.innerHTML      = '★★★★★';
+                detailSentiment.hidden = false;
+                const s = (d.sentiment || 'positive');
+                detailSentiment.className = 'sentiment-pill ' + s;
+                detailSentiment.textContent = '● ' + s.charAt(0).toUpperCase() + s.slice(1);
+                detailWhen.innerHTML = '<span class="mono">' + escapeHtml(d.when || '') + '</span> · Submitted via kiosk';
+                detailBody.textContent = d.body || '(no message body)';
+
+                // Media block — images + audio
+                detailMedia.innerHTML = '';
+                if (d.img) {
+                    const imgs = d.img.split(',').map(x => x.trim()).filter(Boolean);
+                    imgs.forEach(src => {
+                        const a = document.createElement('a');
+                        a.href = src; a.target = '_blank';
+                        const img = document.createElement('img');
+                        img.src = src; img.alt = '';
+                        img.style.cssText = 'max-width:120px; max-height:120px; border:1px solid var(--line); border-radius:6px;';
+                        a.appendChild(img);
+                        detailMedia.appendChild(a);
+                    });
+                }
+                if (d.audio) {
+                    const audio = document.createElement('audio');
+                    audio.controls = true; audio.src = d.audio;
+                    audio.style.cssText = 'display:block; margin-top:10px; width:100%; max-width: 480px;';
+                    detailMedia.appendChild(audio);
+                }
+            }
+
+            list.addEventListener('click', e => {
+                const item = e.target.closest('.msg-item');
+                if (!item) return;
+                list.querySelectorAll('.msg-item').forEach(x => x.classList.remove('selected'));
+                item.classList.add('selected');
+                item.classList.remove('unread');
+                item.querySelector('.dot-unread')?.remove();
+                render(item);
+            });
+
+            composerText?.addEventListener('input', () => {
+                const len = composerText.value.length;
+                const seg = Math.max(1, Math.ceil(len / 160));
+                composerCount.textContent = `${len} of ${seg * 160} chars · ${seg} segment${seg === 1 ? '' : 's'}`;
+            });
+
+            const first = list.querySelector('.msg-item.selected') || list.querySelector('.msg-item');
+            if (first) render(first);
+        })();
+    </script>
+}
+
+<style>
+    /* TODO promote — feedback (inbox) page-scoped styles, mirror prototype */
+    .filter-bar {
+        display:flex; align-items:flex-end; gap:14px; flex-wrap:wrap;
+        padding:14px 18px; background: var(--canvas-elevated);
+        border:1px solid var(--line); border-radius:var(--radius-md); margin-bottom:24px;
+    }
+    .filter-group { display:flex; flex-direction:column; gap:4px; min-width:120px; }
+    .filter-group label { font-size:10px; letter-spacing:var(--tracking-wider); text-transform:uppercase; color:var(--ink-faint); }
+    .filter-group select, .filter-group input, .filter-select {
+        font-family:var(--font-sans); font-size:var(--fs-13); padding:6px 10px;
+        background:var(--canvas); color:var(--ink); border:1px solid var(--line-strong);
+        border-radius:var(--radius-sm); outline:none;
+    }
+    .filter-group select:focus, .filter-group input:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-ring); }
+
+    .avatar.md {
+        width:36px; height:36px; font-size:12px; border-radius:50%;
+        background:var(--canvas-sunken);
+        display:inline-flex; align-items:center; justify-content:center;
+        font-weight:500; color:var(--ink-soft);
+        border:1px solid var(--line); flex:0 0 36px;
+    }
+
+    /* Inbox shell */
+    .inbox {
+        display:grid;
+        grid-template-columns: 360px 1fr;
+        min-height: 720px;
+        overflow: hidden;
+        padding: 0;
+        margin-bottom: 28px;
+    }
+    .inbox-left { border-right: 1px solid var(--line); display:flex; flex-direction:column; min-height: 0; }
+    .inbox-right { display:flex; flex-direction:column; min-height: 0; overflow-y: auto; }
+
+    .inbox-filter { padding: 14px 16px; border-bottom: 1px solid var(--line); display:flex; flex-direction:column; gap:8px; }
+    .inbox-filter .filter-row { display:grid; grid-template-columns: 1fr 1fr; gap:8px; }
+    .inbox-filter select {
+        font-family:var(--font-sans); font-size:12px; padding:6px 8px;
+        background:var(--canvas); color:var(--ink); border:1px solid var(--line-strong);
+        border-radius:var(--radius-sm); outline:none; width:100%;
+    }
+    .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+
+    .msg-list { list-style:none; padding:0; margin:0; overflow-y:auto; flex:1; }
+    .msg-item {
+        display:flex; gap:12px; padding: 14px 16px;
+        border-bottom: 1px solid var(--line);
+        cursor: pointer; transition: background var(--dur-fast); position:relative;
+    }
+    .msg-item:hover { background: var(--canvas-sunken); }
+    .msg-item.selected { background: var(--canvas-sunken); border-left: 2px solid var(--accent); padding-left: 14px; }
+    .msg-item.unread strong { color: var(--ink); }
+    .msg-item:not(.unread) strong { color: var(--ink-soft); font-weight: 400; }
+    .msg-info { flex:1; min-width: 0; }
+    .msg-info-top { display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+    .msg-info-top strong { font-weight:500; font-size: var(--fs-13); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .msg-info-top .ts { font-size: 11px; color: var(--ink-faint); flex-shrink: 0; }
+    .msg-preview { font-size: 12px; color: var(--ink-faint); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top: 3px; }
+    .msg-info-bot { display:flex; justify-content:space-between; align-items:center; margin-top: 4px; }
+    .stars { color: var(--accent); font-size: 11px; letter-spacing: 1px; }
+    .dot-unread { width:7px; height:7px; border-radius:50%; background: var(--accent); }
+    .msg-empty { padding: 36px 16px; text-align:center; color: var(--ink-faint); font-size: var(--fs-13); }
+    .msg-empty p { margin: 0; }
+
+    .msg-detail-head {
+        display:flex; justify-content:space-between; align-items:center;
+        padding: 20px 24px; border-bottom: 1px solid var(--line);
+    }
+    .msg-detail-meta {
+        padding: 12px 24px; font-size: 12px; color: var(--ink-faint);
+        display:flex; gap: 10px; flex-wrap:wrap; border-bottom: 1px solid var(--line);
+    }
+    .msg-detail-body { padding: 20px 24px; }
+    .msg-detail-body p { margin: 0 0 14px; font-size: var(--fs-14); color: var(--ink); line-height: 1.6; }
+    .detail-media { display:flex; flex-wrap:wrap; gap: 10px; margin-top: 6px; }
+
+    .sentiment-pill { font-family: var(--font-mono); font-size: 11px; padding: 3px 10px; border-radius: var(--radius-full); }
+    .sentiment-pill.positive { background: var(--success-soft); color: var(--success); }
+    .sentiment-pill.negative { background: var(--danger-soft);  color: var(--danger); }
+    .sentiment-pill.neutral  { background: var(--canvas-sunken); color: var(--ink-faint); }
+
+    .composer { margin-top:auto; padding: 16px 24px 20px; border-top: 1px solid var(--line); background: var(--canvas-sunken); }
+    .composer-tabs { display:flex; gap:4px; margin-bottom:10px; }
+    .composer-tabs button {
+        background:transparent; border:1px solid transparent; padding: 6px 12px;
+        font-family:var(--font-sans); font-size:var(--fs-13); color: var(--ink-faint);
+        border-radius:var(--radius-sm); cursor: pointer;
+    }
+    .composer-tabs button.active { background: var(--canvas); border-color: var(--line); color: var(--ink); }
+    .composer textarea {
+        width:100%; min-height: 84px; resize: vertical;
+        padding: 12px 14px; background: var(--canvas); color: var(--ink);
+        border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
+        font-family: var(--font-sans); font-size: var(--fs-14); line-height: 1.5; outline:none;
+    }
+    .composer textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+    .composer-foot { display:flex; justify-content:space-between; align-items:center; margin-top:10px; }
+
+    .pager { display:flex; gap:6px; justify-content:flex-end; align-items:center; margin-top: 16px; }
+
+    @@media (max-width: 1180px) {
+        .inbox { grid-template-columns: 1fr; min-height: auto; }
+        .inbox-left { border-right:0; border-bottom: 1px solid var(--line); }
+    }
+</style>

@@ -1,0 +1,7 @@
+@if (Store.DeviceHealth is "degraded" or "faulted")
+{
+    <div class="device-banner @(Store.DeviceHealth == "faulted" ? "faulted" : null)">
+        <span class="pulse-dot"></span>
+        <span>@(Store.DeviceHealth == "faulted" ? L["device.faulted"] : L["device.degraded"])</span>
+    </div>
+}

@@ -1,0 +1,42 @@
+@page "/contact"
+
+<div class="screen screen-contact">
+    <span class="mono-label screen-kicker">@L["contact.kicker"]</span>
+    <h1 class="serif-hero screen-title">@L["contact.title"]</h1>
+    <p class="screen-subtitle">@L["contact.subtitle"]</p>
+
+    <div class="contact-fields">
+        <button class="field @(_activeField == Field.Email ? "field-active" : null)" @onclick="() => FocusField(Field.Email)">
+            <span class="field-label mono-label">@L["contact.email.label"]</span>
+            <span class="field-value">@(_email.Length > 0 ? _email : " ")</span>
+        </button>
+        <button class="field @(_activeField == Field.Phone ? "field-active" : null)" @onclick="() => FocusField(Field.Phone)">
+            <span class="field-label mono-label">@L["contact.phone.label"]</span>
+            <span class="field-value">@(_phone.Length > 0 ? _phone : " ")</span>
+        </button>
+    </div>
+
+    <div class="channel-toggles">
+        <span class="chip selected">
+            @L["contact.channel.qr"]
+        </span>
+        <button class="chip @(_emailChannel ? "selected" : null)" @onclick="ToggleEmailChannel">
+            @L["contact.channel.email"]
+        </button>
+        <button class="chip @(_smsChannel ? "selected" : null)" @onclick="ToggleSmsChannel">
+            @L["contact.channel.sms"]
+        </button>
+    </div>
+
+    @if (_activeField != Field.None)
+    {
+        <TouchKeyboard Layout="KeyboardLayout" OnKey="OnKey" OnBackspace="OnBackspace" />
+    }
+
+    <div class="screen-actions">
+        <button class="btn-primary" disabled="@(!CanContinue)" @onclick="ContinueAsync">
+            @L["common.continue"]
+        </button>
+        <button class="btn-glass" disabled="@_busy" @onclick="SkipAsync">@L["contact.skip"]</button>
+    </div>
+</div>

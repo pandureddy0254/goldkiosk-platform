@@ -46,7 +46,7 @@ src/
   cloud/
     GoldKiosk.Cloud.Api/               # shared cloud backend: offers, AI, KYC, payout, config service
     GoldKiosk.Cloud.AdminPortal/       # admin dashboard (ops, kiosk fleet, pricing, reconciliation)
-    GoldKiosk.Cloud.CrmPortal/         # CRM dashboard (customers, KYC review, campaigns, support)
+    GoldKiosk.Cloud.CRMPortal/         # CRM dashboard (customers, KYC review, campaigns, support)
   kiosk/
     GoldKiosk.Kiosk.Api/               # on-machine edge API: owns hardware, local store, outbox
     GoldKiosk.Kiosk.UI/                # Blazor Hybrid kiosk front-end (BlazorWebView shell)
@@ -60,7 +60,7 @@ tests/                                 # NUnit only — see testing standards
   GoldKiosk.Application.Tests/
   GoldKiosk.Cloud.Api.Tests/
   GoldKiosk.Cloud.AdminPortal.Tests/
-  GoldKiosk.Cloud.CrmPortal.Tests/
+  GoldKiosk.Cloud.CRMPortal.Tests/
   GoldKiosk.Kiosk.Api.Tests/
   GoldKiosk.Kiosk.Core.Tests/
   GoldKiosk.IntegrationTests/

@@ -1,0 +1,95 @@
+@{
+    ViewBag.PageTitle = "Kiosk <em>security tokens.</em>";
+    ViewBag.Eyebrow   = "Operations · Security";
+    ViewBag.Subtitle  = "Long-lived mTLS bearer tokens issued to individual kiosks for relay authentication. Rotate quarterly; revoke immediately on suspected compromise.";
+    ViewBag.ActiveNav = "operations";
+}
+
+<div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin: -16px 0 22px;">
+    <div class="seg seg-tabs">
+        <a asp-controller="Operations" asp-action="CollectionTickets">Collections</a>
+        <a asp-controller="Operations" asp-action="MaintenanceTickets">Maintenance</a>
+        <a asp-controller="Operations" asp-action="TechnicianManagement">Technicians</a>
+        <a asp-controller="Operations" asp-action="SystemHealthCheck">System health</a>
+        <a asp-controller="Operations" asp-action="DeploymentTickets">Deployment</a>
+        <a asp-controller="Operations" asp-action="LocationConfiguration">Locations</a>
+        <a class="active" asp-controller="Operations" asp-action="KioskSecurityToken">Tokens</a>
+    </div>
+    <span style="flex:1;"></span>
+    <button type="button" class="btn btn-primary btn-sm" data-action="open-modal" data-target="issueTokenModal">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M10 7C10 5.3 8.7 4 7 4S4 5.3 4 7 5.3 10 7 10C7.5 10 8 9.9 8.4 9.7L11 12.3L12.3 11L9.7 8.4C9.9 8 10 7.5 10 7Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+        Issue token
+    </button>
+</div>
+
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Active tokens<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value mono">48</div>
+        <div class="kpi-foot"><span class="label-suffix">across 52 kiosks · 4 unbonded</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Expiring &le; 30d<span class="dot" style="background:var(--warning);"></span></div>
+        <div class="kpi-value mono">6</div>
+        <div class="kpi-foot"><span class="label-suffix">rotation due</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Revoked · 30d<span class="dot"></span></div>
+        <div class="kpi-value mono">2</div>
+        <div class="kpi-foot"><span class="label-suffix">all audited</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Rotated · 30d<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value mono">11</div>
+        <div class="kpi-foot"><span class="delta delta-up">&#9650; 3</span><span class="label-suffix">vs prior 30d</span></div>
+    </div>
+</div>
+
+<section class="card" style="margin-bottom:32px;">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Issued tokens</h2>
+            <div class="card-meta" style="margin-top:6px;"><span>Stored hashed (Argon2id) · cleartext shown once at issue</span></div>
+        </div>
+        <div style="display:flex; gap:6px;">
+            <button type="button" class="btn btn-ghost btn-sm">Filter</button>
+            <button type="button" class="btn btn-ghost btn-sm">Export CSV</button>
+        </div>
+    </header>
+
+    <div style="overflow-x:auto;">
+        <table class="user-table">
+            <thead>
+                <tr>
+                    <th>Kiosk</th><th>Token hash · last 4</th><th>Issued</th><th>Expires</th>
+                    <th>Last used</th><th>Issued by</th><th>Status</th>
+                    <th style="text-align:right; padding-right:22px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td class="mono">K-DXB-01</td><td class="mono">&hellip;a31b</td><td class="mono">14 Mar 2026</td><td class="mono">14 Jun 2026</td><td class="mono" style="font-size:12px;">2 min ago</td><td>Sara Al Mansoori</td><td><span class="status-pill s-active">Active</span></td><td><div class="row-actions" style="justify-content:flex-end;"><button type="button" class="icon-btn" title="Revoke"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11" cy="7" r="1.2"/></svg></button></div></td></tr>
+                <tr><td class="mono">K-DXB-02</td><td class="mono">&hellip;9c4e</td><td class="mono">14 Mar 2026</td><td class="mono">14 Jun 2026</td><td class="mono" style="font-size:12px;">12 min ago</td><td>Sara Al Mansoori</td><td><span class="status-pill s-active">Active</span></td><td><div class="row-actions" style="justify-content:flex-end;"><button type="button" class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11" cy="7" r="1.2"/></svg></button></div></td></tr>
+                <tr><td class="mono">K-AUH-01</td><td class="mono">&hellip;f1d8</td><td class="mono">10 Feb 2026</td><td class="mono" style="color:var(--warning);">10 Jun 2026 · 18d</td><td class="mono" style="font-size:12px;">38 min ago</td><td>Ahmed Khoury</td><td><span class="status-pill s-pending">Rotate due</span></td><td><div class="row-actions" style="justify-content:flex-end;"><button type="button" class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11" cy="7" r="1.2"/></svg></button></div></td></tr>
+                <tr><td class="mono">K-AUH-02</td><td class="mono">&hellip;42aa</td><td class="mono">12 Feb 2026</td><td class="mono">12 May 2026</td><td class="mono" style="font-size:12px;">1 hour ago</td><td>Ahmed Khoury</td><td><span class="status-pill s-active">Active</span></td><td><div class="row-actions" style="justify-content:flex-end;"><button type="button" class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11" cy="7" r="1.2"/></svg></button></div></td></tr>
+                <tr><td class="mono">K-SHJ-01</td><td class="mono">&hellip;e07c</td><td class="mono">04 Mar 2026</td><td class="mono">04 Jun 2026</td><td class="mono" style="font-size:12px;">22 min ago</td><td>Fatima Karim</td><td><span class="status-pill s-active">Active</span></td><td><div class="row-actions" style="justify-content:flex-end;"><button type="button" class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11" cy="7" r="1.2"/></svg></button></div></td></tr>
+                <tr><td class="mono">K-RAK-01</td><td class="mono">&hellip;b18f</td><td class="mono">22 Jan 2026</td><td class="mono">22 Apr 2026</td><td class="mono" style="font-size:12px; color:var(--danger);">Expired 32d</td><td>Sara Al Mansoori</td><td><span class="status-pill" style="background:var(--danger-soft); color:var(--danger);">Expired</span></td><td><div class="row-actions" style="justify-content:flex-end;"><button type="button" class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11" cy="7" r="1.2"/></svg></button></div></td></tr>
+                <tr><td class="mono">K-FUJ-01</td><td class="mono">&hellip;dc63</td><td class="mono">28 Feb 2026</td><td class="mono">28 May 2026</td><td class="mono" style="font-size:12px;">3 hours ago</td><td>Sara Al Mansoori</td><td><span class="status-pill s-active">Active</span></td><td><div class="row-actions" style="justify-content:flex-end;"><button type="button" class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11" cy="7" r="1.2"/></svg></button></div></td></tr>
+                <tr><td class="mono">K-AJM-01</td><td class="mono">&hellip;7f02</td><td class="mono">01 Mar 2026</td><td class="mono">01 Jun 2026</td><td class="mono" style="font-size:12px;">5 hours ago</td><td>Ahmed Khoury</td><td><span class="status-pill s-active">Active</span></td><td><div class="row-actions" style="justify-content:flex-end;"><button type="button" class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11" cy="7" r="1.2"/></svg></button></div></td></tr>
+                <tr><td class="mono">K-UAQ-01</td><td class="mono">&hellip;6bf1</td><td class="mono">14 May 2025</td><td class="mono">14 May 2026</td><td class="mono" style="font-size:12px; color:var(--ink-faint);">revoked 09 May</td><td>Sara Al Mansoori</td><td><span class="status-pill s-disabled">Revoked</span></td><td><div class="row-actions" style="justify-content:flex-end;"><button type="button" class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11" cy="7" r="1.2"/></svg></button></div></td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<form asp-controller="Operations" asp-action="IssueKioskSecurityToken" method="post" style="display:none;" id="issueTokenForm">
+    @Html.AntiForgeryToken()
+</form>
+
+@* TODO promote: seg-tabs — same definition as siblings; lift once. *@
+<style>
+    .seg.seg-tabs { display:inline-flex; border:1px solid var(--line-strong); border-radius:var(--radius-md); overflow:hidden; background:var(--canvas-elevated); flex-wrap:wrap; }
+    .seg.seg-tabs a { padding:8px 14px; font-size:13px; color:var(--ink-soft); border-right:1px solid var(--line); text-decoration:none; }
+    .seg.seg-tabs a:last-child { border-right:none; }
+    .seg.seg-tabs a.active { background: var(--ink); color: var(--canvas); }
+    .seg.seg-tabs a:hover:not(.active) { background: var(--canvas-sunken); color: var(--ink); }
+</style>

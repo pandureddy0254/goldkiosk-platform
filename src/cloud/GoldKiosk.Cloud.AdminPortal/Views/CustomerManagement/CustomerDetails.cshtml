@@ -1,0 +1,523 @@
+@model GoldKiosk.Cloud.AdminPortal.Models.CustomerMasterList
+@using System.Globalization
+@{
+    var searchTerm = (string?)ViewBag.SearchTerm;
+    var stat       = (string?)ViewBag.Stat;
+    var pageSize   = (int?)ViewBag.PageSize ?? 10;
+    var pageNo     = (int?)ViewBag.PageNo   ?? 1;
+
+    ViewBag.PageTitle = "Customer <em>directory.</em>";
+    ViewBag.Eyebrow   = "Fleet · Identity";
+    ViewBag.Subtitle  = $"{Model.Total:N0} customers across the GCC. PII is masked by default — every unmask is logged with operator, reason and timestamp.";
+    ViewBag.ActiveNav = "customers";
+    ViewBag.PageHeadActions =
+        "<button type=\"button\" class=\"btn btn-ghost btn-sm\">" +
+        "<svg width=\"14\" height=\"14\" viewBox=\"0 0 14 14\" fill=\"none\"><path d=\"M2 4H12M4 7H10M6 10H8\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/></svg>" +
+        "Export CSV</button>" +
+        "<button type=\"button\" class=\"btn btn-primary btn-sm\" data-action=\"open-add-customer\">" +
+        "<svg width=\"14\" height=\"14\" viewBox=\"0 0 14 14\" fill=\"none\"><path d=\"M7 3V11M3 7H11\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/></svg>" +
+        "Onboard customer</button>";
+
+    // Avatar palette — deterministic by row index for consistent visuals across re-renders.
+    string[] avatarGradients = new[]
+    {
+        "linear-gradient(135deg,#b8941f,#7e6213)",
+        "linear-gradient(135deg,#2a5d8c,#1c3e5d)",
+        "linear-gradient(135deg,#a83232,#7a2424)",
+        "linear-gradient(135deg,#2a7d4f,#1c5d3a)",
+        "linear-gradient(135deg,#c47419,#8b520f)",
+        "linear-gradient(135deg,#75716a,#4a4845)"
+    };
+
+    string InitialsFor(string code) =>
+        string.IsNullOrWhiteSpace(code) ? "C" :
+        code.Length >= 2 ? code.Substring(code.Length - 2).ToUpperInvariant() : code.ToUpperInvariant();
+
+    string StatusPill(string status) => (status ?? "").ToLowerInvariant() switch
+    {
+        "active"   => "s-active",
+        "verified" => "s-active",
+        "prospect" => "s-pending",
+        "pending"  => "s-pending",
+        "blocked"  => "s-disabled",
+        "archived" => "s-disabled",
+        _          => "s-pending"
+    };
+    string StatusLabel(string status) => string.IsNullOrWhiteSpace(status)
+        ? "Pending"
+        : char.ToUpperInvariant(status[0]) + status.Substring(1).ToLowerInvariant();
+}
+
+@* KPI strip *@
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Total customers<span class="dot"></span></div>
+        <div class="kpi-value mono">@Model.Total.ToString("N0", CultureInfo.InvariantCulture)</div>
+        <div class="kpi-foot">
+            <span class="label-suffix">across all kiosks</span>
+        </div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Verified<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value mono">@Model.Active.ToString("N0", CultureInfo.InvariantCulture)</div>
+        <div class="kpi-foot">
+            @if (Model.Total > 0)
+            {
+                var pct = (decimal)Model.Active / Model.Total * 100m;
+                <span class="label-suffix">@pct.ToString("F1", CultureInfo.InvariantCulture)% coverage</span>
+            }
+            else
+            {
+                <span class="label-suffix">No customers yet</span>
+            }
+        </div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Inactive<span class="dot" style="background:var(--warning);"></span></div>
+        <div class="kpi-value mono">@Model.InActive.ToString("N0", CultureInfo.InvariantCulture)</div>
+        <div class="kpi-foot"><span class="label-suffix">prospect · blocked · archived</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">PII unmask · 7d<span class="dot" style="background:var(--danger);"></span></div>
+        <div class="kpi-value mono">0</div>
+        <div class="kpi-foot"><span class="label-suffix">all audited</span></div>
+    </div>
+</div>
+
+@* Filter toolbar *@
+<section class="card" style="margin-bottom:18px;">
+    <form method="get" asp-action="CustomerDetails" class="cust-filter-bar">
+        <div class="cust-filter-group">
+            <label>Status</label>
+            <div class="seg" role="group" aria-label="Status filter">
+                <button type="submit" name="stat" value=""         class="@(string.IsNullOrEmpty(stat) ? "active" : null)">All</button>
+                <button type="submit" name="stat" value="active"   class="@(stat == "active"   ? "active" : null)">Active</button>
+                <button type="submit" name="stat" value="prospect" class="@(stat == "prospect" ? "active" : null)">Prospect</button>
+                <button type="submit" name="stat" value="blocked"  class="@(stat == "blocked"  ? "active" : null)">Blocked</button>
+                <button type="submit" name="stat" value="archived" class="@(stat == "archived" ? "active" : null)">Archived</button>
+            </div>
+        </div>
+        <div class="cust-filter-divider"></div>
+        <div class="cust-filter-group" style="flex:1; min-width:240px;">
+            <label>Search</label>
+            <div class="search inline-search">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                    <circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5" />
+                    <path d="M11 11L14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                </svg>
+                <input type="text" name="search" value="@searchTerm" placeholder="Customer code, mobile last 4…" />
+                @if (!string.IsNullOrEmpty(stat))
+                {
+                    <input type="hidden" name="stat" value="@stat" />
+                }
+            </div>
+        </div>
+        <div class="cust-filter-group">
+            <label class="visually-hidden">Apply</label>
+            <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+        </div>
+    </form>
+</section>
+
+@* Customer table *@
+<section class="card">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">All customers · <span class="mono">@Model.Total.ToString("N0", CultureInfo.InvariantCulture)</span></h2>
+            <div class="card-meta" style="margin-top:6px;">
+                <span>Showing page @pageNo · @(Model.customerMasterList?.Count ?? 0) records · masked by default</span>
+            </div>
+        </div>
+        <div style="display:flex; gap:6px;">
+            <button type="button" class="btn btn-ghost btn-sm">Columns</button>
+            <button type="button" class="btn btn-ghost btn-sm">Density</button>
+        </div>
+    </header>
+
+    <div style="overflow-x:auto;">
+        <table class="user-table customer-table">
+            <thead>
+                <tr>
+                    <th style="width:24%;">Customer</th>
+                    <th style="width:13%;">Mobile</th>
+                    <th style="width:12%;">Status</th>
+                    <th style="width:16%; text-align:right;">Wallet balance</th>
+                    <th style="width:10%;">Joined</th>
+                    <th style="width:17%;">PII access</th>
+                    <th style="width:8%; text-align:right; padding-right:22px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.customerMasterList != null && Model.customerMasterList.Any())
+                {
+                    var idx = 0;
+                    foreach (var row in Model.customerMasterList)
+                    {
+                        var gradient = avatarGradients[idx % avatarGradients.Length];
+                        var initials = InitialsFor(row.CustomerCode);
+                        idx++;
+                        <tr data-code="@row.CustomerCode">
+                            <td>
+                                <div class="user-cell">
+                                    <span class="avatar" style="background:@gradient; color:#fff;">@initials</span>
+                                    <div class="meta">
+                                        <strong>@row.CustomerCode</strong>
+                                        <span class="mono">id · @row.Id.ToString().Substring(0, 8)</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td><span class="mono">@row.MobileMasked</span></td>
+                            <td><span class="status-pill @StatusPill(row.Status)">@StatusLabel(row.Status)</span></td>
+                            <td class="mono" style="text-align:right;">
+                                @row.RunningWalletBalance.ToString("N2", CultureInfo.InvariantCulture)
+                                <span style="color:var(--ink-faint); font-size:11px; margin-left:4px;">@(string.IsNullOrWhiteSpace(row.CurrencyCode) ? "AED" : row.CurrencyCode)</span>
+                            </td>
+                            <td class="mono">@row.CreatedOn.ToString("dd MMM yy", CultureInfo.InvariantCulture)</td>
+                            <td>
+                                <span class="pii-state masked">●●●● masked</span>
+                                <button type="button"
+                                        class="btn btn-ghost btn-sm pii-btn"
+                                        data-action="open-unmask"
+                                        data-code="@row.CustomerCode">
+                                    Unmask
+                                </button>
+                            </td>
+                            <td style="text-align:right; padding-right:22px;">
+                                <div class="row-actions" style="justify-content:flex-end;">
+                                    <button type="button"
+                                            class="icon-btn"
+                                            data-action="open-edit"
+                                            data-code="@row.CustomerCode"
+                                            title="Edit customer">
+                                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                                            <path d="M9 2L12 5L4 13H1V10L9 2Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" />
+                                        </svg>
+                                    </button>
+                                    <a class="row-open" asp-action="TransactionHistory" asp-route-customerCode="@row.CustomerCode" title="View transactions">→</a>
+                                    <button type="button"
+                                            class="icon-btn"
+                                            data-action="open-delete"
+                                            data-code="@row.CustomerCode"
+                                            title="Delete customer"
+                                            style="color:var(--danger);">
+                                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                                            <path d="M2 4H12M5 4V2H9V4M3 4L4 12H10L11 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="7" style="text-align:center; padding:36px 0; color:var(--ink-faint);">
+                            No customers in this window.
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="table-foot">
+        <span>Showing <strong class="mono">@(Model.customerMasterList?.Count ?? 0)</strong> of <strong class="mono">@Model.Total.ToString("N0", CultureInfo.InvariantCulture)</strong></span>
+        <div class="pager">
+            <a class="btn btn-ghost btn-sm @(pageNo <= 1 ? "disabled" : null)"
+               asp-action="CustomerDetails"
+               asp-route-search="@searchTerm"
+               asp-route-stat="@stat"
+               asp-route-pageNo="@(pageNo - 1)"
+               asp-route-pageSize="@pageSize">◀</a>
+            <button type="button" class="btn btn-ghost btn-sm active">@pageNo</button>
+            <a class="btn btn-ghost btn-sm"
+               asp-action="CustomerDetails"
+               asp-route-search="@searchTerm"
+               asp-route-stat="@stat"
+               asp-route-pageNo="@(pageNo + 1)"
+               asp-route-pageSize="@pageSize">▶</a>
+        </div>
+    </div>
+</section>
+
+@* ───── Add customer modal ───── *@
+<div class="modal-backdrop" id="addCustomerModal" role="dialog" aria-modal="true" aria-labelledby="addCustomerTitle">
+    <form class="modal-card" method="post" asp-action="AddCustomer">
+        @Html.AntiForgeryToken()
+        <div class="modal-head">
+            <div class="eyebrow">Fleet · onboarding</div>
+            <h3 id="addCustomerTitle">Onboard <em>customer.</em></h3>
+            <p>Capture the mobile number and wallet PIN. Both are stored encrypted; only the last four digits are surfaced afterwards.</p>
+        </div>
+        <div class="modal-body">
+            <div class="field">
+                <label for="addMobile">Mobile number</label>
+                <input type="text" id="addMobile" name="Mobile" required placeholder="+971 5• ••• ••••" autocomplete="off" />
+            </div>
+            <div class="field">
+                <label for="addWalletPin">Utility wallet PIN</label>
+                <input type="text" id="addWalletPin" name="WalletPin" required placeholder="••••" autocomplete="off" />
+            </div>
+        </div>
+        <div class="modal-foot">
+            <button type="button" class="btn btn-ghost btn-sm" data-action="close-modal">Cancel</button>
+            <button type="submit" class="btn btn-primary btn-sm">Create customer</button>
+        </div>
+    </form>
+</div>
+
+@* ───── Edit customer modal ───── *@
+<div class="modal-backdrop" id="editCustomerModal" role="dialog" aria-modal="true" aria-labelledby="editCustomerTitle">
+    <form class="modal-card" method="post" asp-action="EditCustomer">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="CustomerCode" id="editCustomerCode" />
+        <div class="modal-head">
+            <div class="eyebrow">Fleet · update</div>
+            <h3 id="editCustomerTitle">Edit <em>customer.</em></h3>
+            <p>Leave fields blank to keep their current values. All changes are recorded in the audit ledger.</p>
+        </div>
+        <div class="modal-body">
+            <div class="field">
+                <label>Customer code</label>
+                <input type="text" id="editCustomerCodeReadonly" readonly class="mono" />
+            </div>
+            <div class="field">
+                <label for="editMobile">Mobile number</label>
+                <input type="text" id="editMobile" name="Mobile" placeholder="Leave blank to keep existing" autocomplete="off" />
+            </div>
+            <div class="field">
+                <label for="editWalletPin">Utility wallet PIN</label>
+                <input type="text" id="editWalletPin" name="WalletPin" placeholder="Leave blank to keep existing" autocomplete="off" />
+            </div>
+        </div>
+        <div class="modal-foot">
+            <button type="button" class="btn btn-ghost btn-sm" data-action="close-modal">Cancel</button>
+            <button type="submit" class="btn btn-primary btn-sm">Save changes</button>
+        </div>
+    </form>
+</div>
+
+@* ───── Delete confirmation modal ───── *@
+<div class="modal-backdrop" id="deleteCustomerModal" role="dialog" aria-modal="true" aria-labelledby="deleteCustomerTitle">
+    <form class="modal-card" method="post" asp-action="DeleteCustomer">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="code" id="deleteCustomerCode" />
+        <div class="modal-head">
+            <div class="eyebrow">Fleet · destructive</div>
+            <h3 id="deleteCustomerTitle">Delete <em>customer.</em></h3>
+            <p>Customer <span class="mono" id="deleteCustomerLabel">—</span> will be soft-deleted. Their wallet balance and transaction history remain queryable for audit and regulatory retention.</p>
+        </div>
+        <div class="modal-body">
+            <div class="callout">
+                <strong>Heads up.</strong> Hard-deletion is restricted to the Owner role and only after the regulatory retention window has elapsed.
+            </div>
+        </div>
+        <div class="modal-foot">
+            <button type="button" class="btn btn-ghost btn-sm" data-action="close-modal">Cancel</button>
+            <button type="submit" class="btn btn-primary btn-sm" style="background:var(--danger); border-color:var(--danger);">Confirm delete</button>
+        </div>
+    </form>
+</div>
+
+@* ───── PII unmask modal (visual stub — no backing action wired yet) ───── *@
+<div class="modal-backdrop" id="unmaskModal" role="dialog" aria-modal="true" aria-labelledby="unmaskTitle">
+    <div class="modal-card">
+        <div class="modal-head">
+            <div class="eyebrow">PII access · audited</div>
+            <h3 id="unmaskTitle">Unmask <em>customer PII.</em></h3>
+            <p>This action is logged immutably with your operator ID, reason, customer ID and timestamp. The unmask window is 15 minutes.</p>
+        </div>
+        <div class="modal-body">
+            <div class="field">
+                <label>Reason category</label>
+                <select class="cust-filter-select" style="width:100%;">
+                    <option>Customer support · phone enquiry</option>
+                    <option>KYC review · regulatory</option>
+                    <option>Helpdesk ticket follow-up</option>
+                    <option>AML investigation · compliance officer</option>
+                    <option>Data subject access request</option>
+                </select>
+            </div>
+            <div class="field">
+                <label>Justification (free text · required)</label>
+                <textarea rows="3" placeholder="e.g. Customer called helpdesk re: TX-3492 settlement query · ticket #HD-118"></textarea>
+            </div>
+            <div class="callout">
+                <strong>Heads up.</strong> Unmasking Emirates ID and passport scans triggers a notification to the tenant DPO. Use only when necessary.
+            </div>
+        </div>
+        <div class="modal-foot">
+            <button type="button" class="btn btn-ghost btn-sm" data-action="close-modal">Cancel</button>
+            <button type="button" class="btn btn-primary btn-sm">Unmask &amp; log</button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            function openModal(id) {
+                var el = document.getElementById(id);
+                if (el) el.classList.add('open');
+            }
+            function closeModal(el) {
+                if (el) el.classList.remove('open');
+            }
+
+            // Open buttons (top action bar uses inline onclick via [data-action="open-add-customer"])
+            document.body.addEventListener('click', function (e) {
+                var trigger = e.target.closest('[data-action]');
+                if (!trigger) return;
+                var action = trigger.getAttribute('data-action');
+
+                if (action === 'open-add-customer') {
+                    e.preventDefault();
+                    openModal('addCustomerModal');
+                } else if (action === 'open-edit') {
+                    e.preventDefault();
+                    var code = trigger.getAttribute('data-code') || '';
+                    document.getElementById('editCustomerCode').value = code;
+                    document.getElementById('editCustomerCodeReadonly').value = code;
+                    document.getElementById('editMobile').value = '';
+                    document.getElementById('editWalletPin').value = '';
+                    openModal('editCustomerModal');
+                } else if (action === 'open-delete') {
+                    e.preventDefault();
+                    var code2 = trigger.getAttribute('data-code') || '';
+                    document.getElementById('deleteCustomerCode').value = code2;
+                    document.getElementById('deleteCustomerLabel').textContent = code2;
+                    openModal('deleteCustomerModal');
+                } else if (action === 'open-unmask') {
+                    e.preventDefault();
+                    openModal('unmaskModal');
+                } else if (action === 'close-modal') {
+                    e.preventDefault();
+                    closeModal(trigger.closest('.modal-backdrop'));
+                }
+            });
+
+            // Click-outside to close
+            document.querySelectorAll('.modal-backdrop').forEach(function (m) {
+                m.addEventListener('click', function (e) {
+                    if (e.target === m) closeModal(m);
+                });
+            });
+        })();
+    </script>
+}
+
+@* TODO promote: filter-bar/inline-search/customer-table/pii-state/modal-backdrop styles into main.css after design review *@
+<style>
+    .cust-filter-bar { display:flex; align-items:flex-end; gap:18px; padding:18px 22px; flex-wrap:wrap; }
+    .cust-filter-group { display:flex; flex-direction:column; gap:6px; }
+    .cust-filter-group label { font-size:11px; letter-spacing:var(--tracking-wider); text-transform:uppercase; color:var(--ink-faint); }
+    .cust-filter-divider { width:1px; align-self:stretch; background: var(--line); margin: 6px 0; }
+    .cust-filter-select {
+        appearance:none; -webkit-appearance:none;
+        background: var(--canvas-sunken);
+        border: 1px solid var(--line-strong);
+        color: var(--ink);
+        padding: 8px 28px 8px 12px;
+        font-family: var(--font-sans);
+        font-size: var(--fs-13);
+        border-radius: var(--radius-md);
+        background-image: linear-gradient(45deg, transparent 50%, var(--ink-faint) 50%), linear-gradient(135deg, var(--ink-faint) 50%, transparent 50%);
+        background-position: calc(100% - 14px) 50%, calc(100% - 9px) 50%;
+        background-size: 5px 5px, 5px 5px;
+        background-repeat: no-repeat;
+        min-width: 180px;
+    }
+    .cust-filter-select:focus { outline:none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+
+    .search.inline-search {
+        background: var(--canvas-sunken);
+        border: 1px solid var(--line-strong);
+        padding: 6px 10px;
+        border-radius: var(--radius-md);
+        width: 100%;
+        min-width: 240px;
+    }
+    .search.inline-search input { background: transparent; }
+
+    .customer-table .row-actions { display:flex; gap:4px; align-items:center; }
+    .pii-state {
+        display:inline-block;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.04em;
+        padding: 3px 8px;
+        border-radius: var(--radius-xs);
+        margin-right: 8px;
+        background: var(--canvas-sunken);
+        color: var(--ink-faint);
+        border: 1px solid var(--line);
+    }
+    .pii-state.unmasked { background: var(--warning-soft); color: var(--warning); border-color: rgba(196,116,25,0.22); }
+    .pii-btn { padding: 3px 8px; font-size: 11px; }
+    .row-open {
+        display:inline-flex; align-items:center; justify-content:center;
+        width:28px; height:28px; border-radius:var(--radius-xs);
+        color: var(--accent); text-decoration:none;
+        font-family: var(--font-mono); font-size:14px;
+    }
+    .row-open:hover { background: var(--accent-soft); }
+
+    .table-foot {
+        display:flex; justify-content:space-between; align-items:center;
+        padding: 14px 22px;
+        border-top: 1px solid var(--line);
+        font-size: var(--fs-13); color: var(--ink-faint);
+    }
+    .table-foot strong { color: var(--ink); font-weight:500; }
+    .pager { display:flex; gap:4px; align-items:center; }
+    .pager .btn-sm { padding: 4px 10px; min-width: 30px; }
+    .pager .btn-sm.active { border-color: var(--accent); color: var(--accent); }
+    .pager .disabled { pointer-events: none; opacity: 0.4; }
+
+    /* Modal */
+    .modal-backdrop {
+        position: fixed; inset: 0; background: rgba(10,10,10,0.55);
+        display: none; align-items: center; justify-content: center;
+        z-index: 100;
+        backdrop-filter: blur(4px);
+    }
+    .modal-backdrop.open { display:flex; }
+    .modal-card {
+        width: 480px; max-width: 92vw;
+        background: var(--canvas);
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-md);
+        overflow: hidden;
+    }
+    .modal-head { padding: 22px 24px 14px; border-bottom: 1px solid var(--line); }
+    .modal-head h3 { font-family: var(--font-display); font-size: 24px; font-weight: 400; margin: 8px 0 6px; }
+    .modal-head h3 em { font-style: italic; color: var(--accent); }
+    .modal-head p { font-size: var(--fs-13); color: var(--ink-faint); margin: 0; line-height: 1.5; }
+    .modal-body { padding: 18px 24px; }
+    .modal-body .field { margin-bottom: 14px; }
+    .modal-body label { display:block; font-size: 11px; letter-spacing: var(--tracking-wider); text-transform: uppercase; color: var(--ink-faint); margin-bottom: 6px; }
+    .modal-body input[type="text"],
+    .modal-body textarea {
+        width:100%; resize:vertical;
+        background: var(--canvas-sunken); border: 1px solid var(--line-strong);
+        border-radius: var(--radius-md); padding: 10px 12px;
+        font-family: var(--font-sans); font-size: var(--fs-13); color: var(--ink);
+    }
+    .modal-body input.mono { font-family: var(--font-mono); }
+    .modal-body input:focus,
+    .modal-body textarea:focus { outline:none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+    .modal-foot { padding: 14px 24px 18px; display:flex; justify-content:flex-end; gap:8px; border-top: 1px solid var(--line); background: var(--canvas-sunken); }
+
+    .callout {
+        padding: 10px 12px;
+        background: var(--accent-soft);
+        border-left: 2px solid var(--accent);
+        border-radius: var(--radius-sm);
+        font-size: var(--fs-13); color: var(--ink-soft); line-height: 1.5;
+    }
+    .callout strong { color: var(--ink); font-weight: 500; }
+
+    .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+</style>

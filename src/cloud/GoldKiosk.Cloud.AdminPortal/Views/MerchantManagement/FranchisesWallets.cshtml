@@ -1,0 +1,426 @@
+@using GoldKiosk.Cloud.AdminPortal.Models
+@using System.Globalization
+@model FranchiseWalletsList
+@{
+    var searchTerm = ViewBag.SearchTerm as string;
+    var pageSize   = (int?)ViewBag.PageSize ?? 10;
+    var pageNo     = (int?)ViewBag.PageNo   ?? 1;
+
+    ViewBag.PageTitle = "Franchise <em>wallets.</em>";
+    ViewBag.Eyebrow   = "Merchants · Wallet operations";
+    ViewBag.Subtitle  = "Manage merchant prepaid balances, approve top-ups, and audit every ledger entry. Postings are append-only and reconciled nightly with the settlement bank.";
+    ViewBag.ActiveNav = "merchants";
+    ViewBag.PageHeadActions =
+        "<button type=\"button\" class=\"btn btn-ghost btn-sm\">Statement</button>" +
+        "<button type=\"button\" class=\"btn btn-primary btn-sm\">" +
+        "<svg width=\"14\" height=\"14\" viewBox=\"0 0 14 14\" fill=\"none\"><path d=\"M7 3V11M3 7H11\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/></svg>" +
+        "Manual top-up</button>";
+
+    decimal totalBalance = Model.Wallets?.Sum(w => w.Balance) ?? 0m;
+    int     walletCount  = Model.Wallets?.Count ?? 0;
+
+    string[] avatarGradients = new[]
+    {
+        "linear-gradient(135deg,#b8941f,#7a610f)",
+        "linear-gradient(135deg,#a83232,#7a2424)",
+        "linear-gradient(135deg,#2a5d8c,#1c3e5d)",
+        "linear-gradient(135deg,#c47419,#8b520f)",
+        "linear-gradient(135deg,#2a7d4f,#1c5d3a)",
+        "linear-gradient(135deg,#75716a,#4a4845)"
+    };
+    string Initials(string? code, string? name)
+    {
+        var src = !string.IsNullOrWhiteSpace(name) ? name : (code ?? "");
+        var parts = src.Split(new[] { ' ', '-', '_' }, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2) return (parts[0][0].ToString() + parts[1][0]).ToUpperInvariant();
+        if (parts.Length == 1 && parts[0].Length >= 2) return parts[0].Substring(0, 2).ToUpperInvariant();
+        return "M";
+    }
+
+    // Status pill helpers are inlined in the partial _TopupRequestsTable.cshtml.
+}
+
+@* KPI strip *@
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Wallets · active<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value mono">@walletCount.ToString("N0", CultureInfo.InvariantCulture)</div>
+        <div class="kpi-foot"><span class="label-suffix">linked to merchants</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Total balance<span class="dot" style="background:var(--accent);"></span></div>
+        <div class="kpi-value mono">@totalBalance.ToString("N2", CultureInfo.InvariantCulture)<span class="unit">AED</span></div>
+        <div class="kpi-foot"><span class="label-suffix">across all wallets</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Pending top-ups<span class="dot" style="background:var(--warning);"></span></div>
+        <div class="kpi-value mono">@Model.PendingCount.ToString("N0", CultureInfo.InvariantCulture)</div>
+        <div class="kpi-foot"><span class="label-suffix">awaiting approval</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Approved · 7d<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value mono">@Model.ApprovedCount.ToString("N0", CultureInfo.InvariantCulture)</div>
+        <div class="kpi-foot"><span class="label-suffix">@Model.RejectedCount rejected</span></div>
+    </div>
+</div>
+
+@* Filter toolbar *@
+<form method="get" asp-action="FranchisesWallets" class="wallet-filter-bar">
+    <div class="wallet-filter-left">
+        <div class="search inline-search" style="min-width:280px;">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/>
+                <path d="M11 11L14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <input type="text" name="search" value="@searchTerm" placeholder="Filter by merchant code or name…" />
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">Search</button>
+    </div>
+    <div class="wallet-filter-right">
+        <span class="filter-meta mono">@walletCount wallets · @Model.TotalRequests requests</span>
+    </div>
+</form>
+
+@* Split layout: wallets ledger + pending top-ups *@
+<div class="split-2-1">
+
+    @* ── Wallets list ─────────────────────────────────────────────── *@
+    <section class="card">
+        <header class="card-head">
+            <div>
+                <h2 class="card-title">Wallet ledger</h2>
+                <div class="card-meta" style="margin-top:6px;">
+                    <span>@walletCount wallets · sorted by last top-up</span>
+                </div>
+            </div>
+            <div style="display:flex; gap:6px;">
+                <button type="button" class="btn btn-ghost btn-sm">Filter</button>
+                <button type="button" class="btn btn-ghost btn-sm">Export</button>
+            </div>
+        </header>
+        <div style="overflow-x:auto;">
+            <table class="user-table wallet-table">
+                <thead>
+                    <tr>
+                        <th style="width:38%;">Merchant</th>
+                        <th style="width:14%;">Code</th>
+                        <th style="width:18%; text-align:right;">Balance</th>
+                        <th style="width:10%;">Currency</th>
+                        <th style="width:20%;">Last top-up</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.Wallets != null && Model.Wallets.Any())
+                    {
+                        var idx = 0;
+                        foreach (var w in Model.Wallets)
+                        {
+                            var gradient = avatarGradients[idx % avatarGradients.Length];
+                            var initials = Initials(w.MerchantCode, w.MerchantName);
+                            var curr = string.IsNullOrWhiteSpace(w.CurrencyCode) ? "AED" : w.CurrencyCode;
+                            idx++;
+                            <tr>
+                                <td>
+                                    <div class="user-cell">
+                                        <span class="avatar" style="background:@gradient; color:#fff;">@initials</span>
+                                        <div class="meta">
+                                            <strong>@w.MerchantName</strong>
+                                            <span class="mono">wallet · @w.WalletId.ToString().Substring(0, 8)</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="mono">@w.MerchantCode</td>
+                                <td class="mono" style="text-align:right;">
+                                    @w.Balance.ToString("N2", CultureInfo.InvariantCulture)
+                                </td>
+                                <td class="mono">@curr</td>
+                                <td class="mono">
+                                    @if (w.LastTopupOn.HasValue)
+                                    {
+                                        @w.LastTopupOn.Value.ToString("dd MMM yy · HH:mm", CultureInfo.InvariantCulture)
+                                    }
+                                    else
+                                    {
+                                        <span style="color:var(--ink-faint);">—</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="5" style="text-align:center; padding:36px 0; color:var(--ink-faint);">
+                                No wallets in this window.
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="table-foot">
+            <span>Showing <strong class="mono">@walletCount</strong> wallets · page @pageNo</span>
+            <div class="pager">
+                <a class="btn btn-ghost btn-sm @(pageNo <= 1 ? "disabled" : null)"
+                   asp-action="FranchisesWallets"
+                   asp-route-search="@searchTerm"
+                   asp-route-pageNo="@(pageNo - 1)"
+                   asp-route-pageSize="@pageSize">◀</a>
+                <button type="button" class="btn btn-ghost btn-sm active">@pageNo</button>
+                <a class="btn btn-ghost btn-sm"
+                   asp-action="FranchisesWallets"
+                   asp-route-search="@searchTerm"
+                   asp-route-pageNo="@(pageNo + 1)"
+                   asp-route-pageSize="@pageSize">▶</a>
+            </div>
+        </div>
+    </section>
+
+    @* ── Pending top-ups (with approve/reject) ─────────────────────── *@
+    <section class="card">
+        <header class="card-head">
+            <div>
+                <h2 class="card-title">Pending top-ups</h2>
+                <div class="card-meta" style="margin-top:6px;">
+                    <span class="dot-pulse" style="background:var(--warning);"></span>
+                    <span>@Model.PendingCount awaiting approval</span>
+                </div>
+            </div>
+        </header>
+        <div class="topup-list">
+            @if (Model.Pending != null && Model.Pending.Any())
+            {
+                foreach (var r in Model.Pending)
+                {
+                    var curr = string.IsNullOrWhiteSpace(r.CurrencyCode) ? "AED" : r.CurrencyCode;
+                    <div class="topup-row">
+                        <div class="topup-top">
+                            <span class="mono" style="font-size:11px; color:var(--ink-faint);">REQ-@r.Id.ToString().Substring(0, 8)</span>
+                            <span class="status-pill s-pending">Awaiting L2</span>
+                        </div>
+                        <div class="topup-amt mono">+ @r.RequestedAmount.ToString("N2", CultureInfo.InvariantCulture) <span class="unit">@curr</span></div>
+                        <div class="topup-meta">
+                            <span><strong>Merchant:</strong> @r.MerchantName · <span class="mono">@r.MerchantCode</span></span>
+                            @if (!string.IsNullOrWhiteSpace(r.PaymentReference))
+                            {
+                                <span><strong>Bank ref:</strong> <span class="mono">@r.PaymentReference</span></span>
+                            }
+                            <span><strong>Raised:</strong> <span class="mono">@r.RequestedOn.ToString("dd MMM yy · HH:mm", CultureInfo.InvariantCulture)</span></span>
+                        </div>
+                        <div class="topup-actions">
+                            <form method="post" asp-action="ApproveTopup" style="display:inline;">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="topupId" value="@r.Id" />
+                                <button type="submit" class="btn btn-primary btn-sm">Approve</button>
+                            </form>
+                            <form method="post" asp-action="RejectTopup" style="display:inline;"
+                                  onsubmit="var reason = prompt('Rejection reason?'); if (!reason) return false; this.querySelector('[name=reason]').value = reason;">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="topupId" value="@r.Id" />
+                                <input type="hidden" name="reason" value="" />
+                                <button type="submit" class="btn btn-ghost btn-sm">Reject</button>
+                            </form>
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <div style="padding: 36px 22px; text-align:center; color: var(--ink-faint); font-size: var(--fs-13);">
+                    No top-up requests awaiting approval.
+                </div>
+            }
+        </div>
+    </section>
+
+</div>
+
+@* History tabs: approved / rejected / all *@
+<section class="card" style="margin-top:32px;">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Top-up history</h2>
+            <div class="card-meta" style="margin-top:6px;">
+                <span>Append-only ledger · auditable</span>
+            </div>
+        </div>
+        <div class="seg" role="tablist">
+            <button type="button" class="active" data-tab="approved">Approved · @Model.ApprovedCount</button>
+            <button type="button" data-tab="rejected">Rejected · @Model.RejectedCount</button>
+            <button type="button" data-tab="all">All · @Model.TotalRequests</button>
+        </div>
+    </header>
+
+    <div data-pane="approved">
+        @await Html.PartialAsync("_TopupRequestsTable",
+            (IEnumerable<WalletTopupRequestViewModel>)Model.Approved,
+            new ViewDataDictionary(ViewData) { { "ShowActions", false } })
+    </div>
+    <div data-pane="rejected" style="display:none;">
+        @await Html.PartialAsync("_TopupRequestsTable",
+            (IEnumerable<WalletTopupRequestViewModel>)Model.Rejected,
+            new ViewDataDictionary(ViewData) { { "ShowActions", false } })
+    </div>
+    <div data-pane="all" style="display:none;">
+        @await Html.PartialAsync("_TopupRequestsTable",
+            (IEnumerable<WalletTopupRequestViewModel>)Model.All,
+            new ViewDataDictionary(ViewData) { { "ShowActions", false } })
+    </div>
+</section>
+
+@* Privileged actions grid *@
+<section class="card" style="margin-top:32px;">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Wallet actions</h2>
+            <div class="card-meta" style="margin-top:6px;">
+                <span>Privileged operations · all actions audit-logged with reason</span>
+            </div>
+        </div>
+    </header>
+    <div class="action-grid">
+        <button type="button" class="action-tile">
+            <div class="action-icon">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                    <path d="M10 4V16M4 10H16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+            </div>
+            <div class="action-title">Manual top-up</div>
+            <div class="action-desc">Post a credit entry against a settled bank transfer. Requires L2 approval above AED 50k.</div>
+        </button>
+        <button type="button" class="action-tile">
+            <div class="action-icon">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                    <path d="M4 4H16V16H4V4Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                    <line x1="4" y1="8" x2="16" y2="8" stroke="currentColor" stroke-width="1.5"/>
+                </svg>
+            </div>
+            <div class="action-title">Generate statement</div>
+            <div class="action-desc">PDF statement for a date range · signed with tenant cert · auto-emailed to merchant.</div>
+        </button>
+        <button type="button" class="action-tile danger">
+            <div class="action-icon">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                    <circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5"/>
+                    <path d="M5 5L15 15" stroke="currentColor" stroke-width="1.5"/>
+                </svg>
+            </div>
+            <div class="action-title">Suspend wallet</div>
+            <div class="action-desc">Freeze all outgoing postings. Requires Owner-level role. Notification fires to merchant admin.</div>
+        </button>
+    </div>
+</section>
+
+@section Scripts {
+    <script>
+        (function () {
+            // Tab switcher for top-up history
+            document.querySelectorAll('.seg [data-tab]').forEach(function (btn) {
+                btn.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    var name = btn.getAttribute('data-tab');
+                    var group = btn.parentElement;
+                    group.querySelectorAll('[data-tab]').forEach(function (b) { b.classList.remove('active'); });
+                    btn.classList.add('active');
+                    var card = btn.closest('.card');
+                    card.querySelectorAll('[data-pane]').forEach(function (p) {
+                        p.style.display = p.getAttribute('data-pane') === name ? '' : 'none';
+                    });
+                });
+            });
+        })();
+    </script>
+}
+
+@* TODO promote: wallet-filter / topup-list / action-grid into main.css *@
+<style>
+    .wallet-filter-bar {
+        display:flex; align-items:center; justify-content:space-between; gap:16px;
+        padding: 14px 4px 22px; margin-bottom: 4px;
+        flex-wrap: wrap;
+    }
+    .wallet-filter-left { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .wallet-filter-right { display:flex; align-items:center; gap:12px; }
+    .filter-meta { font-size:12px; color:var(--ink-faint); }
+
+    .search.inline-search {
+        display:flex; align-items:center; gap:8px;
+        padding: 7px 12px;
+        background: var(--canvas-elevated);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        color: var(--ink-faint);
+    }
+    .search.inline-search input {
+        background: transparent; border: none; outline: none; width: 100%;
+        font-size: 13px; color: var(--ink);
+    }
+
+    .table-foot {
+        display:flex; justify-content:space-between; align-items:center;
+        padding: 16px 22px; border-top:1px solid var(--line);
+        font-size: 12px; color: var(--ink-faint);
+    }
+    .table-foot strong { color: var(--ink); font-weight: 500; }
+    .pager { display:flex; gap:4px; align-items:center; }
+    .pager .btn-sm { padding: 4px 10px; min-width: 30px; }
+    .pager .btn-sm.active { border-color: var(--accent); color: var(--accent); }
+    .pager .disabled { pointer-events: none; opacity: 0.4; }
+
+    /* Pending top-ups list */
+    .topup-list { display:flex; flex-direction:column; }
+    .topup-row { padding: 18px 22px; border-bottom: 1px solid var(--line); }
+    .topup-row:last-child { border-bottom: none; }
+    .topup-top { display:flex; justify-content:space-between; align-items:center; }
+    .topup-amt {
+        font-family:var(--font-mono); font-size: 22px; font-weight: 500;
+        color: var(--success); margin: 8px 0;
+    }
+    .topup-amt .unit { font-size:12px; color:var(--ink-faint); font-weight:400; margin-left:4px; }
+    .topup-meta {
+        display:flex; flex-direction:column; gap:3px;
+        font-size:12px; color:var(--ink-faint); margin-bottom:12px;
+    }
+    .topup-meta strong { color:var(--ink-soft); font-weight:500; }
+    .topup-actions { display:flex; gap:8px; }
+
+    /* Privileged actions row */
+    .action-grid {
+        display:grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0;
+    }
+    .action-tile {
+        text-align:left;
+        padding: 24px 22px;
+        border-right: 1px solid var(--line);
+        background: transparent;
+        cursor: pointer;
+        transition: background var(--dur-fast);
+    }
+    .action-tile:last-child { border-right: none; }
+    .action-tile:hover { background: var(--canvas-sunken); }
+    .action-icon {
+        width:38px; height:38px; border-radius: 8px;
+        background: var(--accent-soft); color: var(--accent);
+        display:flex; align-items:center; justify-content:center;
+        margin-bottom:14px;
+    }
+    .action-tile.danger .action-icon {
+        background: rgba(168,50,50,0.10);
+        color: var(--danger);
+    }
+    .action-title {
+        font-family: var(--font-display); font-size: 18px; font-weight: 500;
+        margin-bottom: 6px;
+    }
+    .action-desc {
+        font-size: 13px; color: var(--ink-faint); line-height: 1.5;
+    }
+
+    @@media (max-width: 1180px) {
+        .action-grid { grid-template-columns: 1fr; }
+        .action-tile { border-right: none; border-bottom: 1px solid var(--line); }
+        .action-tile:last-child { border-bottom: none; }
+    }
+</style>

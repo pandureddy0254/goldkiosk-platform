@@ -1,0 +1,141 @@
+@model ExpectedProfitReportViewModel
+@using System.Globalization
+@{
+    var report = Model ?? throw new InvalidOperationException("This report view requires a model.");
+
+    var inv = CultureInfo.InvariantCulture;
+
+    ViewBag.PageTitle = "Profit <em>(daily).</em>";
+    ViewBag.Eyebrow   = "R-07 · EXPECTED PROFIT · DAILY · PRE-EXPENSE";
+    ViewBag.Subtitle  = "Gross sales less cost-of-acquisition, rolled up daily. The leading indicator before operational expenses are layered in.";
+    ViewBag.ActiveNav = "reports";
+
+    var rows = report.Rows ?? new List<ExpectedProfitReportRow>();
+    var from = report.From?.ToString("yyyy-MM-dd", inv) ?? "";
+    var to   = report.To?.ToString("yyyy-MM-dd", inv) ?? "";
+
+    var margin = report.TotalGrossSales > 0
+        ? (report.TotalExpectedProfit / report.TotalGrossSales * 100m)
+        : 0m;
+}
+
+@section Head {
+    @await Html.PartialAsync("_ReportDetailStyles")
+}
+
+<div class="breadcrumb">
+    <a asp-controller="Reports" asp-action="Index">Reports library</a>
+    <span class="sep">&rsaquo;</span>
+    <span>R-07 &middot; Expected Profit</span>
+</div>
+
+<form method="get" asp-controller="Reports" asp-action="ExpectedProfit" class="report-filter">
+    @Html.AntiForgeryToken()
+    <label>From <input type="date" name="from" value="@from" /></label>
+    <label>To <input type="date" name="to" value="@to" /></label>
+    <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+    <a class="btn btn-ghost btn-sm" asp-controller="Reports" asp-action="ExpectedProfit">Reset</a>
+    <span style="flex:1;"></span>
+    <button type="button" class="btn btn-ghost btn-sm">Export &middot; CSV</button>
+    <button type="button" class="btn btn-ghost btn-sm">Export &middot; PDF</button>
+</form>
+
+<section class="card" style="margin-bottom:24px;">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Gross sales vs cost &middot; daily</h2>
+            <div class="card-meta" style="margin-top:6px;">
+                <span><span class="mono">@report.TotalExpectedProfit.ToString("N0", inv)</span> AED expected profit &middot;
+                margin <span class="mono">@margin.ToString("F1", inv)%</span></span>
+            </div>
+        </div>
+    </header>
+    <div class="card-body">
+        <div class="chart">
+            <svg viewBox="0 0 1000 240" preserveAspectRatio="none">
+                <defs>
+                    <linearGradient id="prGrad" x1="0" x2="0" y1="0" y2="1">
+                        <stop offset="0%"   stop-color="var(--success)" stop-opacity="0.32"/>
+                        <stop offset="100%" stop-color="var(--success)" stop-opacity="0"/>
+                    </linearGradient>
+                </defs>
+                <g stroke="var(--line)" stroke-dasharray="2 4">
+                    <line x1="0" x2="1000" y1="60" y2="60"/><line x1="0" x2="1000" y1="120" y2="120"/><line x1="0" x2="1000" y1="180" y2="180"/>
+                </g>
+                <path d="M0,200 L50,194 L100,188 L150,178 L200,182 L250,170 L300,168 L350,158 L400,155 L450,150 L500,142 L550,140 L600,128 L650,125 L700,118 L750,112 L800,108 L850,98 L900,92 L950,82 L1000,72 L1000,240 L0,240 Z" fill="url(#prGrad)"/>
+                <path d="M0,200 L50,194 L100,188 L150,178 L200,182 L250,170 L300,168 L350,158 L400,155 L450,150 L500,142 L550,140 L600,128 L650,125 L700,118 L750,112 L800,108 L850,98 L900,92 L950,82 L1000,72" fill="none" stroke="var(--success)" stroke-width="2"/>
+            </svg>
+        </div>
+    </div>
+</section>
+
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Gross sales<span class="dot"></span></div>
+        <div class="kpi-value"><span class="mono">@report.TotalGrossSales.ToString("N0", inv)</span><span class="unit">AED</span></div>
+        <div class="kpi-foot"><span class="delta delta-up">&#9650; 12.6%</span><span class="label-suffix">window total</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Cost of acquisition<span class="dot" style="background:var(--danger);"></span></div>
+        <div class="kpi-value"><span class="mono">@report.TotalCostOfAcquisition.ToString("N0", inv)</span><span class="unit">AED</span></div>
+        <div class="kpi-foot"><span class="label-suffix">spot &times; weight</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Expected profit<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value"><span class="mono">@report.TotalExpectedProfit.ToString("N0", inv)</span><span class="unit">AED</span></div>
+        <div class="kpi-foot"><span class="delta delta-up">&#9650; 18.2%</span><span class="label-suffix">pre-expense</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Gross margin<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value"><span class="mono">@margin.ToString("F1", inv)</span><span class="unit">%</span></div>
+        <div class="kpi-foot"><span class="label-suffix">profit &divide; sales</span></div>
+    </div>
+</div>
+
+<section class="card" style="margin-bottom:24px;">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Per-day breakdown</h2>
+            <div class="card-meta" style="margin-top:6px;"><span>Gross, cost of acquisition, expected profit by date</span></div>
+        </div>
+    </header>
+    <div style="overflow-x:auto;">
+        <table class="report-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th class="num">Gross</th>
+                    <th class="num">Cost of acquisition</th>
+                    <th class="num">Expected profit</th>
+                    <th>Currency</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (rows.Count == 0)
+                {
+                    <tr><td colspan="5" style="text-align:center; padding:32px 18px; color:var(--ink-faint);">No data.</td></tr>
+                }
+                else
+                {
+                    foreach (var r in rows)
+                    {
+                        <tr>
+                            <td class="mono"><strong>@r.ProfitDate.ToString("yyyy-MM-dd", inv)</strong></td>
+                            <td class="num mono">@r.GrossSales.ToString("N2", inv)</td>
+                            <td class="num mono">@r.CostOfAcquisition.ToString("N2", inv)</td>
+                            <td class="num mono">@r.ExpectedProfit.ToString("N2", inv)</td>
+                            <td>@r.CurrencyCode</td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@await Html.PartialAsync("_ReportMetaCard", new ReportMetaCardModel {
+    ReportCode = "R-07",
+    Matview    = "mv_daily_expected_profit",
+    Cadence    = "Every 15 minutes",
+    Rows       = rows.Count
+})
