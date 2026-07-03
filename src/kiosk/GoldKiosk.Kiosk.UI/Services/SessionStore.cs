@@ -378,12 +378,14 @@ public sealed class SessionStore
             InitializeIdentityStepsLocked();
         }
 
-        if (progress.Steps.Count > 0)
+        // The identity/start REST response carries only current_step (steps list is null);
+        // full step lists arrive via identity_progress hub events. Guard both shapes.
+        if (progress.Steps is { Count: > 0 })
         {
             IdentitySteps = progress.Steps;
         }
 
-        CurrentIdentityStep = progress.CurrentStep;
+        CurrentIdentityStep = progress.CurrentStep ?? CurrentIdentityStep;
         IdentityStarted = true;
     }
 

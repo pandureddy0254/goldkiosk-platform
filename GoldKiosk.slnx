@@ -2,6 +2,7 @@
   <Folder Name="/src/" />
   <Folder Name="/src/cloud/">
     <Project Path="src/cloud/GoldKiosk.Cloud.AdminPortal/GoldKiosk.Cloud.AdminPortal.csproj" />
+    <Project Path="src/cloud/GoldKiosk.Cloud.Api/GoldKiosk.Cloud.Api.csproj" />
     <Project Path="src/cloud/GoldKiosk.Cloud.CRMPortal/GoldKiosk.Cloud.CRMPortal.csproj" />
   </Folder>
   <Folder Name="/src/kiosk/">

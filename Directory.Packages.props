@@ -33,6 +33,10 @@
     <PackageVersion Include="System.IO.Ports" Version="10.0.9" />
   </ItemGroup>
 
+  <ItemGroup Label="Cloud.Api (auth; AI via the in-house goldkiosk-ai HTTP service, no LLM SDK)">
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.9" />
+  </ItemGroup>
+
   <ItemGroup Label="Data (PostgreSQL / EF Core)">
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2" />
     <PackageVersion Include="EFCore.NamingConventions" Version="10.0.1" />
