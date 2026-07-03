@@ -19,6 +19,7 @@ public partial class App : Application
 {
     private ServiceProvider? _services;
     private ILogger<App>? _logger;
+    private SplashWindow? _splash;
 
     /// <inheritdoc />
     protected override void OnStartup(StartupEventArgs e)
@@ -42,12 +43,44 @@ public partial class App : Application
         _logger = _services.GetRequiredService<ILogger<App>>();
         _logger.UiStarting(options.ApiBaseUrl);
 
-        // Packaged kiosk: the shell owns the edge API lifecycle (MSIX can't host a service).
-        // Blocks briefly until the API answers health so the first screen has a live backend.
-        _services.GetRequiredService<LocalApiHost>().StartAsync().GetAwaiter().GetResult();
+        // Show the branded splash immediately, then bring the edge API up off the UI thread so
+        // the splash stays live; reveal the kiosk once the API answers ("GoldKiosk App is ready").
+        _splash = new SplashWindow();
+        _splash.Show();
+        _ = StartKioskAsync();
+    }
 
-        MainWindow window = _services.GetRequiredService<MainWindow>();
-        window.Show();
+    private async Task StartKioskAsync()
+    {
+        try
+        {
+            _splash?.SetStatus("Starting hardware…");
+            await _services!.GetRequiredService<LocalApiHost>().StartAsync();
+
+            _splash?.SetStatus("GoldKiosk App is ready");
+            await Task.Delay(TimeSpan.FromMilliseconds(900));
+
+            MainWindow window = _services!.GetRequiredService<MainWindow>();
+            window.Show();
+            _splash?.Close();
+            _splash = null;
+        }
+        catch (Exception ex)
+        {
+            // async startup on the UI thread: never let an exception escape the dispatcher.
+            // Reveal the kiosk anyway (it surfaces connectivity errors) rather than hang on splash.
+            _logger?.DispatcherException(ex);
+            try
+            {
+                _services!.GetRequiredService<MainWindow>().Show();
+                _splash?.Close();
+                _splash = null;
+            }
+            catch (Exception revealEx)
+            {
+                _logger?.DispatcherException(revealEx);
+            }
+        }
     }
 
     /// <inheritdoc />
