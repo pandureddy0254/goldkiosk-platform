@@ -50,7 +50,12 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         _logger?.UiExiting(e.ApplicationExitCode);
-        _services?.Dispose();
+
+        // KioskHubClient is IAsyncDisposable-only, so the container must be disposed
+        // asynchronously. OnExit is synchronous and the app is terminating — a bounded
+        // blocking wait here cannot deadlock the (already stopping) dispatcher.
+        _services?.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(3));
+
         base.OnExit(e);
     }
 
