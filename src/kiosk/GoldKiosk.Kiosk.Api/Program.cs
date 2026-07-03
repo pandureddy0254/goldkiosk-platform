@@ -1,5 +1,6 @@
 using System.Text.Json;
 using FluentValidation;
+using GoldKiosk.Kiosk.Api.Cloud;
 using GoldKiosk.Kiosk.Api.Devices;
 using GoldKiosk.Kiosk.Api.Endpoints;
 using GoldKiosk.Kiosk.Api.Errors;
@@ -8,6 +9,7 @@ using GoldKiosk.Kiosk.Api.Hub;
 using GoldKiosk.Kiosk.Api.Idempotency;
 using GoldKiosk.Kiosk.Api.Orchestration;
 using GoldKiosk.Kiosk.Core.Analysis;
+using GoldKiosk.Kiosk.Core.Cloud;
 using GoldKiosk.Kiosk.Core.Options;
 using GoldKiosk.Kiosk.Core.Orchestration;
 using GoldKiosk.Kiosk.Core.Persistence;
@@ -66,6 +68,10 @@ builder.Services.AddOptions<DevicesOptions>()
     .BindConfiguration(DevicesOptions.SectionName)
     .ValidateDataAnnotations()
     .ValidateOnStart();
+builder.Services.AddOptions<CloudOptions>()
+    .BindConfiguration(CloudOptions.SectionName)
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
 
 builder.Services.AddSingleton(TimeProvider.System);
 
@@ -81,19 +87,45 @@ builder.Services.AddSingleton<IdempotencyStore>();
 builder.Services.AddSingleton<ISessionStore>(static sp => new FileSessionStore(
     sp.GetRequiredService<IOptions<KioskOptions>>().Value,
     sp.GetRequiredService<TimeProvider>()));
-builder.Services.AddSingleton<IOfferCalculator>(static sp => new MockOfferCalculator(
+// Local mock pricing is always available. When Cloud:Enabled it becomes the offline
+// fallback behind the cloud-backed calculator; when disabled it is used directly, so the
+// offline demo path is byte-identical (architecture-principles §4).
+builder.Services.AddSingleton<MockOfferCalculator>(static sp => new MockOfferCalculator(
     sp.GetRequiredService<IOptions<MockRatesOptions>>().Value,
     sp.GetRequiredService<IOptions<KioskOptions>>().Value,
     sp.GetRequiredService<TimeProvider>()));
+builder.Services.AddSingleton<IOfferCalculator>(static sp =>
+{
+    MockOfferCalculator mock = sp.GetRequiredService<MockOfferCalculator>();
+    return sp.GetRequiredService<IOptions<CloudOptions>>().Value.Enabled
+        ? new CloudBackedOfferCalculator(sp.GetRequiredService<ICloudGateway>(), mock)
+        : mock;
+});
 builder.Services.AddSingleton<IOfferExplainer, MockOfferExplainer>();
 builder.Services.AddSingleton(static sp => new AnalysisPolicy(
     sp.GetRequiredService<IOptions<AnalysisOptions>>().Value));
 builder.Services.AddSingleton<IKioskEventPublisher, SignalRKioskEventPublisher>();
 builder.Services.AddSingleton<TransactionOrchestrator>();
 
+// Cloud edge integration (feature-flagged by Cloud:Enabled). The named client carries the
+// base address + per-request timeout; the gateway owns the bearer token. Provisioning is
+// pulled at startup and re-polled; completed transactions forward through the outbox worker.
+// With Cloud:Enabled=false the gateway is never exercised and both workers no-op.
+builder.Services.AddHttpClient(CloudGateway.HttpClientName, static (sp, client) =>
+{
+    CloudOptions cloud = sp.GetRequiredService<IOptions<CloudOptions>>().Value;
+    string baseUrl = string.IsNullOrWhiteSpace(cloud.BaseUrl) ? CloudOptions.DefaultBaseUrl : cloud.BaseUrl;
+    client.BaseAddress = new Uri(baseUrl.EndsWith('/') ? baseUrl : baseUrl + "/");
+    client.Timeout = TimeSpan.FromSeconds(cloud.RequestTimeoutSeconds);
+});
+builder.Services.AddSingleton<ICloudGateway, CloudGateway>();
+builder.Services.AddSingleton<CurrentProvisioning>();
+
 builder.Services.AddHostedService<SessionRecoveryService>();
 builder.Services.AddHostedService<DeviceLifecycleService>();
 builder.Services.AddHostedService<IdleTimeoutService>();
+builder.Services.AddHostedService<CloudProvisioningService>();
+builder.Services.AddHostedService<TransactionUploadWorker>();
 
 var app = builder.Build();
 
