@@ -66,6 +66,32 @@ public sealed class DevicesOptions
                 $"Invalid device mode '{configured}' configured for '{key}' — expected 'Real' or 'Mock'.");
     }
 
+    /// <summary>
+    /// Resolves the effective connection facts for a real driver: the device's
+    /// <c>Connection</c> override merged member-by-member onto the legacy-parity defaults
+    /// from <see cref="RealDeviceDefaults.For"/>.
+    /// </summary>
+    /// <param name="key">The canonical device key (see <see cref="DeviceKeys"/>).</param>
+    /// <returns>The merged connection options (never <see langword="null"/>).</returns>
+    public ConnectionOptions ResolveConnection(string key)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(key);
+
+        string normalizedKey = Normalize(key);
+        ConnectionOptions? configured = null;
+        foreach ((string overrideKey, DeviceOverride @override) in Overrides)
+        {
+            if (Normalize(overrideKey) == normalizedKey)
+            {
+                configured = @override.Connection;
+                break;
+            }
+        }
+
+        ConnectionOptions defaults = RealDeviceDefaults.For(key);
+        return configured is null ? defaults : configured.MergedWith(defaults);
+    }
+
     private static string Normalize(string key) =>
         key.Replace("_", string.Empty, StringComparison.Ordinal).ToUpperInvariant();
 }

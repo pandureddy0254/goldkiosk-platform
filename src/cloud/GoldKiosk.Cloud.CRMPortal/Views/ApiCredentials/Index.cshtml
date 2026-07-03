@@ -1,0 +1,72 @@
+@model IReadOnlyList<Partner>
+
+<div class="page-head">
+    <div class="page-title-block">
+        <div class="eyebrow">Partners · API credentials · informational · read-only</div>
+        <h1 class="page-title">API <em>credentials.</em></h1>
+        <p class="page-subtitle">Where partner integrations live — counts only. Generation and rotation happen in the Admin Dashboard, by the partner.</p>
+    </div>
+</div>
+
+<div class="warn-callout">
+    <div class="ico">!</div>
+    <div class="body">
+        <strong>CRM staff never see partner API keys.</strong>
+        The CRM mints exactly one credential per partner — the <span class="mono" style="color:var(--accent);">AIKI-XXXX-XXXX-XXXX</span> activation key — and hands it off. After the partner consumes the key inside the Admin Dashboard, they generate <span class="mono">app_id</span> + <span class="mono">app_key</span> pairs for their own backend integrations.
+    </div>
+</div>
+
+<section class="card">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Credential counts · per partner</h2>
+            <div class="card-meta" style="margin-top:6px;"><span>Source · Admin Dashboard · refreshed every 5 minutes</span></div>
+        </div>
+    </header>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Partner</th><th>Tenant</th>
+                <th style="text-align:right;">App keys · live</th>
+                <th style="text-align:right;">Revoked · 30d</th>
+                <th>Last rotated</th><th></th>
+            </tr>
+        </thead>
+        <tbody>
+        @if (!Model.Any())
+        {
+            <tr><td colspan="6" style="text-align:center; color:var(--ink-faint); padding:24px 0;">No partners yet.</td></tr>
+        }
+        else
+        {
+            foreach (var p in Model)
+            {
+                var tenantId = $"tnt_{p.Id.ToString().Replace("-", "").Substring(0, 8)}";
+                var isAwaiting = p.TenantStatus == TenantStatus.Provisioning;
+                <tr>
+                    <td><a class="row-link" asp-controller="Partners" asp-action="Details" asp-route-id="@p.Id">@p.DisplayName</a></td>
+                    <td class="mono" style="color:@(isAwaiting ? "var(--ink-faint)" : "var(--accent)");">@tenantId</td>
+                    <td class="num-cell" style="text-align:right;">0</td>
+                    <td class="num-cell" style="text-align:right;">0</td>
+                    <td>—</td>
+                    <td>
+                        @if (isAwaiting)
+                        {
+                            <span class="status-pill s-pending">Awaiting activation</span>
+                        }
+                        else
+                        {
+                            <a href="#" style="color:var(--accent);">Open in Admin →</a>
+                        }
+                    </td>
+                </tr>
+            }
+        }
+        </tbody>
+    </table>
+</section>
+
+<footer class="crm-foot">
+    <span>Gold Kiosk · CRM · © AI Kiosks International Inc. 2026</span>
+    <span class="mono">api credentials · informational · cleartext never visible to CRM staff</span>
+</footer>

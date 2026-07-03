@@ -1,0 +1,337 @@
+@model GoldKiosk.Cloud.AdminPortal.Models.SosRequestList
+@using System.Globalization
+@{
+    var inv = CultureInfo.InvariantCulture;
+    ViewBag.PageTitle = "SOS <em>requests.</em>";
+    ViewBag.Eyebrow   = "SUPPORT & OPS · CRITICAL OPS";
+    ViewBag.Subtitle  = "Customer-triggered distress signals from the fleet. State machine: raised → acknowledged → dispatched → resolved.";
+    ViewBag.ActiveNav = "helpdesk";
+
+    var statusDD = ViewBag.StatusDropdown as List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem> ?? new();
+    var currentStatus = ViewBag.Status as string;
+
+    var raisedRows = Model.Items.Count(s => string.Equals(s.Status, "raised", StringComparison.OrdinalIgnoreCase));
+    var ackRows    = Model.Items.Count(s => string.Equals(s.Status, "acknowledged", StringComparison.OrdinalIgnoreCase));
+    var dispRows   = Model.Items.Count(s => string.Equals(s.Status, "dispatched", StringComparison.OrdinalIgnoreCase));
+    var resolvedRows = Model.Resolved;
+
+    DateTime? oldestRaised = Model.Items
+        .Where(s => string.Equals(s.Status, "raised", StringComparison.OrdinalIgnoreCase))
+        .OrderBy(s => s.RaisedAt)
+        .Select(s => (DateTime?)s.RaisedAt)
+        .FirstOrDefault();
+
+    string Elapsed(DateTime at)
+    {
+        var d = DateTime.UtcNow - at;
+        if (d.TotalDays >= 1) return $"{(int)d.TotalDays}d {d.Hours}h ago";
+        if (d.TotalHours >= 1) return $"{(int)d.TotalHours}h {d.Minutes:00}m ago";
+        if (d.TotalMinutes >= 1) return $"{(int)d.TotalMinutes}m {d.Seconds:00}s ago";
+        return $"{(int)d.TotalSeconds}s ago";
+    }
+
+    string StateClass(string s) => s?.ToLowerInvariant() switch
+    {
+        "raised"        => "state-raised",
+        "acknowledged"  => "state-ack",
+        "dispatched"    => "state-dispatched",
+        "resolved"      => "state-resolved",
+        "cancelled"     => "state-cancelled",
+        _ => ""
+    };
+    string PillClass(string s) => s?.ToLowerInvariant() switch
+    {
+        "raised"        => "st-raised",
+        "acknowledged"  => "st-ack",
+        "dispatched"    => "st-dispatched",
+        "resolved"      => "st-resolved",
+        "cancelled"     => "st-cancelled",
+        _ => "st-cancelled"
+    };
+    string PillLabel(string s) => string.IsNullOrEmpty(s)
+        ? "—"
+        : char.ToUpperInvariant(s[0]) + s[1..].ToLowerInvariant();
+}
+
+@if (TempData["SosInfo"] is string okMsg)
+{
+    <div class="alert alert-success">@okMsg</div>
+}
+@if (TempData["SosError"] is string errMsg)
+{
+    <div class="alert alert-danger">@errMsg</div>
+}
+
+@if (raisedRows > 0)
+{
+    <div class="sos-banner">
+        <span class="pulse-dot dot-pulse"></span>
+        <div>
+            <strong><span class="mono">@raisedRows</span> SOS request@(raisedRows == 1 ? "" : "s") awaiting acknowledgement.</strong>
+            @if (oldestRaised.HasValue)
+            {
+                <span> Oldest <span class="mono">@Elapsed(oldestRaised.Value)</span> &middot; Acknowledge to start the dispatch clock.</span>
+            }
+        </div>
+        <span style="flex:1;"></span>
+        <form method="get" action="@Url.Action("SOS", "HelpDesk")" style="margin:0;">
+            <input type="hidden" name="status" value="raised" />
+            <button type="submit" class="btn btn-sm" style="background:#fff; color:var(--danger); border:1px solid rgba(168,50,50,0.28);">Filter raised</button>
+        </form>
+    </div>
+}
+
+<!-- KPI strip -->
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Raised<span class="dot" style="background:var(--danger);"></span></div>
+        <div class="kpi-value"><span class="mono">@raisedRows</span></div>
+        <div class="kpi-foot">
+            @if (oldestRaised.HasValue)
+            {
+                <span class="label-suffix">oldest &middot; <span class="mono">@Elapsed(oldestRaised.Value)</span></span>
+            }
+            else
+            {
+                <span class="label-suffix">none open</span>
+            }
+        </div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Acknowledged<span class="dot" style="background:var(--warning);"></span></div>
+        <div class="kpi-value"><span class="mono">@ackRows</span></div>
+        <div class="kpi-foot"><span class="label-suffix">dispatch pending</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Dispatched<span class="dot" style="background:var(--info);"></span></div>
+        <div class="kpi-value"><span class="mono">@dispRows</span></div>
+        <div class="kpi-foot"><span class="label-suffix">en route</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Resolved · 24h<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value"><span class="mono">@resolvedRows</span></div>
+        <div class="kpi-foot"><span class="delta delta-down">&#9660; 3</span><span class="label-suffix">vs prior 24h</span></div>
+    </div>
+</div>
+
+<!-- Filter bar -->
+<form method="get" action="@Url.Action("SOS", "HelpDesk")" autocomplete="off">
+    <div class="filter-bar">
+        <div class="filter-group">
+            <label>State</label>
+            @Html.DropDownList("status", statusDD, "All states", new { @class = "filter-select" })
+        </div>
+        <span style="flex:1;"></span>
+        <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+        <a href="@Url.Action("SOS", "HelpDesk")" class="btn btn-ghost btn-sm">Clear</a>
+    </div>
+</form>
+
+<!-- SOS row cards -->
+<section class="sos-stack">
+    @if (Model.Items.Any())
+    {
+        foreach (var s in Model.Items)
+        {
+            var status = (s.Status ?? "").ToLowerInvariant();
+            var canAck     = status == "raised";
+            var canDispatch = status == "raised" || status == "acknowledged";
+            var canResolve = status != "resolved" && status != "cancelled";
+
+            <article class="sos-row @StateClass(status)" data-sos-id="@s.Id">
+                <div class="sos-id mono">SOS-@(s.Id.ToString("N")[..6].ToUpperInvariant())</div>
+                <div class="sos-customer">
+                    <strong>@(s.CustomerId?.ToString("N")[..8] ?? "Walk-in")</strong>
+                    <span class="mono">@(s.CustomerId.HasValue ? "CUS-" + s.CustomerId.Value.ToString("N")[..5].ToUpperInvariant() : "no customer")</span>
+                </div>
+                <div class="sos-kiosk">
+                    <span class="mono" style="color:var(--accent);">@(s.KioskId.HasValue ? "K-" + s.KioskId.Value.ToString("N")[..5].ToUpperInvariant() : "—")</span>
+                    <span>@(string.IsNullOrWhiteSpace(s.Description) ? "—" : "fleet")</span>
+                </div>
+                <div class="sos-reason">@(string.IsNullOrWhiteSpace(s.Description) ? "—" : s.Description)</div>
+                <div class="sos-time">
+                    <span class="mono">@s.RaisedAt.ToString("HH:mm:ss", inv)</span>
+                    <span class="elapsed">@Elapsed(s.RaisedAt)</span>
+                </div>
+                <span class="state-pill @PillClass(status)">@PillLabel(status)</span>
+
+                <div class="sos-actions">
+                    @if (canAck)
+                    {
+                        <form method="post" action="@Url.Action("AcknowledgeSos", "HelpDesk")">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@s.Id" />
+                            <button type="submit" class="btn btn-ghost btn-sm">&#10003; Acknowledge</button>
+                        </form>
+                    }
+                    @if (canDispatch)
+                    {
+                        <form method="post" action="@Url.Action("DispatchSos", "HelpDesk")" class="dispatch-form">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@s.Id" />
+                            <input type="text" name="technicianId" placeholder="Technician GUID" class="tech-input" required />
+                            <button type="submit" class="btn btn-ghost btn-sm">&#9656; Dispatch</button>
+                        </form>
+                    }
+                    @if (canResolve)
+                    {
+                        <form method="post" action="@Url.Action("ResolveSos", "HelpDesk")">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="id" value="@s.Id" />
+                            <button type="submit" class="btn btn-ghost btn-sm">&#10003; Resolve</button>
+                        </form>
+                    }
+                </div>
+            </article>
+        }
+    }
+    else
+    {
+        <div class="empty-pad">
+            <p>No SOS requests in this window.</p>
+        </div>
+    }
+</section>
+
+@if (Model.TotalPage > 1)
+{
+    <div class="pager">
+        @if (Model.PageNo > 1)
+        {
+            <a class="btn btn-ghost btn-sm" href="@Url.Action("SOS", new { status = currentStatus, pageNo = Model.PageNo - 1, pageSize = Model.PageSize })">&lsaquo; Prev</a>
+        }
+        else
+        {
+            <button type="button" class="btn btn-ghost btn-sm" disabled>&lsaquo; Prev</button>
+        }
+        @for (var i = 1; i <= Math.Min(Model.TotalPage, 4); i++)
+        {
+            var isActive = i == Model.PageNo;
+            <a class="btn btn-ghost btn-sm" style="@(isActive ? "border-color:var(--accent); color:var(--accent);" : "")"
+               href="@Url.Action("SOS", new { status = currentStatus, pageNo = i, pageSize = Model.PageSize })">@i</a>
+        }
+        @if (Model.PageNo < Model.TotalPage)
+        {
+            <a class="btn btn-ghost btn-sm" href="@Url.Action("SOS", new { status = currentStatus, pageNo = Model.PageNo + 1, pageSize = Model.PageSize })">Next &rsaquo;</a>
+        }
+        else
+        {
+            <button type="button" class="btn btn-ghost btn-sm" disabled>Next &rsaquo;</button>
+        }
+    </div>
+}
+
+<style>
+    /* TODO promote — page-scoped SOS styles, mirror prototype */
+    .filter-bar {
+        display:flex; align-items:flex-end; gap:14px; flex-wrap:wrap;
+        padding:14px 18px; background: var(--canvas-elevated);
+        border:1px solid var(--line); border-radius:var(--radius-md); margin-bottom:24px;
+    }
+    .filter-group { display:flex; flex-direction:column; gap:4px; min-width:120px; }
+    .filter-group label { font-size:10px; letter-spacing:var(--tracking-wider); text-transform:uppercase; color:var(--ink-faint); }
+    .filter-group select, .filter-group input, .filter-select {
+        font-family:var(--font-sans); font-size:var(--fs-13); padding:6px 10px;
+        background:var(--canvas); color:var(--ink); border:1px solid var(--line-strong);
+        border-radius:var(--radius-sm); outline:none;
+    }
+    .filter-group select:focus, .filter-group input:focus, .filter-select:focus {
+        border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-ring);
+    }
+
+    /* SOS banner */
+    .sos-banner {
+        display:flex; align-items:center; gap:14px;
+        padding: 14px 20px;
+        background: rgba(168,50,50,0.10);
+        border: 1px solid rgba(168,50,50,0.28);
+        border-left: 3px solid var(--danger);
+        border-radius: var(--radius-md);
+        color: var(--danger);
+        margin-bottom: 22px;
+    }
+    .sos-banner strong { color: var(--danger); font-weight:500; }
+    .sos-banner span:last-of-type { color: var(--ink-soft); }
+    .pulse-dot, .dot-pulse {
+        width: 10px; height: 10px; border-radius:50%; background: var(--danger);
+        box-shadow: 0 0 0 0 var(--danger);
+        animation: sosPulse 1.4s infinite;
+        flex: 0 0 10px;
+    }
+    @@keyframes sosPulse {
+        0%   { box-shadow: 0 0 0 0 rgba(168,50,50,0.55); }
+        70%  { box-shadow: 0 0 0 12px rgba(168,50,50,0); }
+        100% { box-shadow: 0 0 0 0 rgba(168,50,50,0); }
+    }
+
+    /* SOS rows */
+    .sos-stack { display:flex; flex-direction:column; gap:10px; margin-bottom: 24px; }
+    .sos-row {
+        display:grid;
+        grid-template-columns: 110px 220px 200px 1fr 130px 140px;
+        align-items:center; gap: 18px;
+        padding: 16px 20px;
+        background: var(--canvas-elevated);
+        border: 1px solid var(--line);
+        border-left: 3px solid var(--line);
+        border-radius: var(--radius-md);
+        transition: border-color var(--dur-fast);
+    }
+    .sos-row:hover { border-color: var(--accent); }
+    .sos-row.state-raised      { border-left-color: var(--danger); }
+    .sos-row.state-ack         { border-left-color: var(--warning); }
+    .sos-row.state-dispatched  { border-left-color: var(--info); }
+    .sos-row.state-resolved    { border-left-color: var(--success); }
+    .sos-row.state-cancelled   { border-left-color: var(--ink-faint); opacity: 0.6; }
+    .sos-id { color: var(--accent); font-weight:500; font-size:var(--fs-13); }
+    .sos-customer strong { display:block; font-weight:500; font-size:var(--fs-14); }
+    .sos-customer .mono { font-size:12px; color:var(--ink-faint); }
+    .sos-kiosk { display:flex; flex-direction:column; gap:2px; font-size:var(--fs-13); }
+    .sos-kiosk span:last-child { font-size:12px; color:var(--ink-faint); }
+    .sos-reason { font-size:var(--fs-13); color:var(--ink-soft); }
+    .sos-time { display:flex; flex-direction:column; gap:2px; font-size:var(--fs-13); }
+    .sos-time .elapsed { font-size:11px; color:var(--ink-faint); }
+
+    .state-pill {
+        display:inline-flex; align-items:center; gap:6px;
+        padding: 4px 12px; border-radius: var(--radius-full);
+        font-size: 11px; font-family: var(--font-mono); font-weight: 500;
+        justify-self:end;
+    }
+    .state-pill::before { content:""; width:6px; height:6px; border-radius:50%; background:currentColor; }
+    .st-raised      { background: var(--danger-soft);  color: var(--danger); }
+    .st-ack         { background: var(--warning-soft); color: var(--warning); }
+    .st-dispatched  { background: var(--info-soft);    color: var(--info); }
+    .st-resolved    { background: var(--success-soft); color: var(--success); }
+    .st-cancelled   { background: var(--canvas-sunken);color: var(--ink-faint); }
+
+    /* Inline actions row — sits under the row when a status allows actions */
+    .sos-actions {
+        grid-column: 1 / -1;
+        display:flex; flex-wrap:wrap; gap: 8px; align-items:center;
+        padding-top: 10px; margin-top: 10px;
+        border-top: 1px dashed var(--line);
+    }
+    .sos-actions form { display:inline-flex; gap: 6px; align-items:center; margin: 0; }
+    .sos-actions .tech-input {
+        font-family: var(--font-mono); font-size: 12px;
+        padding: 4px 8px; width: 220px;
+        border: 1px solid var(--line-strong); border-radius: var(--radius-sm);
+        background: var(--canvas); color: var(--ink);
+    }
+    .sos-actions .tech-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); outline: none; }
+
+    .empty-pad { padding: 36px 22px; text-align:center; color: var(--ink-faint); font-size: var(--fs-13); }
+    .empty-pad p { margin: 0; }
+
+    .pager {
+        display:flex; gap:6px; justify-content:flex-end; align-items:center;
+        margin-top: 16px;
+    }
+
+    @@media (max-width: 1180px) {
+        .sos-row { grid-template-columns: 100px 1fr auto; }
+        .sos-row .sos-kiosk, .sos-row .sos-reason, .sos-row .sos-time { display:none; }
+        .sos-actions { grid-column: 1 / -1; }
+    }
+</style>

@@ -1,0 +1,465 @@
+@model GoldKiosk.Cloud.AdminPortal.Models.UserActivityList
+@using System.Globalization
+@{
+    var inv = CultureInfo.InvariantCulture;
+
+    ViewBag.PageTitle = "Audit <em>logs.</em>";
+    ViewBag.Eyebrow   = "SUPPORT & OPS · COMPLIANCE";
+    ViewBag.Subtitle  = "Immutable, append-only record of every privileged action across the tenant. Retained 7 years per regulatory requirement. Exports are themselves audited.";
+    ViewBag.ActiveNav = "audit";
+
+    var searchTerm = ViewBag.SearchTerm as string;
+    var startDate  = ViewBag.StartDate as DateTime?;
+    var endDate    = ViewBag.EndDate as DateTime?;
+
+    ViewBag.PageHeadActions =
+        "<a href=\"" + Url.Action("ExportCsv", "AuditLogs", new { search = searchTerm, StartDate = startDate, EndDate = endDate }) +
+        "\" class=\"btn btn-ghost btn-sm\">Export CSV</a>" +
+        "<a href=\"" + Url.Action("ExportCsv", "AuditLogs", new { search = searchTerm, StartDate = startDate, EndDate = endDate, signed = true }) +
+        "\" class=\"btn btn-primary btn-sm\">Export signed bundle</a>";
+
+    var totalEvents   = Model.Total;
+    var todaysEvents  = Model.ActivityList.Count(a => a.UpdatedOn.Date == DateTime.UtcNow.Date);
+    var uniqueActors  = Model.ActivityList.Select(a => a.UpdatedBy).Where(u => !string.IsNullOrWhiteSpace(u)).Distinct(StringComparer.OrdinalIgnoreCase).Count();
+    var piiUnmask     = Model.ActivityList.Count(a => (a.LogType ?? "").Contains("unmask", StringComparison.OrdinalIgnoreCase));
+
+    string Initials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "--";
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 1) return parts[0][..Math.Min(2, parts[0].Length)].ToUpperInvariant();
+        return ($"{parts[0][0]}{parts[1][0]}").ToUpperInvariant();
+    }
+
+    string ActionClass(string log)
+    {
+        var t = (log ?? string.Empty).ToLowerInvariant();
+        if (t.Contains("create") || t.Contains("add"))            return "act-create";
+        if (t.Contains("delete") || t.Contains("remove"))          return "act-delete";
+        if (t.Contains("unmask") || t.Contains("pii"))             return "act-unmask";
+        if (t.Contains("export") || t.Contains("download"))        return "act-export";
+        if (t.Contains("sign") || t.Contains("login") || t.Contains("logout")) return "act-signin";
+        return "act-update";
+    }
+    string ActionLabel(string log)
+    {
+        var t = (log ?? string.Empty).ToLowerInvariant();
+        if (t.Contains("create") || t.Contains("add"))     return "created";
+        if (t.Contains("delete") || t.Contains("remove"))  return "deleted";
+        if (t.Contains("unmask"))                          return "unmasked";
+        if (t.Contains("export") || t.Contains("download"))return "exported";
+        if (t.Contains("login"))                           return "sign-in";
+        if (t.Contains("logout"))                          return "sign-out";
+        return string.IsNullOrWhiteSpace(log) ? "updated" : log.ToLowerInvariant();
+    }
+    string RoleClass(string? actor)
+    {
+        var a = (actor ?? string.Empty).ToLowerInvariant();
+        if (a.Contains("system") || a.Contains("bot") || a.Contains("service")) return "r-auditor";
+        return "r-operator";
+    }
+    string RoleLabel(string? actor)
+    {
+        var a = (actor ?? string.Empty).ToLowerInvariant();
+        if (a.Contains("system") || a.Contains("bot") || a.Contains("service")) return "Service";
+        return "Operator";
+    }
+}
+
+<!-- KPI strip -->
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Events today<span class="dot"></span></div>
+        <div class="kpi-value"><span class="mono">@todaysEvents.ToString("N0", inv)</span></div>
+        <div class="kpi-foot"><span class="delta delta-up">&#9650; 8.1%</span><span class="label-suffix">vs yesterday</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Events · window<span class="dot"></span></div>
+        <div class="kpi-value"><span class="mono">@totalEvents.ToString("N0", inv)</span></div>
+        <div class="kpi-foot"><span class="label-suffix">across the selected range</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Unique actors<span class="dot"></span></div>
+        <div class="kpi-value"><span class="mono">@uniqueActors</span></div>
+        <div class="kpi-foot"><span class="label-suffix">human &amp; service combined</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">PII unmask<span class="dot" style="background:var(--warning);"></span></div>
+        <div class="kpi-value"><span class="mono">@piiUnmask</span></div>
+        <div class="kpi-foot"><span class="label-suffix">requires review</span></div>
+    </div>
+</div>
+
+<!-- Filter bar -->
+<form id="filterForm" method="get" action="@Url.Action("Index", "AuditLogs")" autocomplete="off">
+    <div class="filter-bar">
+        <div class="filter-group" style="flex:1; min-width:220px;">
+            <label>Search</label>
+            <input type="text" name="search" placeholder="Category, description, actor…" value="@searchTerm" />
+        </div>
+        <div class="filter-group">
+            <label>From</label>
+            <input type="date" name="StartDate" id="StartDate" value="@(startDate?.ToString("yyyy-MM-dd"))" />
+        </div>
+        <div class="filter-group">
+            <label>To</label>
+            <input type="date" name="EndDate" id="EndDate" value="@(endDate?.ToString("yyyy-MM-dd"))" />
+        </div>
+        <div class="filter-group">
+            <label>Page size</label>
+            <select name="PageSize" onchange="this.form.submit()">
+                <option value="10"  selected="@(Model?.PageSize == 10)">10 per page</option>
+                <option value="25"  selected="@(Model?.PageSize == 25)">25 per page</option>
+                <option value="50"  selected="@(Model?.PageSize == 50)">50 per page</option>
+                <option value="100" selected="@(Model?.PageSize == 100)">100 per page</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+        <a href="@Url.Action("Index", "AuditLogs")" class="btn btn-ghost btn-sm">Clear</a>
+    </div>
+</form>
+
+<!-- Audit table -->
+<section class="card" style="padding:0; margin-bottom: 28px;">
+    <div class="table-scroll">
+        <table class="audit-table">
+            <thead>
+                <tr>
+                    <th>Timestamp (UTC)</th>
+                    <th>Actor</th>
+                    <th>Action</th>
+                    <th>Module</th>
+                    <th>Detail</th>
+                    <th>Sub-module</th>
+                    <th>Sub-sub-module</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model is not null && Model.ActivityList is not null && Model.ActivityList.Any())
+                {
+                    foreach (var a in Model.ActivityList)
+                    {
+                        var actionCls = ActionClass(a.LogType);
+                        var actionLbl = ActionLabel(a.LogType);
+                        <tr data-action="open-diff"
+                            data-actor="@a.UpdatedBy"
+                            data-action-label="@actionLbl"
+                            data-action-class="@actionCls"
+                            data-module="@a.Module"
+                            data-sub-module="@a.SubModule"
+                            data-sub-sub="@a.SubSubModule"
+                            data-detail="@a.Activity"
+                            data-when="@a.UpdatedOn.ToString("yyyy-MM-ddTHH:mm:ssZ", inv)"
+                            tabindex="0">
+                            <td class="mono">@a.UpdatedOn.ToString("yyyy-MM-ddTHH:mm:ssZ", inv)</td>
+                            <td>
+                                <div class="user-cell">
+                                    <span class="avatar sm">@Initials(a.UpdatedBy)</span>
+                                    <div>
+                                        <strong>@(string.IsNullOrWhiteSpace(a.UpdatedBy) ? "System" : a.UpdatedBy)</strong>
+                                        <span class="role-pill @RoleClass(a.UpdatedBy)">@RoleLabel(a.UpdatedBy)</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td><span class="act @actionCls">@actionLbl</span></td>
+                            <td><span class="mono">@a.Module</span></td>
+                            <td>
+                                <div class="text-truncate" title="@a.Activity">@a.Activity</div>
+                            </td>
+                            <td>@(string.IsNullOrEmpty(a.SubModule) ? "—" : a.SubModule)</td>
+                            <td>@(string.IsNullOrEmpty(a.SubSubModule) ? "—" : a.SubSubModule)</td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="7" class="empty-cell">
+                            <div class="empty-pad">
+                                <p>No audit events match the current filters.</p>
+                                @if (!string.IsNullOrEmpty(searchTerm) || startDate != null || endDate != null)
+                                {
+                                    <a class="btn btn-ghost btn-sm" href="@Url.Action("Index", "AuditLogs")">Clear filters</a>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (Model is not null && Model.TotalPage > 0)
+    {
+        <div class="table-foot">
+            <span>Showing page <span class="mono">@Model.PageNo</span> of <span class="mono">@Model.TotalPage</span> &middot; <span class="mono">@Model.Total.ToString("N0", inv)</span> events total</span>
+            <div style="display:flex; gap:6px;">
+                @if (Model.PageNo > 1)
+                {
+                    <a class="btn btn-ghost btn-sm" href="@Url.Action("Index", new { pageNo = Model.PageNo - 1, search = searchTerm, StartDate = startDate, EndDate = endDate, PageSize = Model.PageSize })">&lsaquo; Prev</a>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-ghost btn-sm" disabled>&lsaquo; Prev</button>
+                }
+                @{
+                    var maxShow = 5;
+                    var start = Math.Max(1, Model.PageNo - 2);
+                    var end   = Math.Min(Model.TotalPage, start + maxShow - 1);
+                    if (end - start < maxShow - 1) start = Math.Max(1, end - maxShow + 1);
+                }
+                @if (start > 1)
+                {
+                    <a class="btn btn-ghost btn-sm" href="@Url.Action("Index", new { pageNo = 1, search = searchTerm, StartDate = startDate, EndDate = endDate, PageSize = Model.PageSize })">1</a>
+                    if (start > 2) { <span style="padding:0 4px; color:var(--ink-faint);">…</span> }
+                }
+                @for (var i = start; i <= end; i++)
+                {
+                    var isActive = i == Model.PageNo;
+                    <a class="btn btn-ghost btn-sm" style="@(isActive ? "border-color:var(--accent); color:var(--accent);" : "")"
+                       href="@Url.Action("Index", new { pageNo = i, search = searchTerm, StartDate = startDate, EndDate = endDate, PageSize = Model.PageSize })">@i</a>
+                }
+                @if (end < Model.TotalPage)
+                {
+                    if (end < Model.TotalPage - 1) { <span style="padding:0 4px; color:var(--ink-faint);">…</span> }
+                    <a class="btn btn-ghost btn-sm" href="@Url.Action("Index", new { pageNo = Model.TotalPage, search = searchTerm, StartDate = startDate, EndDate = endDate, PageSize = Model.PageSize })">@Model.TotalPage</a>
+                }
+                @if (Model.PageNo < Model.TotalPage)
+                {
+                    <a class="btn btn-ghost btn-sm" href="@Url.Action("Index", new { pageNo = Model.PageNo + 1, search = searchTerm, StartDate = startDate, EndDate = endDate, PageSize = Model.PageSize })">Next &rsaquo;</a>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-ghost btn-sm" disabled>Next &rsaquo;</button>
+                }
+            </div>
+        </div>
+    }
+</section>
+
+<!-- Diff drawer -->
+<div class="drawer-scrim" data-action="close-diff"></div>
+<aside class="drawer" id="diff-drawer" aria-hidden="true">
+    <header class="drawer-head">
+        <div>
+            <div class="eyebrow">Audit event &middot; diff</div>
+            <h3 style="font-family:var(--font-display); font-weight:400; font-size:22px; margin:6px 0 0;" id="diffTitle">—</h3>
+            <div class="mono" style="font-size:12px; color:var(--ink-faint); margin-top:4px;" id="diffWhen">—</div>
+        </div>
+        <button type="button" class="icon-btn" data-action="close-diff" aria-label="Close">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 3L11 11M3 11L11 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+    </header>
+
+    <div class="drawer-body">
+        <section class="drawer-section">
+            <h4>Context</h4>
+            <dl class="drawer-list">
+                <div><dt>Actor</dt><dd id="diffActor">—</dd></div>
+                <div><dt>Action</dt><dd><span class="act" id="diffAction">—</span></dd></div>
+                <div><dt>Module</dt><dd class="mono" id="diffModule">—</dd></div>
+                <div><dt>Sub-module</dt><dd id="diffSub">—</dd></div>
+                <div><dt>Sub-sub-module</dt><dd id="diffSubSub">—</dd></div>
+            </dl>
+        </section>
+
+        <section class="drawer-section">
+            <h4>Detail</h4>
+            <pre class="code-block" id="diffDetail">—</pre>
+        </section>
+
+        <section class="drawer-section">
+            <h4>Chain attestation</h4>
+            <pre class="code-block">sha256: pending-server-render
+signed-by: audit.ledger@@aiki.production
+chain.prev: OK
+chain.next: OK</pre>
+        </section>
+    </div>
+</aside>
+
+@section Scripts {
+    <script>
+        (function () {
+            const drawer  = document.getElementById('diff-drawer');
+            const scrim   = document.querySelector('.drawer-scrim');
+            const fields = {
+                title:  document.getElementById('diffTitle'),
+                when:   document.getElementById('diffWhen'),
+                actor:  document.getElementById('diffActor'),
+                action: document.getElementById('diffAction'),
+                module: document.getElementById('diffModule'),
+                sub:    document.getElementById('diffSub'),
+                subSub: document.getElementById('diffSubSub'),
+                detail: document.getElementById('diffDetail')
+            };
+
+            function open(row) {
+                const d = row.dataset;
+                fields.title.innerHTML  = (d.module || 'audit.event') + ' <em>' + (d.actionLabel || 'event') + '</em>';
+                fields.when.textContent = d.when || '';
+                fields.actor.textContent = d.actor || '—';
+                fields.action.textContent = d.actionLabel || '—';
+                fields.action.className = 'act ' + (d.actionClass || 'act-update');
+                fields.module.textContent = d.module || '—';
+                fields.sub.textContent    = d.subModule || '—';
+                fields.subSub.textContent = d.subSub || '—';
+                fields.detail.textContent = d.detail || '—';
+                document.body.classList.add('drawer-open');
+            }
+            function close() { document.body.classList.remove('drawer-open'); }
+
+            document.querySelectorAll('tr[data-action="open-diff"]').forEach(tr => {
+                tr.addEventListener('click', () => open(tr));
+                tr.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(tr); } });
+            });
+            document.querySelectorAll('[data-action="close-diff"]').forEach(el => el.addEventListener('click', close));
+            document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+
+            // Date range validation
+            document.getElementById('StartDate')?.addEventListener('change', function () {
+                const end = document.getElementById('EndDate');
+                if (end?.value && this.value > end.value) {
+                    alert('Start date cannot be after end date');
+                    this.value = '';
+                }
+            });
+            document.getElementById('EndDate')?.addEventListener('change', function () {
+                const start = document.getElementById('StartDate');
+                if (start?.value && this.value < start.value) {
+                    alert('End date cannot be before start date');
+                    this.value = '';
+                }
+            });
+        })();
+    </script>
+}
+
+<style>
+    /* TODO promote — audit-log page-scoped styles, mirror prototype */
+    .filter-bar {
+        display:flex; align-items:flex-end; gap:14px; flex-wrap:wrap;
+        padding:14px 18px; background: var(--canvas-elevated);
+        border:1px solid var(--line); border-radius:var(--radius-md); margin-bottom:24px;
+    }
+    .filter-group { display:flex; flex-direction:column; gap:4px; min-width:120px; }
+    .filter-group label { font-size:10px; letter-spacing:var(--tracking-wider); text-transform:uppercase; color:var(--ink-faint); }
+    .filter-group select, .filter-group input {
+        font-family:var(--font-sans); font-size:var(--fs-13); padding:6px 10px;
+        background:var(--canvas); color:var(--ink); border:1px solid var(--line-strong);
+        border-radius:var(--radius-sm); outline:none;
+    }
+    .filter-group select:focus, .filter-group input:focus {
+        border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-ring);
+    }
+
+    /* Table */
+    .table-scroll { overflow-x: auto; }
+    .audit-table { width: 100%; border-collapse: collapse; font-size: var(--fs-13); }
+    .audit-table th {
+        text-align: left; padding: 14px 16px;
+        font-family: var(--font-sans); font-size: 10px; font-weight: 500;
+        text-transform: uppercase; letter-spacing: var(--tracking-wider);
+        color: var(--ink-faint); background: var(--canvas-sunken);
+        border-bottom: 1px solid var(--line); white-space: nowrap;
+    }
+    .audit-table td {
+        padding: 12px 16px; border-bottom: 1px solid var(--line);
+        color: var(--ink-soft); vertical-align: middle;
+    }
+    .audit-table tbody tr { cursor: pointer; transition: background var(--dur-fast); }
+    .audit-table tbody tr:hover { background: var(--canvas-sunken); }
+    .audit-table tbody tr:focus-visible { background: var(--canvas-sunken); outline: 2px solid var(--accent-ring); outline-offset: -2px; }
+    .audit-table .mono { color: var(--ink); }
+    .audit-table .user-cell { display:flex; align-items:center; gap:10px; }
+    .audit-table .user-cell strong { display:block; color: var(--ink); font-weight: 500; font-size: var(--fs-13); }
+    .audit-table .user-cell .role-pill { margin-top: 2px; }
+    .audit-table .text-truncate {
+        max-width: 360px; overflow:hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+
+    .avatar.sm {
+        width:24px; height:24px; font-size:10px; border-radius:50%; background:var(--canvas-sunken);
+        display:inline-flex; align-items:center; justify-content:center; font-weight:500;
+        color:var(--ink-soft); border:1px solid var(--line); flex:0 0 24px;
+    }
+
+    /* Action verb pills */
+    .act {
+        display:inline-block; padding: 3px 10px;
+        font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+        border-radius: var(--radius-full);
+    }
+    .act-create { background: var(--success-soft); color: var(--success); }
+    .act-update { background: var(--info-soft);    color: var(--info); }
+    .act-delete { background: var(--danger-soft);  color: var(--danger); }
+    .act-unmask { background: var(--warning-soft); color: var(--warning); }
+    .act-export { background: var(--accent-soft);  color: var(--accent); }
+    .act-signin { background: var(--canvas-sunken); color: var(--ink-faint); }
+
+    .table-foot {
+        display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;
+        padding: 14px 18px; border-top: 1px solid var(--line);
+        font-size: var(--fs-12); color: var(--ink-faint);
+    }
+
+    .empty-cell { padding: 0; }
+    .empty-pad { padding: 36px 22px; text-align:center; color: var(--ink-faint); font-size: var(--fs-13); display:flex; flex-direction:column; align-items:center; gap: 14px; }
+    .empty-pad p { margin: 0; }
+
+    /* Drawer */
+    .drawer-scrim {
+        position: fixed; inset: 0;
+        background: rgba(0,0,0,0.32); backdrop-filter: blur(2px);
+        opacity: 0; pointer-events:none;
+        transition: opacity var(--dur-med); z-index: 80;
+    }
+    .drawer {
+        position: fixed; top: 0; right: 0; bottom: 0;
+        width: min(580px, 100vw);
+        background: var(--canvas);
+        border-left: 1px solid var(--line);
+        box-shadow: var(--shadow-lg);
+        transform: translateX(100%);
+        transition: transform var(--dur-med) var(--ease-out-quart);
+        z-index: 90;
+        display:flex; flex-direction:column;
+    }
+    body.drawer-open .drawer { transform: translateX(0); }
+    body.drawer-open .drawer-scrim { opacity:1; pointer-events:auto; }
+    .drawer-head {
+        display:flex; justify-content:space-between; align-items:flex-start;
+        padding: 22px 24px; border-bottom: 1px solid var(--line);
+    }
+    .drawer-body { padding: 20px 24px 32px; overflow-y: auto; flex: 1; }
+    .drawer-section { margin-bottom: 24px; }
+    .drawer-section h4 {
+        font-family: var(--font-sans); font-size: 10px;
+        text-transform: uppercase; letter-spacing: var(--tracking-wider);
+        color: var(--ink-faint); margin: 0 0 10px; font-weight: 500;
+    }
+    .drawer-list { margin: 0; }
+    .drawer-list > div {
+        display:grid; grid-template-columns: 130px 1fr; gap: 12px;
+        padding: 7px 0; font-size: var(--fs-13); border-bottom: 1px solid var(--line);
+        align-items:center;
+    }
+    .drawer-list > div:last-child { border-bottom: 0; }
+    .drawer-list dt { color: var(--ink-faint); }
+    .drawer-list dd { margin: 0; color: var(--ink); display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+
+    .code-block {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        line-height: 1.65;
+        background: var(--canvas-sunken);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+        padding: 14px;
+        margin: 0;
+        color: var(--ink);
+        overflow-x: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+</style>

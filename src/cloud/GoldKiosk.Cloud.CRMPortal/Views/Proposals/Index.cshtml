@@ -1,0 +1,230 @@
+@model IReadOnlyList<Lead>
+@{
+    var openCount = Model.Count;
+    var aggregateValue = Model.Sum(l => l.EstimatedValue ?? 0m);
+    var primaryCurrency = Model.Select(l => l.CurrencyCode).FirstOrDefault() ?? "USD";
+}
+
+<div class="page-head">
+    <div class="page-title-block">
+        <div class="eyebrow">Pipeline · proposals</div>
+        <h1 class="page-title">Open <em>proposals.</em></h1>
+        <p class="page-subtitle">@openCount live · backed by leads at <code>stage = 'proposal'</code>.</p>
+    </div>
+    <div style="display:flex; gap:10px;">
+        <button type="button" class="btn btn-ghost btn-sm" disabled title="CSV export not wired yet">Export CSV</button>
+        <button type="button" id="open-new-proposal" class="btn btn-gold btn-sm">New proposal</button>
+    </div>
+</div>
+
+@if (TempData["ProposalError"] is string proposalErr)
+{
+    <div class="warn-callout" style="margin-bottom:16px;"><div class="ico">!</div><div class="body">@proposalErr</div></div>
+}
+@if (TempData["ProposalFlash"] is string proposalFlash)
+{
+    <div class="callout" style="margin-bottom:16px;"><div class="ico">i</div><div class="body">@proposalFlash</div></div>
+}
+
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Open proposals<span class="dot"></span></div>
+        <div class="kpi-value">@openCount</div>
+        <div class="kpi-foot"><span class="delta delta-flat">live from PostgreSQL</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Aggregate value<span class="dot"></span></div>
+        <div class="kpi-value">@($"{primaryCurrency} {aggregateValue:N0}")</div>
+        <div class="kpi-foot"><span class="delta delta-flat">sum of estimated_value</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Awaiting countersig<span class="dot" style="background:var(--warning);"></span></div>
+        <div class="kpi-value">—</div>
+        <div class="kpi-foot"><span class="delta delta-flat">tracked when contract lands</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Win rate · last 90d<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value">—</div>
+        <div class="kpi-foot"><span class="delta delta-flat">needs historical data</span></div>
+    </div>
+</div>
+
+<section class="card">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Live proposals</h2>
+            <div class="card-meta" style="margin-top:6px;"><span>Sorted by most recently updated</span></div>
+        </div>
+    </header>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Lead ID</th><th>Partner</th><th>Region</th>
+                <th style="text-align:right;">Value</th><th>Updated</th><th>Stage</th><th></th>
+            </tr>
+        </thead>
+        <tbody>
+        @if (!Model.Any())
+        {
+            <tr><td colspan="7" style="text-align:center; color:var(--ink-faint); padding:24px 0;">No leads currently at the proposal stage.</td></tr>
+        }
+        else
+        {
+            foreach (var lead in Model)
+            {
+                <tr>
+                    <td class="num-cell">@($"LEAD-{lead.Id.ToString().Substring(0, 8)}")</td>
+                    <td><a class="row-link" asp-controller="Leads" asp-action="Details" asp-route-id="@lead.Id">@lead.CompanyName</a></td>
+                    <td>@(lead.Region ?? lead.Country ?? "—")</td>
+                    <td class="num-cell" style="text-align:right;">
+                        @if (lead.EstimatedValue.HasValue)
+                        {
+                            @($"{lead.CurrencyCode} {lead.EstimatedValue.Value:N0}")
+                        }
+                        else
+                        {
+                            <span style="color:var(--ink-faint);">—</span>
+                        }
+                    </td>
+                    <td>@lead.UpdatedAt.ToString("dd MMM")</td>
+                    <td><span class="stage-pill s-proposal">Proposal</span></td>
+                    <td><a asp-controller="Leads" asp-action="Details" asp-route-id="@lead.Id" style="color:var(--accent);">→</a></td>
+                </tr>
+            }
+        }
+        </tbody>
+    </table>
+</section>
+
+<div class="callout" style="margin-top:24px;">
+    <div class="ico">i</div>
+    <div class="body">
+        <strong>This page is a thin layer over the leads at stage <code>proposal</code>.</strong>
+        In the production build, proposals will become first-class records with their own versioning, attached PDF, and a DocuSign envelope state machine — until then, this is a filtered view of the leads table.
+    </div>
+</div>
+
+@* ============== NEW PROPOSAL MODAL ============== *@
+<div class="modal-overlay" id="new-proposal-modal" role="dialog" aria-modal="true" aria-labelledby="new-proposal-title" hidden>
+    <div class="modal">
+        <header class="modal-head">
+            <div>
+                <div class="modal-eyebrow">Pipeline · new proposal</div>
+                <h2 class="modal-title" id="new-proposal-title">New <em>proposal.</em></h2>
+            </div>
+            <button class="modal-close" id="close-new-proposal" type="button" aria-label="Close">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4L12 12M4 12L12 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </button>
+        </header>
+
+        <form id="new-proposal-form" method="post" asp-action="Create">
+            @Html.AntiForgeryToken()
+            <div class="modal-body">
+                <div class="form-grid">
+                    <div class="field">
+                        <label for="np-company">Company name <span class="req">*</span></label>
+                        <input id="np-company" name="company" type="text" placeholder="Emirates Gold Bank PJSC" required maxlength="200" />
+                    </div>
+                    <div class="field">
+                        <label for="np-contact">Contact person <span class="req">*</span></label>
+                        <input id="np-contact" name="contact" type="text" placeholder="Sara Al Mansoori" required maxlength="200" />
+                    </div>
+                    <div class="field">
+                        <label for="np-email">Email</label>
+                        <input id="np-email" name="email" type="email" placeholder="contact@partner.com" maxlength="200" />
+                    </div>
+                    <div class="field">
+                        <label for="np-phone">Phone</label>
+                        <input id="np-phone" name="phone" type="tel" placeholder="+971 50 123 4567" maxlength="50" />
+                    </div>
+                    <div class="field">
+                        <label for="np-source">Source <span class="req">*</span></label>
+                        <select id="np-source" name="source" required>
+                            <option value="">Select source…</option>
+                            <option value="website">Website</option>
+                            <option value="inbound_call">Inbound call</option>
+                            <option value="partner_referral">Partner referral</option>
+                            <option value="conference">Conference</option>
+                            <option value="outbound">Outbound</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="np-country">Country</label>
+                        <input id="np-country" name="country" type="text" placeholder="United Arab Emirates" maxlength="100" />
+                    </div>
+                    <div class="field">
+                        <label for="np-city">City</label>
+                        <input id="np-city" name="city" type="text" placeholder="Dubai" maxlength="100" />
+                    </div>
+                    <div class="field">
+                        <label for="np-value">Estimated value</label>
+                        <input id="np-value" name="value" type="number" inputmode="numeric" placeholder="250000" min="0" step="0.01" />
+                    </div>
+                    <div class="field">
+                        <label for="np-currency">Currency</label>
+                        <select id="np-currency" name="currency">
+                            <option value="USD">USD</option>
+                            <option value="AED">AED</option>
+                            <option value="EUR">EUR</option>
+                            <option value="GBP">GBP</option>
+                            <option value="INR">INR</option>
+                            <option value="SAR">SAR</option>
+                            <option value="QAR">QAR</option>
+                            <option value="KWD">KWD</option>
+                            <option value="BHD">BHD</option>
+                            <option value="OMR">OMR</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="np-kiosks">Est. kiosk count</label>
+                        <input id="np-kiosks" name="kiosks" type="number" inputmode="numeric" placeholder="4" min="0" />
+                    </div>
+                    <div class="field full">
+                        <label for="np-notes">Proposal notes</label>
+                        <textarea id="np-notes" name="notes" placeholder="Scope, sites, pricing terms, expected close date…" maxlength="2000"></textarea>
+                    </div>
+                </div>
+            </div>
+            <footer class="modal-foot">
+                <button class="btn btn-ghost btn-sm" type="button" id="cancel-new-proposal">Cancel</button>
+                <button class="btn btn-gold btn-sm" type="submit">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L6 11L12 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    Save proposal
+                </button>
+            </footer>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    (function () {
+        const modal     = document.getElementById('new-proposal-modal');
+        const openBtn   = document.getElementById('open-new-proposal');
+        const closeBtn  = document.getElementById('close-new-proposal');
+        const cancelBtn = document.getElementById('cancel-new-proposal');
+
+        function open() {
+            modal.hidden = false;
+            modal.classList.add('open');
+            document.body.style.overflow = 'hidden';
+            setTimeout(() => document.getElementById('np-company').focus(), 50);
+        }
+        function close() {
+            modal.hidden = true;
+            modal.classList.remove('open');
+            document.body.style.overflow = '';
+        }
+        openBtn?.addEventListener('click', open);
+        closeBtn?.addEventListener('click', close);
+        cancelBtn?.addEventListener('click', close);
+        modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !modal.hidden) close(); });
+    })();
+</script>
+}
+
+<footer class="crm-foot">
+    <span>Gold Kiosk · CRM · © AI Kiosks International Inc. 2026</span>
+    <span class="mono">proposals · stub view · backed by leads where stage = 'proposal'</span>
+</footer>

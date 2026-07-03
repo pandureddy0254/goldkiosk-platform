@@ -1,0 +1,96 @@
+@model IEnumerable<GoldKiosk.Cloud.CRMPortal.Models.Domain.RenewalReminder>
+@{
+    ViewData["Title"] = "Renewals queue";
+    var grouped  = (Dictionary<string, List<GoldKiosk.Cloud.CRMPortal.Models.Domain.RenewalReminder>>)(ViewBag.Grouped ?? new Dictionary<string, List<GoldKiosk.Cloud.CRMPortal.Models.Domain.RenewalReminder>>());
+    var subById  = (Dictionary<Guid, GoldKiosk.Cloud.CRMPortal.Models.Domain.Subscription>)(ViewBag.SubById ?? new Dictionary<Guid, GoldKiosk.Cloud.CRMPortal.Models.Domain.Subscription>());
+    var partners = (Dictionary<Guid, GoldKiosk.Cloud.CRMPortal.Models.Domain.Partner>)(ViewBag.Partners ?? new Dictionary<Guid, GoldKiosk.Cloud.CRMPortal.Models.Domain.Partner>());
+
+    var statuses = new[] { "queued", "sent", "opened", "bounced", "failed", "suppressed" };
+
+    int Count(string s) => grouped.TryGetValue(s, out var list) ? list.Count : 0;
+
+    string PillCls(string s) => s switch
+    {
+        "queued"   => "t-pill t-provisioning",
+        "sent"     => "t-pill t-active",
+        "opened"   => "t-pill t-active",
+        "bounced"  => "t-pill t-suspended",
+        "failed"   => "t-pill t-suspended",
+        "suppressed" => "t-pill",
+        _          => "t-pill"
+    };
+}
+
+<div class="page-head">
+    <div class="page-title-block">
+        <div class="eyebrow">Billing · renewals queue</div>
+        <h1 class="page-title">Renewal <em>reminders.</em></h1>
+        @* TODO(GK-CRM-1): the daily 02:00 renewal-reminder cron is not ported yet — reminders stay queued. *@
+        <p class="page-subtitle">Next 60-day window · @Model.Count() reminders · grouped by delivery status · daily 02:00 cron drains the queue.</p>
+    </div>
+</div>
+
+<div class="kpi-strip">
+    @foreach (var s in statuses)
+    {
+        <div class="kpi-cell">
+            <div class="kpi-label">@(char.ToUpperInvariant(s[0]) + s.Substring(1))<span class="dot"></span></div>
+            <div class="kpi-value">@Count(s)</div>
+            <div class="kpi-foot"><span class="delta delta-flat">delivery_status = @s</span></div>
+        </div>
+    }
+</div>
+
+@foreach (var s in statuses)
+{
+    if (!grouped.TryGetValue(s, out var bucket) || bucket.Count == 0) continue;
+    <section class="card">
+        <header class="card-head">
+            <div>
+                <h2 class="card-title">@(char.ToUpperInvariant(s[0]) + s.Substring(1)) · @bucket.Count</h2>
+                <div class="card-meta" style="margin-top:6px;"><span>delivery_status = @s</span></div>
+            </div>
+        </header>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Kind</th>
+                    <th>Partner</th>
+                    <th>Recipient</th>
+                    <th>Scheduled</th>
+                    <th>Sent</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var r in bucket)
+            {
+                subById.TryGetValue(r.SubscriptionId, out var sub);
+                partners.TryGetValue(sub?.PartnerId ?? Guid.Empty, out var pp);
+                var pname = pp?.DisplayName ?? pp?.LegalName ?? "—";
+                <tr>
+                    <td><span class="role-pill r-operator">@r.Kind</span></td>
+                    <td>@pname</td>
+                    <td><span class="mono">@r.RecipientEmail</span></td>
+                    <td>@r.ScheduledFor.ToString("dd MMM yyyy")</td>
+                    <td>@(r.SentAt?.ToString("dd MMM HH:mm") ?? "—")</td>
+                    <td><span class="@PillCls(r.DeliveryStatus)">@r.DeliveryStatus</span></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </section>
+}
+
+@if (!Model.Any())
+{
+    <section class="card">
+        <div style="padding:32px; text-align:center; color:var(--ink-faint);">No renewal reminders in the next 60-day window.</div>
+    </section>
+}
+
+<footer class="crm-foot">
+    <span>Gold Kiosk · CRM · © AI Kiosks International Inc. 2026</span>
+    @* TODO(GK-CRM-1): renewal cron not ported yet. *@
+    <span class="mono">renewals · email: ses (me-central-1) · cron: 02:00 daily</span>
+</footer>

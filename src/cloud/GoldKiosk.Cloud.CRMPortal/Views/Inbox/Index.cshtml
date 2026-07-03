@@ -1,0 +1,103 @@
+@model IReadOnlyList<LeadActivity>
+@{
+    var leads = ViewData["LeadLookup"] as Dictionary<Guid, Lead> ?? new Dictionary<Guid, Lead>();
+    var sourceFilter = ViewData["SourceFilter"] as string ?? "all";
+
+    string SourcePill(string t) => t switch
+    {
+        ActivityType.Call => "src-pill src-call",
+        _                  => "src-pill src-website"
+    };
+
+    string SourceLabel(string t) => t switch
+    {
+        ActivityType.Call  => "Call",
+        ActivityType.Email => "Email",
+        _                   => t
+    };
+
+    string SnippetFor(LeadActivity a)
+    {
+        if (a.Payload is null) return $"{SourceLabel(a.Type)} logged · open the lead for full context.";
+        var keys = new[] { "summary", "subject", "text", "note" };
+        foreach (var k in keys)
+        {
+            var v = a.Payload[k]?.ToString();
+            if (!string.IsNullOrWhiteSpace(v)) return v.Length > 140 ? v.Substring(0, 137) + "…" : v;
+        }
+        return a.Payload.ToString(Newtonsoft.Json.Formatting.None);
+    }
+
+    string Initials(string s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return "··";
+        var parts = s.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length switch
+        {
+            0 => "··",
+            1 => parts[0].Substring(0, Math.Min(2, parts[0].Length)).ToUpperInvariant(),
+            _ => $"{parts[0][0]}{parts[1][0]}".ToUpperInvariant()
+        };
+    }
+}
+
+<div class="page-head">
+    <div class="page-title-block">
+        <div class="eyebrow">Workspace · inbox</div>
+        <h1 class="page-title">Shared <em>inbox.</em></h1>
+        <p class="page-subtitle">Inbound signals across leads — calls, emails, meetings — last 30 days.</p>
+    </div>
+    <div style="display:flex; gap:10px;">
+        <a class="btn btn-ghost btn-sm @(sourceFilter == "all" ? "is-active" : "")" asp-action="Index">All</a>
+        <a class="btn btn-ghost btn-sm @(sourceFilter == "email" ? "is-active" : "")" asp-action="Index" asp-route-source="email">Email</a>
+        <a class="btn btn-ghost btn-sm @(sourceFilter == "call" ? "is-active" : "")" asp-action="Index" asp-route-source="call">Call</a>
+    </div>
+</div>
+
+<section class="card">
+    <header class="card-head"><div><h2 class="card-title">Recent · @Model.Count</h2></div></header>
+    @if (!Model.Any())
+    {
+        <div class="card-body" style="color:var(--ink-faint);">
+            No inbound signals in the last 30 days. New email / call activities logged against leads will appear here.
+        </div>
+    }
+    else
+    {
+        <div class="attn-list">
+            @foreach (var a in Model)
+            {
+                leads.TryGetValue(a.LeadId, out var lead);
+                var co = lead?.CompanyName ?? "Lead";
+                var contact = lead?.ContactName ?? "Unknown";
+                <div class="attn-row">
+                    <span class="avatar" style="width:32px; height:32px; font-size:11px;">@Initials(contact)</span>
+                    <div>
+                        <div class="attn-co">@contact · <span style="color:var(--ink-faint);">@co</span></div>
+                        <div class="attn-meta">@SnippetFor(a) <span style="color:var(--ink-faint); margin-left:6px;">· @a.OccurredAt.ToString("dd MMM HH:mm")</span></div>
+                    </div>
+                    @if (lead is not null)
+                    {
+                        <a class="@SourcePill(a.Type)" asp-controller="Leads" asp-action="Details" asp-route-id="@lead.Id" style="text-decoration:none;">@SourceLabel(a.Type)</a>
+                    }
+                    else
+                    {
+                        <span class="@SourcePill(a.Type)">@SourceLabel(a.Type)</span>
+                    }
+                </div>
+            }
+        </div>
+    }
+</section>
+
+<div class="callout" style="margin-top:24px;">
+    <div class="ico">i</div>
+    <div class="body">
+        Inbox is sourced from <code>lead_activities</code>. The next iteration adds a dedicated <code>inbox_messages</code> table for inbound SES email + public-site form submissions; until then, log calls and emails against leads to see them here.
+    </div>
+</div>
+
+<footer class="crm-foot">
+    <span>Gold Kiosk · CRM · © AI Kiosks International Inc. 2026</span>
+    <span class="mono">inbox · derived from lead_activities · last 30 days</span>
+</footer>

@@ -1,0 +1,18 @@
+@{
+    var title  = (ViewData["Title"]  as string) ?? "Coming next";
+    var eyebrow = (ViewData["Eyebrow"] as string) ?? "";
+    var blurb  = (ViewData["Blurb"]  as string) ?? "This module is queued for the next agent pass.";
+}
+<div class="page-head">
+    <div class="page-title-block">
+        <div class="eyebrow">@eyebrow</div>
+        <h1 class="page-title">@title</h1>
+        <p class="page-subtitle">@blurb</p>
+    </div>
+</div>
+<div class="callout" style="margin-top:24px;">
+    <div class="ico">i</div>
+    <div class="body">
+        <strong>Scaffold in place.</strong> Sidebar, auth, and the EF Core + PostgreSQL data layer are wired. The view, controller, and DB calls for this section will land in the next parallel agent pass — see the prototype HTML under <code>designs/goldkiosk-crm-dashboard/screens/</code> for the visual target.
+    </div>
+</div>

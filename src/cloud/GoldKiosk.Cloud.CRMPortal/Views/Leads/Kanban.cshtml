@@ -1,0 +1,97 @@
+@using GoldKiosk.Cloud.CRMPortal.Models.Domain
+@using GoldKiosk.Cloud.CRMPortal.Models.ViewModels
+@model LeadListViewModel
+@{
+    ViewData["Title"] = "Leads · Kanban";
+    string Money(Lead l) => l.EstimatedValue.HasValue
+        ? string.Format("{0} {1:N0}", l.CurrencyCode, l.EstimatedValue.Value)
+        : "—";
+    string SourcePill(string s) => s switch
+    {
+        "website"          => "src-website",
+        "inbound_call"     => "src-call",
+        "partner_referral" => "src-referral",
+        "conference"       => "src-conference",
+        "outbound"         => "src-outbound",
+        _ => "src-website"
+    };
+    string SourceLabel(string s) => s switch
+    {
+        "website"          => "Website",
+        "inbound_call"     => "Call",
+        "partner_referral" => "Referral",
+        "conference"       => "Conf",
+        "outbound"         => "Outbound",
+        _ => s
+    };
+    string Ago(DateTime when)
+    {
+        var diff = DateTime.UtcNow - when.ToUniversalTime();
+        if (diff.TotalMinutes < 60) return $"{(int)diff.TotalMinutes}m";
+        if (diff.TotalHours   < 24) return $"{(int)diff.TotalHours}h";
+        return $"{(int)diff.TotalDays}d";
+    }
+
+    var stages = new[]
+    {
+        ("new", "New"), ("contacted", "Contacted"), ("qualified", "Qualified"),
+        ("proposal", "Proposal"), ("won", "Won"), ("lost", "Lost")
+    };
+}
+
+<div class="page-head">
+    <div class="page-title-block">
+        <div class="eyebrow">Pipeline · kanban</div>
+        <h1 class="page-title">Lead <em>pipeline.</em></h1>
+        <p class="page-subtitle">@Model.TotalCount leads across 6 stages.</p>
+    </div>
+    <div style="display:flex; gap:10px; align-items:center;">
+        <a class="btn btn-ghost btn-sm" asp-action="Index">← Table view</a>
+    </div>
+</div>
+
+@* Hidden form for antiforgery token — read by leads-kanban.js for the AJAX MoveStage POST *@
+<form id="kanban-csrf" style="display:none;">@Html.AntiForgeryToken()</form>
+
+<div class="kanban">
+    @foreach (var (key, label) in stages)
+    {
+        <div class="kb-col" data-stage="@key">
+            <div class="kb-col-head"><span>@label</span><span class="kb-count">@Model.CountInStage(key)</span></div>
+            @foreach (var l in Model.InStage(key))
+            {
+                var loc = string.Join(" · ", new[] { l.Region, l.Country }.Where(x => !string.IsNullOrWhiteSpace(x)));
+                <div class="kb-card"
+                     data-lead-id="@l.Id"
+                     data-href="@Url.Action("Details", "Leads", new { id = l.Id })"
+                     draggable="true"
+                     role="button"
+                     tabindex="0"
+                     aria-label="@l.CompanyName — @label stage">
+                    <div class="kb-co">@l.CompanyName</div>
+                    <div class="kb-meta"><span class="src-pill @SourcePill(l.Source)">@SourceLabel(l.Source)</span>@(string.IsNullOrEmpty(loc) ? "" : " · " + loc)</div>
+                    <div class="kb-meta">
+                        <span>@Model.OwnerInitials(l.OwnerId) · @Ago(l.CreatedAt)</span>
+                        <span class="kb-val">@Money(l)</span>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@* Lead detail drawer *@
+<aside id="leadDrawer" class="drawer" hidden aria-label="Lead detail">
+    <button class="drawer-close" type="button" aria-label="Close" data-action="close-drawer">&times;</button>
+    <div id="leadDrawerBody"><div class="drawer-loading">Loading&hellip;</div></div>
+</aside>
+<div id="drawerBackdrop" hidden data-action="close-drawer"></div>
+
+<footer class="crm-foot">
+    <span>Gold Kiosk &middot; CRM &middot; &copy; AI Kiosks International Inc. 2026</span>
+    <span class="mono">leads &middot; kanban</span>
+</footer>
+
+@section Scripts {
+<script src="~/js/leads-kanban.js" defer></script>
+}

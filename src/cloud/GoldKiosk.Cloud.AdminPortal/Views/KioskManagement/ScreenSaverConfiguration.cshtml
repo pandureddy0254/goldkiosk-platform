@@ -1,0 +1,739 @@
+@model ScreenSaverMasterList
+@using System.Globalization
+@{
+    var inv = CultureInfo.InvariantCulture;
+
+    ViewBag.Eyebrow   = "FLEET · ATTRACT MODE";
+    ViewBag.PageTitle = "Screen <em>saver.</em>";
+    ViewBag.Subtitle  = "Curate the attract-mode media library shown on idle kiosks. Schedule by day-part, push by region, preview before publishing.";
+    ViewBag.ActiveNav = "kiosks";
+    ViewBag.PageHeadActions =
+        "<button class=\"btn btn-ghost btn-sm\">Sync to fleet</button>" +
+        "<a href=\"#\" class=\"btn btn-primary btn-sm\" data-action=\"open-add-ss\">" +
+            "<svg width=\"14\" height=\"14\" viewBox=\"0 0 14 14\" fill=\"none\"><path d=\"M7 3V11M3 7H11\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/></svg>" +
+            " Upload media" +
+        "</a>";
+
+    var stat       = (ViewBag.Stat as string) ?? "";
+    var searchTerm = (ViewBag.SearchTerm as string) ?? "";
+    string SegActive(string forValue) => stat.Equals(forValue, StringComparison.OrdinalIgnoreCase) ? "active" : "";
+
+    // Pick the first active item for the preview frame (graceful fallback when empty)
+    var onAir = Model.screenSaverMasterList?.FirstOrDefault(s => s.IsActive);
+
+    // Themed thumbnail rotation (matches prototype palette)
+    string[] thumbThemes = { "thumb-eid", "thumb-spot", "thumb-refer", "thumb-how", "thumb-purity", "thumb-bank", "thumb-ramadan", "thumb-silver", "thumb-trust", "thumb-natdays", "thumb-tax", "thumb-newyear" };
+
+    Func<string?, bool> IsVideo = url =>
+    {
+        if (string.IsNullOrEmpty(url)) return false;
+        var ext = System.IO.Path.GetExtension(url.Split('?')[0])?.ToLowerInvariant();
+        return ext is ".mp4" or ".webm" or ".ogg" or ".mov";
+    };
+    Func<string?, bool> IsImage = url =>
+    {
+        if (string.IsNullOrEmpty(url)) return false;
+        var ext = System.IO.Path.GetExtension(url.Split('?')[0])?.ToLowerInvariant();
+        return ext is ".jpg" or ".jpeg" or ".png" or ".gif" or ".webp";
+    };
+}
+
+<!-- KPI strip -->
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Active assets<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value"><span class="mono">@Model.Active</span></div>
+        <div class="kpi-foot"><span class="label-suffix"><span class="mono">@Model.InActive</span> inactive &middot; <span class="mono">@Model.Total</span> total</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Scheduled rotations<span class="dot"></span></div>
+        <div class="kpi-value"><span class="mono">4</span></div>
+        <div class="kpi-foot"><span class="label-suffix">morning &middot; afternoon &middot; evening &middot; late</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Loop duration<span class="dot"></span></div>
+        <div class="kpi-value"><span class="mono">8:42</span><span class="unit">min</span></div>
+        <div class="kpi-foot"><span class="label-suffix">all assets &middot; evening loop</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Last sync<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value"><span class="mono">3</span><span class="unit">m ago</span></div>
+        <div class="kpi-foot"><span class="label-suffix">47 of 52 kiosks &middot; OK</span></div>
+    </div>
+</div>
+
+<!-- Filter bar -->
+<section class="card" style="margin-bottom:24px;">
+    <form asp-controller="KioskManagement" asp-action="ScreenSaverConfiguration" method="get" autocomplete="off">
+        <div class="fleet-toolbar">
+            <span style="text-transform:uppercase; letter-spacing:0.08em;">Status</span>
+            <div class="seg">
+                <button type="submit" name="stat" value=""        class="@SegActive("")">All</button>
+                <button type="submit" name="stat" value="active"  class="@SegActive("active")">Active</button>
+                <button type="submit" name="stat" value="inactive" class="@SegActive("inactive")">Inactive</button>
+            </div>
+            <span style="flex:1;"></span>
+            <div class="inline-search">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/><path d="M11 11L14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                <input type="text" name="search" placeholder="Search code, file…" value="@searchTerm" />
+            </div>
+        </div>
+    </form>
+</section>
+
+<!-- Two-column: library + sticky preview -->
+<div class="ss-split">
+
+    <section class="card">
+        <header class="card-head">
+            <div>
+                <h2 class="card-title">Media library</h2>
+                <div class="card-meta" style="margin-top:6px;"><span><span class="mono">@(Model.screenSaverMasterList?.Count ?? 0)</span> assets &middot; sorted by next-on-air</span></div>
+            </div>
+            <div class="seg">
+                <button class="active">All</button>
+                <button>Campaigns</button>
+                <button>Pricing</button>
+                <button>Educational</button>
+            </div>
+        </header>
+
+        <div class="ss-grid">
+            @if (Model.screenSaverMasterList != null && Model.screenSaverMasterList.Any())
+            {
+                int idx = 0;
+                foreach (var item in Model.screenSaverMasterList)
+                {
+                    var fileUrl   = item.ImgUrl ?? "";
+                    var isVideo   = IsVideo(fileUrl);
+                    var isImage   = IsImage(fileUrl);
+                    var isOnAir   = onAir != null && onAir.Code == item.Code;
+                    var theme     = thumbThemes[idx % thumbThemes.Length];
+                    idx++;
+
+                    var encCode = (item.Code ?? "").Replace("'", "\\'");
+                    var encUrl  = fileUrl.Replace("'", "\\'");
+
+                    <article class="ss-tile @(isOnAir ? "playing" : "")">
+                        <div class="ss-thumb @theme">
+                            @if (isImage)
+                            {
+                                <img src="@fileUrl" alt="Screen saver @item.Code" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:0;" />
+                            }
+                            else if (isVideo)
+                            {
+                                <video muted loop playsinline preload="metadata" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:0;">
+                                    <source src="@fileUrl" type="video/mp4" />
+                                </video>
+                            }
+                            <div class="thumb-overlay">
+                                <span class="thumb-title">@item.Code</span>
+                                <span class="thumb-sub">@item.CreatedOn.ToString("dd MMM yyyy", inv)</span>
+                            </div>
+                            @if (isOnAir)
+                            {
+                                <div class="ss-now"><span class="dot-pulse" style="background:var(--accent);"></span>On air</div>
+                            }
+                        </div>
+                        <div class="ss-tile-body">
+                            <div class="ss-tile-title">@item.Code</div>
+                            <div class="ss-tile-meta">
+                                <span class="mono">@(isVideo ? "video" : isImage ? "image" : "media")</span>
+                                &middot;
+                                @item.CreatedOn.ToString("dd MMM, HH:mm", inv)
+                            </div>
+                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                                @if (item.IsActive)
+                                {
+                                    <span class="status-pill s-active">Active</span>
+                                }
+                                else
+                                {
+                                    <span class="status-pill s-disabled">Inactive</span>
+                                }
+                                <div class="row-actions">
+                                    <button type="button" class="icon-btn" title="Edit"
+                                            data-action="edit-ss"
+                                            data-code="@encCode"
+                                            data-url="@encUrl"
+                                            data-active="@(item.IsActive ? "true" : "false")">
+                                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9 2L12 5L5 12H2V9L9 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+                                    </button>
+                                    <button type="button" class="icon-btn" title="Delete"
+                                            data-action="delete-ss"
+                                            data-code="@encCode">
+                                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 4H11M5.5 4V2.5H8.5V4M4 4L4.5 12H9.5L10 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+                }
+            }
+            else
+            {
+                <div style="grid-column: 1 / -1; padding:36px 0; text-align:center; color:var(--ink-faint);">
+                    No screen savers in this window.
+                </div>
+            }
+        </div>
+
+        <div class="table-foot">
+            <span>Showing <span class="mono">@(Model.screenSaverMasterList?.Count ?? 0)</span> of <span class="mono">@Model.Total</span> assets</span>
+            <div class="pager">
+                @if (Model.PageNo > 1)
+                {
+                    <a class="btn btn-ghost btn-sm" href="@Url.Action("ScreenSaverConfiguration", new { PageNo = Model.PageNo - 1, PageSize = Model.PageSize, search = searchTerm, stat = stat })">&lsaquo; Prev</a>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-ghost btn-sm" disabled>&lsaquo; Prev</button>
+                }
+
+                @{
+                    int pageLimit = 5;
+                    int startPage = Math.Max(1, Model.PageNo - pageLimit / 2);
+                    int endPage   = Math.Min(Math.Max(1, Model.TotalPage), startPage + pageLimit - 1);
+                    if (endPage - startPage < pageLimit - 1)
+                    {
+                        startPage = Math.Max(1, endPage - pageLimit + 1);
+                    }
+                }
+                @for (int i = startPage; i <= endPage; i++)
+                {
+                    if (i == Model.PageNo)
+                    {
+                        <a class="btn btn-ghost btn-sm" style="border-color:var(--accent); color:var(--accent);" href="@Url.Action("ScreenSaverConfiguration", new { PageNo = i, PageSize = Model.PageSize, search = searchTerm, stat = stat })">@i</a>
+                    }
+                    else
+                    {
+                        <a class="btn btn-ghost btn-sm" href="@Url.Action("ScreenSaverConfiguration", new { PageNo = i, PageSize = Model.PageSize, search = searchTerm, stat = stat })">@i</a>
+                    }
+                }
+
+                @if (Model.PageNo < Model.TotalPage)
+                {
+                    <a class="btn btn-ghost btn-sm" href="@Url.Action("ScreenSaverConfiguration", new { PageNo = Model.PageNo + 1, PageSize = Model.PageSize, search = searchTerm, stat = stat })">Next &rsaquo;</a>
+                }
+                else
+                {
+                    <button type="button" class="btn btn-ghost btn-sm" disabled>Next &rsaquo;</button>
+                }
+            </div>
+        </div>
+    </section>
+
+    <!-- Sticky preview panel — 9:16 kiosk frame -->
+    <aside class="ss-preview">
+        <div class="eyebrow" style="margin-bottom:10px;">Preview &middot; currently on air</div>
+        <div class="ss-phone">
+            <div class="ss-phone-bezel">
+                <div class="ss-phone-screen">
+                    @if (onAir != null && IsImage(onAir.ImgUrl))
+                    {
+                        <img src="@onAir.ImgUrl" alt="On air" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover;" />
+                    }
+                    else if (onAir != null && IsVideo(onAir.ImgUrl))
+                    {
+                        <video autoplay muted loop playsinline style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover;">
+                            <source src="@onAir.ImgUrl" type="video/mp4" />
+                        </video>
+                    }
+                    else
+                    {
+                        <div class="ss-poster">
+                            <div class="ss-poster-grain"></div>
+                            <div class="ss-poster-mark"><span class="brand-mark" style="width:34px; height:34px;"></span></div>
+                            <div class="ss-poster-eyebrow">CAMPAIGN &middot; LIVE</div>
+                            <h3 class="ss-poster-title">Eid Al Fitr<br/><em>Gold Promotion</em></h3>
+                            <p class="ss-poster-sub">Sell 22K jewellery this Eid and earn an additional <strong>AED 250</strong> on offers above AED 5,000.</p>
+                            <div class="ss-poster-cta">Tap the screen to begin</div>
+                        </div>
+                    }
+                </div>
+            </div>
+            <div class="ss-phone-meta">
+                <div><span class="mono">@(onAir?.Code ?? "—")</span> &middot; live mirror</div>
+                <div class="mono">0:18 / 0:42</div>
+            </div>
+            <div class="ss-phone-progress"><span style="width:42%;"></span></div>
+        </div>
+
+        <div class="ss-preview-meta">
+            <div><dt>Active assets</dt><dd><span class="mono">@Model.Active</span> of <span class="mono">@Model.Total</span></dd></div>
+            <div><dt>Slot</dt><dd>Morning &middot; 09:00 – 12:00</dd></div>
+            <div><dt>Reaching</dt><dd>47 of 52 kiosks</dd></div>
+        </div>
+    </aside>
+
+</div>
+
+<!-- Day-part schedule -->
+<section class="card" style="margin-top:32px; margin-bottom:32px;">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Day-part schedule</h2>
+            <div class="card-meta" style="margin-top:6px;"><span>Drag to rearrange &middot; changes auto-save &middot; push to fleet from header</span></div>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm">Add slot</button>
+    </header>
+    <div class="ss-timeline">
+        <div class="ss-timeline-axis">
+            <span>00:00</span><span>04:00</span><span>08:00</span><span>12:00</span><span>16:00</span><span>20:00</span><span>24:00</span>
+        </div>
+
+        <div class="ss-band">
+            <div class="ss-band-label">Morning<br/><small>06:00 – 12:00</small></div>
+            <div class="ss-band-track">
+                <span class="ss-blk b-gold"  style="left:25%; width:8%;">22K Spot</span>
+                <span class="ss-blk b-info"  style="left:33%; width:10%;">How it works</span>
+                <span class="ss-blk b-gold"  style="left:43%; width:6%;">VAT</span>
+                <span class="ss-blk b-warn"  style="left:49%; width:12%;">Refer &amp; Earn</span>
+            </div>
+        </div>
+
+        <div class="ss-band">
+            <div class="ss-band-label">Afternoon<br/><small>12:00 – 17:00</small></div>
+            <div class="ss-band-track">
+                <span class="ss-blk b-gold"    style="left:50%; width:7%;">22K Spot</span>
+                <span class="ss-blk b-info"    style="left:57%; width:9%;">Purity 101</span>
+                <span class="ss-blk b-success" style="left:66%; width:6%;">Direct to bank</span>
+            </div>
+        </div>
+
+        <div class="ss-band">
+            <div class="ss-band-label">Evening<br/><small>17:00 – 22:00</small></div>
+            <div class="ss-band-track">
+                <span class="ss-blk b-warn" style="left:70%; width:11%;">Eid Al Fitr &middot; Gold Promotion</span>
+                <span class="ss-blk b-info" style="left:81%; width:7%;">Silver &middot; now accepted</span>
+                <span class="ss-blk b-gold" style="left:88%; width:4%;">Bank-grade</span>
+            </div>
+        </div>
+
+        <div class="ss-band">
+            <div class="ss-band-label">Late<br/><small>22:00 – 06:00</small></div>
+            <div class="ss-band-track">
+                <span class="ss-blk b-ghost" style="left:0%;  width:25%;">22K Spot &middot; low-traffic loop</span>
+                <span class="ss-blk b-ghost" style="left:92%; width:8%;">VAT</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ───────────────────────── Drawer ─────────────────── -->
+
+<div class="drawer-backdrop" data-drawer="ss" hidden>
+    <aside class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="ss-drawer-title">
+        <header class="drawer-head">
+            <div>
+                <div class="eyebrow">Fleet &middot; Attract mode</div>
+                <h2 id="ss-drawer-title" class="drawer-title">Upload <em>media.</em></h2>
+            </div>
+            <button type="button" class="icon-btn" data-action="close-ss-drawer">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 2L12 12M12 2L2 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </button>
+        </header>
+
+        <div class="drawer-body">
+
+            <!-- Add -->
+            <form id="add-ss-form" asp-controller="KioskManagement" asp-action="AddScreenSaver" method="post" autocomplete="off" enctype="multipart/form-data" data-form="add">
+                @Html.AntiForgeryToken()
+                <div class="callout" style="margin-bottom:18px;">
+                    Max 100 MB &middot; recommended W:2000px × H:1333px &middot; JPG, PNG, GIF, MP4, WebM accepted.
+                </div>
+                <div class="field">
+                    <label for="addSsPhoto">Upload file <span style="color:var(--danger);">*</span></label>
+                    <input type="file" id="addSsPhoto" name="Photo" accept="image/*,video/*" required />
+                </div>
+                <div class="drawer-actions">
+                    <button type="button" class="btn btn-ghost btn-sm" data-action="close-ss-drawer">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm">Upload</button>
+                </div>
+            </form>
+
+            <!-- Edit -->
+            <form id="edit-ss-form" asp-controller="KioskManagement" asp-action="EditScreenSaver" method="post" autocomplete="off" enctype="multipart/form-data" data-form="edit" hidden>
+                @Html.AntiForgeryToken()
+                <div class="field">
+                    <label for="editSsCode">Code</label>
+                    <input type="text" id="editSsCode" name="Code" readonly />
+                </div>
+                <div class="field">
+                    <label>Currently uploaded</label>
+                    <img id="editSsPreview" src="" alt="" style="max-height:160px; width:auto; border:1px solid var(--line); border-radius: var(--radius-md); background: var(--canvas-sunken);" />
+                </div>
+                <div class="field">
+                    <label for="editSsPhoto">Replace file</label>
+                    <input type="file" id="editSsPhoto" name="Photo" accept="image/*,video/*" />
+                </div>
+                <div class="field">
+                    <label for="editSsActive">Status</label>
+                    @Html.DropDownList("IsActive", (IEnumerable<SelectListItem>)ViewBag.StatusDropdown, "Select status", new { id = "editSsActive" })
+                </div>
+                <div class="drawer-actions">
+                    <button type="button" class="btn btn-ghost btn-sm" data-action="close-ss-drawer">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm">Save changes</button>
+                </div>
+            </form>
+
+            <!-- Delete -->
+            <form id="delete-ss-form" asp-controller="KioskManagement" asp-action="DeleteScreenSaver" method="post" autocomplete="off" data-form="delete" hidden>
+                @Html.AntiForgeryToken()
+                <div class="callout" style="margin-bottom:18px;">
+                    Deleting a screen saver removes it from rotation across all kiosks. The asset is purged after 30 days.
+                </div>
+                <div class="field">
+                    <label>Asset to delete</label>
+                    <input type="text" id="deleteSsCode" name="Code" readonly />
+                </div>
+                <div class="drawer-actions">
+                    <button type="button" class="btn btn-ghost btn-sm" data-action="close-ss-drawer">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm" style="background: var(--danger); border-color: var(--danger);">Delete</button>
+                </div>
+            </form>
+
+        </div>
+    </aside>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            var backdrop = document.querySelector('[data-drawer="ss"]');
+            if (!backdrop) return;
+
+            var forms = {
+                add:    document.getElementById('add-ss-form'),
+                edit:   document.getElementById('edit-ss-form'),
+                delete: document.getElementById('delete-ss-form')
+            };
+            var titles = {
+                add:    'Upload <em>media.</em>',
+                edit:   'Edit <em>media.</em>',
+                delete: 'Delete <em>media.</em>'
+            };
+            var titleEl = document.getElementById('ss-drawer-title');
+
+            function showForm(which) {
+                Object.keys(forms).forEach(function (k) {
+                    if (forms[k]) forms[k].hidden = (k !== which);
+                });
+                if (titleEl && titles[which]) titleEl.innerHTML = titles[which];
+                backdrop.hidden = false;
+                document.body.style.overflow = 'hidden';
+            }
+            function closeDrawer() {
+                backdrop.hidden = true;
+                document.body.style.overflow = '';
+            }
+
+            document.addEventListener('click', function (e) {
+                var target = e.target.closest('[data-action]');
+                if (!target) return;
+                var action = target.getAttribute('data-action');
+
+                if (action === 'open-add-ss') {
+                    e.preventDefault();
+                    forms.add.reset();
+                    showForm('add');
+                }
+                else if (action === 'edit-ss') {
+                    e.preventDefault();
+                    document.getElementById('editSsCode').value = target.dataset.code || '';
+                    var preview = document.getElementById('editSsPreview');
+                    if (preview) preview.src = target.dataset.url || '';
+                    var act = document.getElementById('editSsActive');
+                    if (act) act.value = target.dataset.active || '';
+                    showForm('edit');
+                }
+                else if (action === 'delete-ss') {
+                    e.preventDefault();
+                    document.getElementById('deleteSsCode').value = target.dataset.code || '';
+                    showForm('delete');
+                }
+                else if (action === 'close-ss-drawer') {
+                    e.preventDefault();
+                    closeDrawer();
+                }
+            });
+
+            backdrop.addEventListener('click', function (e) {
+                if (e.target === backdrop) closeDrawer();
+            });
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape' && !backdrop.hidden) closeDrawer();
+            });
+        })();
+    </script>
+}
+
+<!-- Page-scoped styles — same component set used in kiosk-configuration. TODO promote into main.css. -->
+<style>
+    /* Inline search inside fleet-toolbar (also used on kiosk-configuration). /* TODO promote */ */
+    .inline-search {
+        display: inline-flex; align-items: center; gap: 8px;
+        background: var(--canvas-sunken);
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius-md);
+        padding: 6px 10px;
+        color: var(--ink-faint);
+    }
+    .inline-search input {
+        background: transparent; border: none; outline: none;
+        font: 13px var(--font-sans); color: var(--ink);
+        min-width: 220px;
+    }
+    .inline-search input::placeholder { color: var(--ink-faint); }
+
+    /* Table footer + pager (shared with kiosk-configuration). /* TODO promote */ */
+    .table-foot {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 14px 22px; border-top: 1px solid var(--line);
+        font-size: 12px; color: var(--ink-faint);
+    }
+    .pager { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+    .pager .btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+
+    /* Drawer (shared with kiosk-configuration). /* TODO promote */ */
+    .drawer-backdrop {
+        position: fixed; inset: 0; z-index: 90;
+        background: rgba(10,10,10,0.42);
+        display: flex; justify-content: flex-end;
+        backdrop-filter: blur(2px);
+    }
+    .drawer-panel {
+        width: min(480px, 100%);
+        background: var(--canvas);
+        border-left: 1px solid var(--line);
+        height: 100vh;
+        display: flex; flex-direction: column;
+        box-shadow: var(--shadow-lg);
+    }
+    .drawer-head {
+        padding: 22px 22px 18px;
+        border-bottom: 1px solid var(--line);
+        display: flex; justify-content: space-between; align-items: flex-start;
+    }
+    .drawer-title {
+        font-family: var(--font-display);
+        font-size: var(--fs-24);
+        margin: 4px 0 0;
+        letter-spacing: var(--tracking-snug);
+    }
+    .drawer-title em { font-style: italic; color: var(--accent); font-weight: 400; }
+    .drawer-body { padding: 22px; overflow-y: auto; flex: 1; }
+    .drawer-actions {
+        display: flex; gap: 10px; justify-content: flex-end;
+        margin-top: 18px; padding-top: 18px;
+        border-top: 1px solid var(--line);
+    }
+    .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+    .field label { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-faint); }
+    .field input, .field select {
+        background: var(--canvas-sunken);
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius-md);
+        padding: 10px 12px;
+        font: 14px var(--font-sans);
+        color: var(--ink);
+        outline: none;
+        transition: border-color 180ms, box-shadow 180ms;
+    }
+    .field input:focus, .field select:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-ring);
+    }
+    .field input[readonly] { background: var(--canvas-elevated); color: var(--ink-faint); }
+    .callout {
+        font-size: 13px; color: var(--ink-soft);
+        background: var(--warning-soft);
+        border: 1px solid var(--warning);
+        border-radius: var(--radius-md);
+        padding: 12px 14px;
+    }
+
+    /* Screen-saver gallery layout + sticky preview. /* TODO promote */ */
+    .ss-split {
+        display: grid;
+        grid-template-columns: 1fr 360px;
+        gap: 24px;
+        align-items: start;
+        margin-bottom: 32px;
+    }
+
+    .ss-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 18px;
+        padding: 18px 22px 24px;
+    }
+    .ss-tile {
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        background: var(--canvas);
+        transition: border-color 180ms, transform 180ms;
+    }
+    .ss-tile:hover { border-color: var(--line-strong); transform: translateY(-1px); }
+    .ss-tile.playing { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+
+    .ss-thumb {
+        aspect-ratio: 16/9;
+        position: relative;
+        overflow: hidden;
+        background: linear-gradient(135deg, var(--canvas-sunken), var(--canvas-elevated));
+    }
+    .ss-thumb::after {
+        content: ""; position: absolute; inset: 0;
+        background-image: radial-gradient(rgba(184,148,31,0.18) 1px, transparent 1px);
+        background-size: 14px 14px;
+        mix-blend-mode: multiply;
+        opacity: 0.4; pointer-events: none;
+        z-index: 1;
+    }
+    .thumb-overlay {
+        position: absolute; left: 16px; bottom: 14px; z-index: 2;
+        display: flex; flex-direction: column; gap: 2px;
+        background: rgba(10,10,10,0.55);
+        padding: 6px 10px;
+        border-radius: var(--radius-sm);
+        backdrop-filter: blur(3px);
+    }
+    .thumb-title {
+        font-family: var(--font-display); font-size: 16px; color: #f4ead0;
+        letter-spacing: var(--tracking-tight); line-height: 1.1;
+    }
+    .thumb-sub {
+        font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.12em;
+        text-transform: uppercase; color: #d6d1c2;
+    }
+
+    .thumb-eid     { background: linear-gradient(135deg, #1c1612, #3a2a14 50%, #b8941f); }
+    .thumb-spot    { background: linear-gradient(135deg, #f4ead0, #fbfaf6); }
+    .thumb-refer   { background: linear-gradient(135deg, #2a5d8c, #1c3e5d); }
+    .thumb-how     { background: linear-gradient(135deg, #fbfaf6, #ebe8df); }
+    .thumb-purity  { background: linear-gradient(135deg, #2a7d4f, #1c5d3a); }
+    .thumb-bank    { background: linear-gradient(135deg, #141312, #0a0a0a); }
+    .thumb-ramadan { background: linear-gradient(135deg, #4a2a55, #1c1432); }
+    .thumb-silver  { background: linear-gradient(135deg, #d6d1c2, #b5b1a6); }
+    .thumb-trust   { background: linear-gradient(135deg, #0a0a0a, #2a2620); }
+    .thumb-natdays { background: linear-gradient(135deg, #a83232, #1c1612 60%, #2a7d4f); }
+    .thumb-tax     { background: linear-gradient(135deg, #f4ead0, #b8941f); }
+    .thumb-newyear { background: linear-gradient(135deg, #2a2620, #4a4845); }
+
+    .ss-now {
+        position: absolute; top: 10px; right: 10px; z-index: 3;
+        font: 11px/1 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase;
+        padding: 4px 8px; border-radius: var(--radius-full);
+        background: rgba(10,10,10,0.7); color: var(--accent);
+        display: inline-flex; align-items: center; gap: 6px;
+        backdrop-filter: blur(4px);
+    }
+
+    .ss-tile-body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 8px; }
+    .ss-tile-title { font-size: 14px; font-weight: 500; color: var(--ink); }
+    .ss-tile-meta { font-size: 12px; color: var(--ink-faint); }
+
+    /* Sticky preview */
+    .ss-preview {
+        position: sticky; top: 88px;
+        background: var(--canvas);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        padding: 20px;
+    }
+    .ss-phone { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+    .ss-phone-bezel {
+        width: 100%; max-width: 220px;
+        background: #0a0a0a;
+        border-radius: 22px;
+        padding: 10px;
+        border: 1px solid #2a2620;
+        box-shadow: 0 14px 28px rgba(0,0,0,0.2);
+    }
+    .ss-phone-screen {
+        aspect-ratio: 9 / 16;
+        border-radius: 14px;
+        overflow: hidden;
+        background: linear-gradient(170deg, #1c1612, #3a2a14 60%, #b8941f);
+        position: relative;
+    }
+    .ss-poster { position: absolute; inset: 0; padding: 18px 16px; color: #f4ead0; display: flex; flex-direction: column; gap: 10px; }
+    .ss-poster-grain {
+        position: absolute; inset: 0;
+        background-image: radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px);
+        background-size: 4px 4px; pointer-events: none;
+    }
+    .ss-poster-mark { display: flex; align-items: center; }
+    .ss-poster-eyebrow {
+        font: 9px/1 var(--font-mono); letter-spacing: 0.18em; text-transform: uppercase;
+        color: var(--accent); margin-top: 2px;
+    }
+    .ss-poster-title {
+        font-family: var(--font-display); font-weight: 400;
+        font-size: 22px; line-height: 1.05; margin: 0;
+        letter-spacing: var(--tracking-tight);
+    }
+    .ss-poster-title em { font-style: italic; color: #d4af37; }
+    .ss-poster-sub { font-size: 11px; line-height: 1.45; color: #ebe8df; margin: 0; }
+    .ss-poster-sub strong { color: #d4af37; }
+    .ss-poster-cta {
+        margin-top: auto;
+        font: 10px/1 var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase;
+        color: #d4af37;
+        padding: 8px 0; border-top: 1px solid rgba(212,175,55,0.3);
+    }
+    .ss-phone-meta { display: flex; justify-content: space-between; width: 100%; max-width: 220px; font-size: 11px; color: var(--ink-faint); }
+    .ss-phone-progress {
+        width: 100%; max-width: 220px; height: 3px; background: var(--canvas-sunken); border-radius: 999px; overflow: hidden;
+    }
+    .ss-phone-progress span { display: block; height: 100%; background: var(--accent); }
+
+    .ss-preview-meta { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); display: grid; gap: 12px; }
+    .ss-preview-meta div { display: flex; justify-content: space-between; gap: 14px; }
+    .ss-preview-meta dt { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); margin: 0; }
+    .ss-preview-meta dd { margin: 0; font-size: 12px; color: var(--ink); text-align: right; }
+
+    /* Timeline */
+    .ss-timeline { padding: 18px 22px 24px; }
+    .ss-timeline-axis {
+        display: grid; grid-template-columns: 120px repeat(6, 1fr);
+        font: 10px var(--font-mono); color: var(--ink-faint);
+        padding-left: 120px; margin-bottom: 8px;
+    }
+    .ss-timeline-axis span { border-left: 1px dashed var(--line); padding-left: 6px; }
+    .ss-timeline-axis span:first-child { border-left: none; padding-left: 0; }
+    .ss-band {
+        display: grid; grid-template-columns: 120px 1fr;
+        gap: 14px; align-items: center;
+        padding: 10px 0; border-top: 1px solid var(--line);
+    }
+    .ss-band-label { font-family: var(--font-display); font-size: 14px; color: var(--ink); }
+    .ss-band-label small { font: 10px var(--font-mono); color: var(--ink-faint); letter-spacing: 0.08em; }
+    .ss-band-track {
+        position: relative; height: 32px;
+        background: var(--canvas-sunken); border-radius: var(--radius-sm);
+        border: 1px solid var(--line);
+        overflow: hidden;
+    }
+    .ss-blk {
+        position: absolute; top: 4px; bottom: 4px;
+        display: flex; align-items: center; padding: 0 10px;
+        font: 500 11px var(--font-sans);
+        border-radius: var(--radius-xs);
+        overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+        cursor: grab;
+    }
+    .ss-blk.b-gold    { background: var(--accent-soft);   color: var(--accent);  border: 1px solid var(--accent-ring); }
+    .ss-blk.b-info    { background: var(--info-soft);     color: var(--info);    border: 1px solid rgba(42,93,140,0.25); }
+    .ss-blk.b-success { background: var(--success-soft);  color: var(--success); border: 1px solid rgba(42,125,79,0.25); }
+    .ss-blk.b-warn    { background: var(--warning-soft);  color: var(--warning); border: 1px solid rgba(196,116,25,0.25); }
+    .ss-blk.b-ghost   { background: var(--canvas-elevated); color: var(--ink-faint); border: 1px dashed var(--line-strong); }
+
+    @@media (max-width: 1280px) {
+        .ss-split { grid-template-columns: 1fr; }
+        .ss-preview { position: static; }
+        .ss-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+</style>

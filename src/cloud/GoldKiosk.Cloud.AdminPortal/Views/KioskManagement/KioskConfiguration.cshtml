@@ -1,0 +1,386 @@
+@model KioskMasterList
+@using System.Globalization
+@{
+    var inv = CultureInfo.InvariantCulture;
+
+    // Page chrome
+    ViewBag.Eyebrow   = "FLEET · CONFIGURATION";
+    ViewBag.PageTitle = "Kiosk <em>configuration.</em>";
+    ViewBag.Subtitle  = $"{Model.Total} kiosks deployed across the UAE. Inspect, provision, retire or push updates from a single fleet directory.";
+    ViewBag.ActiveNav = "kiosks";
+    ViewBag.PageHeadActions =
+        "<button type=\"button\" class=\"btn btn-ghost btn-sm\">" +
+            "<svg width=\"14\" height=\"14\" viewBox=\"0 0 14 14\" fill=\"none\"><path d=\"M2 4L7 9L12 4\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/></svg>" +
+            " Export CSV" +
+        "</button>" +
+        "<button type=\"button\" class=\"btn btn-primary btn-sm\" data-action=\"open-add-kiosk\">" +
+            "<svg width=\"14\" height=\"14\" viewBox=\"0 0 14 14\" fill=\"none\"><path d=\"M7 3V11M3 7H11\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/></svg>" +
+            " Provision kiosk" +
+        "</button>";
+
+    // Toolbar selection state
+    var stat        = (ViewBag.Stat as string) ?? "";
+    var searchTerm  = (ViewBag.SearchTerm as string) ?? "";
+    string SegActive(string forValue) => stat.Equals(forValue, StringComparison.OrdinalIgnoreCase) ? "active" : "";
+
+    // Maintenance count (used in KPI strip)
+    var maintenance = Model.kioskMasterList?.Count(k => k.IsMaintenance) ?? 0;
+}
+
+<!-- KPI strip -->
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Fleet total<span class="dot"></span></div>
+        <div class="kpi-value"><span class="mono">@Model.Total</span></div>
+        <div class="kpi-foot"><span class="label-suffix">across 7 emirates</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Online<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value"><span class="mono">@Model.Active</span><span class="unit">/ @Model.Total</span></div>
+        <div class="kpi-foot">
+            <span class="delta delta-up">&#9650; @((Model.Total == 0 ? 0 : (Model.Active * 100m / Model.Total)).ToString("N1", inv))%</span>
+            <span class="label-suffix">uptime &middot; 7d</span>
+        </div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Maintenance<span class="dot" style="background:var(--warning);"></span></div>
+        <div class="kpi-value"><span class="mono">@maintenance</span></div>
+        <div class="kpi-foot"><span class="label-suffix">tech onsite</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Offline<span class="dot" style="background:var(--danger);"></span></div>
+        <div class="kpi-value"><span class="mono">@Model.InActive</span></div>
+        <div class="kpi-foot"><span class="label-suffix">vs yesterday</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Showing<span class="dot"></span></div>
+        <div class="kpi-value"><span class="mono">@(Model.kioskMasterList?.Count ?? 0)</span><span class="unit">/ @Model.Total</span></div>
+        <div class="kpi-foot"><span class="label-suffix">page @Model.PageNo of @Math.Max(1, Model.TotalPage)</span></div>
+    </div>
+</div>
+
+<!-- Filter toolbar + table -->
+<section class="card" style="margin-bottom:32px;">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Fleet directory</h2>
+            <div class="card-meta" style="margin-top:6px;">
+                <span>Showing <span class="mono">@(Model.kioskMasterList?.Count ?? 0)</span> of <span class="mono">@Model.Total</span> &middot; click row to drill into kiosk detail</span>
+            </div>
+        </div>
+        <div style="display:flex; gap:6px;">
+            <button type="button" class="btn btn-ghost btn-sm">Columns</button>
+            <button type="button" class="btn btn-ghost btn-sm">Saved views</button>
+        </div>
+    </header>
+
+    <form id="fleet-filter-form" asp-controller="KioskManagement" asp-action="KioskConfiguration" method="get" autocomplete="off">
+        <div class="fleet-toolbar">
+            <span style="text-transform:uppercase; letter-spacing:0.08em;">Status</span>
+            <div class="seg" role="tablist">
+                <button type="submit" name="stat" value=""        class="@SegActive("")">All</button>
+                <button type="submit" name="stat" value="active"  class="@SegActive("active")">Online</button>
+                <button type="submit" name="stat" value="maint"   class="@SegActive("maint")">Maint</button>
+                <button type="submit" name="stat" value="inactive" class="@SegActive("inactive")">Offline</button>
+            </div>
+            <span style="flex:1;"></span>
+            <div class="inline-search">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/><path d="M11 11L14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                <input type="text" name="search" placeholder="Search code, name, serial…" value="@searchTerm" />
+            </div>
+        </div>
+    </form>
+
+    <div style="overflow-x:auto;">
+        <table class="user-table fleet-table">
+            <thead>
+                <tr>
+                    <th>Code</th>
+                    <th>Name</th>
+                    <th>Region</th>
+                    <th>Status</th>
+                    <th>Onboarded</th>
+                    <th>Last heartbeat</th>
+                    <th style="text-align:center;">Maintenance</th>
+                    <th style="text-align:right; padding-right:22px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.kioskMasterList != null && Model.kioskMasterList.Any())
+                {
+                    foreach (var item in Model.kioskMasterList)
+                    {
+                        // Derive a 3-letter region from K-XXX-NN style codes.
+                        var code   = item.KioskCode ?? "";
+                        var parts  = code.Split('-');
+                        var region = parts.Length >= 2 ? parts[1].ToUpperInvariant() : "—";
+
+                        var chipClass = item.IsMaintenance ? "chip-maint"
+                                       : (item.IsActive ? "chip-online" : "chip-offline");
+                        var chipText  = item.IsMaintenance ? "Maintenance"
+                                       : (item.IsActive ? "Online" : "Offline");
+
+                        var encName    = (item.KioskName ?? "").Replace("'", "\\'");
+                        var encAddress = (item.Address ?? "").Replace("'", "\\'");
+                        var encPin     = (item.KioskPin ?? "").Replace("'", "\\'");
+
+                        <tr data-row-code="@code">
+                            <td><span class="row-code mono">@code</span></td>
+                            <td>
+                                <strong>@item.KioskName</strong>
+                                <div class="row-sub">@item.Address</div>
+                            </td>
+                            <td class="mono">@region</td>
+                            <td><span class="kiosk-chip @chipClass">@chipText</span></td>
+                            <td class="mono">@item.OnboardingDate.ToString("dd MMM yyyy", inv)</td>
+                            <td class="mono">@item.LastPing.ToString("dd MMM, HH:mm", inv)</td>
+                            <td class="mono" style="text-align:center;">
+                                @if (item.IsMaintenance)
+                                {
+                                    <span style="color:var(--warning);">YES</span>
+                                }
+                                else
+                                {
+                                    <span style="color:var(--ink-faint);">—</span>
+                                }
+                            </td>
+                            <td>
+                                <div class="row-actions" style="justify-content:flex-end;">
+                                    <button type="button" class="icon-btn" title="Edit"
+                                            data-action="edit-kiosk"
+                                            data-code="@code"
+                                            data-name="@encName"
+                                            data-address="@encAddress"
+                                            data-pin="@encPin"
+                                            data-maintenance="@(item.IsMaintenance ? "true" : "false")"
+                                            data-active="@(item.IsActive ? "true" : "false")">
+                                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9 2L12 5L5 12H2V9L9 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+                                    </button>
+                                    <button type="button" class="icon-btn" title="Decommission"
+                                            data-action="delete-kiosk"
+                                            data-code="@code">
+                                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 4H11M5.5 4V2.5H8.5V4M4 4L4.5 12H9.5L10 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="8" style="text-align:center; padding:36px 0; color:var(--ink-faint);">No kiosks match the current filter.</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="table-foot">
+        <span>Showing <span class="mono">@(Model.kioskMasterList?.Count ?? 0)</span> of <span class="mono">@Model.Total</span> kiosks</span>
+        <div class="pager">
+            @if (Model.PageNo > 1)
+            {
+                <a class="btn btn-ghost btn-sm" href="@Url.Action("KioskConfiguration", new { PageNo = Model.PageNo - 1, search = searchTerm, stat = stat })">&lsaquo; Prev</a>
+            }
+            else
+            {
+                <button type="button" class="btn btn-ghost btn-sm" disabled>&lsaquo; Prev</button>
+            }
+
+            @for (int i = 1; i <= Math.Max(1, Model.TotalPage); i++)
+            {
+                if (i == Model.PageNo)
+                {
+                    <a class="btn btn-ghost btn-sm" style="border-color:var(--accent); color:var(--accent);" href="@Url.Action("KioskConfiguration", new { PageNo = i, search = searchTerm, stat = stat })">@i</a>
+                }
+                else
+                {
+                    <a class="btn btn-ghost btn-sm" href="@Url.Action("KioskConfiguration", new { PageNo = i, search = searchTerm, stat = stat })">@i</a>
+                }
+            }
+
+            @if (Model.PageNo < Model.TotalPage)
+            {
+                <a class="btn btn-ghost btn-sm" href="@Url.Action("KioskConfiguration", new { PageNo = Model.PageNo + 1, search = searchTerm, stat = stat })">Next &rsaquo;</a>
+            }
+            else
+            {
+                <button type="button" class="btn btn-ghost btn-sm" disabled>Next &rsaquo;</button>
+            }
+        </div>
+    </div>
+</section>
+
+<!-- ───────────────────────── Drawers (Add / Edit / Delete) ─────────────────── -->
+
+<div class="drawer-backdrop" data-drawer="kiosk" hidden>
+    <aside class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+        <header class="drawer-head">
+            <div>
+                <div class="eyebrow">Fleet &middot; Provisioning</div>
+                <h2 id="drawer-title" class="drawer-title">Provision <em>kiosk.</em></h2>
+            </div>
+            <button type="button" class="icon-btn" data-action="close-drawer">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 2L12 12M12 2L2 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </button>
+        </header>
+
+        <div class="drawer-body">
+            <!-- Add form -->
+            <form id="add-kiosk-form" asp-controller="KioskManagement" asp-action="AddKiosk" method="post" autocomplete="off" enctype="multipart/form-data" data-form="add">
+                @Html.AntiForgeryToken()
+                <div class="field">
+                    <label for="addKioskCode">Kiosk code <span style="color:var(--danger);">*</span></label>
+                    <input type="text" id="addKioskCode" name="KioskCode" placeholder="e.g. K-DXB-07" required />
+                </div>
+                <div class="field">
+                    <label for="addKioskName">Kiosk name <span style="color:var(--danger);">*</span></label>
+                    <input type="text" id="addKioskName" name="KioskName" placeholder="Dubai Mall · North" required />
+                </div>
+                <div class="field">
+                    <label for="addKioskPin">Kiosk PIN <span style="color:var(--danger);">*</span></label>
+                    <input type="password" id="addKioskPin" name="KioskPin" placeholder="Kiosk PIN" required />
+                </div>
+                <div class="field">
+                    <label for="addAddress">Address <span style="color:var(--danger);">*</span></label>
+                    <input type="text" id="addAddress" name="Address" placeholder="Financial Centre Rd · L1" required />
+                </div>
+                <div class="field">
+                    <label for="addOnboardingDate">Onboarding date <span style="color:var(--danger);">*</span></label>
+                    <input type="date" id="addOnboardingDate" name="OnboardingDate" required />
+                </div>
+                <div class="drawer-actions">
+                    <button type="button" class="btn btn-ghost btn-sm" data-action="close-drawer">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm">Provision kiosk</button>
+                </div>
+            </form>
+
+            <!-- Edit form -->
+            <form id="edit-kiosk-form" asp-controller="KioskManagement" asp-action="EditKiosk" method="post" autocomplete="off" enctype="multipart/form-data" data-form="edit" hidden>
+                @Html.AntiForgeryToken()
+                <div class="field">
+                    <label for="editKioskCode">Kiosk code</label>
+                    <input type="text" id="editKioskCode" name="KioskCode" readonly />
+                </div>
+                <div class="field">
+                    <label for="editKioskName">Kiosk name <span style="color:var(--danger);">*</span></label>
+                    <input type="text" id="editKioskName" name="KioskName" required />
+                </div>
+                <div class="field">
+                    <label for="editKioskPin">Kiosk PIN</label>
+                    <input type="password" id="editKioskPin" name="KioskPin" placeholder="Leave blank to keep current" />
+                </div>
+                <div class="field">
+                    <label for="editAddress">Address <span style="color:var(--danger);">*</span></label>
+                    <input type="text" id="editAddress" name="Address" required />
+                </div>
+                <div class="field-row">
+                    <div class="field">
+                        <label for="editIsActive">Status</label>
+                        @Html.DropDownList("IsActive", (IEnumerable<SelectListItem>)ViewBag.StatusDropdown, "Select status", new { id = "editIsActive" })
+                    </div>
+                    <div class="field">
+                        <label for="editIsMaintenance">Maintenance</label>
+                        @Html.DropDownList("IsMaintenance", (IEnumerable<SelectListItem>)ViewBag.MaintenanceDropdown, "Select", new { id = "editIsMaintenance" })
+                    </div>
+                </div>
+                <div class="drawer-actions">
+                    <button type="button" class="btn btn-ghost btn-sm" data-action="close-drawer">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm">Save changes</button>
+                </div>
+            </form>
+
+            <!-- Delete confirm -->
+            <form id="delete-kiosk-form" asp-controller="KioskManagement" asp-action="DeleteKiosk" method="post" autocomplete="off" data-form="delete" hidden>
+                @Html.AntiForgeryToken()
+                <div class="callout" style="margin-bottom:18px;">
+                    Decommissioning a kiosk removes it from the fleet directory and revokes its mTLS certificate. This is irreversible.
+                </div>
+                <div class="field">
+                    <label>Kiosk to decommission</label>
+                    <input type="text" id="deleteKioskCode" name="Code" readonly />
+                </div>
+                <div class="drawer-actions">
+                    <button type="button" class="btn btn-ghost btn-sm" data-action="close-drawer">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm" style="background: var(--danger); border-color: var(--danger);">Decommission</button>
+                </div>
+            </form>
+        </div>
+    </aside>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            var backdrop = document.querySelector('[data-drawer="kiosk"]');
+            if (!backdrop) return;
+
+            var forms = {
+                add:    document.getElementById('add-kiosk-form'),
+                edit:   document.getElementById('edit-kiosk-form'),
+                delete: document.getElementById('delete-kiosk-form')
+            };
+            var titles = {
+                add:    'Provision <em>kiosk.</em>',
+                edit:   'Edit <em>kiosk.</em>',
+                delete: 'Decommission <em>kiosk.</em>'
+            };
+            var titleEl = document.getElementById('drawer-title');
+
+            function showForm(which) {
+                Object.keys(forms).forEach(function (k) {
+                    if (forms[k]) forms[k].hidden = (k !== which);
+                });
+                if (titleEl && titles[which]) titleEl.innerHTML = titles[which];
+                backdrop.hidden = false;
+                document.body.style.overflow = 'hidden';
+            }
+            function closeDrawer() {
+                backdrop.hidden = true;
+                document.body.style.overflow = '';
+            }
+
+            document.addEventListener('click', function (e) {
+                var target = e.target.closest('[data-action]');
+                if (!target) return;
+                var action = target.getAttribute('data-action');
+
+                if (action === 'open-add-kiosk') {
+                    e.preventDefault();
+                    if (forms.add) forms.add.reset();
+                    showForm('add');
+                }
+                else if (action === 'edit-kiosk') {
+                    e.preventDefault();
+                    document.getElementById('editKioskCode').value = target.dataset.code || '';
+                    document.getElementById('editKioskName').value = target.dataset.name || '';
+                    document.getElementById('editAddress').value   = target.dataset.address || '';
+                    document.getElementById('editKioskPin').value  = target.dataset.pin || '';
+                    var act = document.getElementById('editIsActive');
+                    if (act) act.value = target.dataset.active || '';
+                    var mnt = document.getElementById('editIsMaintenance');
+                    if (mnt) mnt.value = target.dataset.maintenance || '';
+                    showForm('edit');
+                }
+                else if (action === 'delete-kiosk') {
+                    e.preventDefault();
+                    document.getElementById('deleteKioskCode').value = target.dataset.code || '';
+                    showForm('delete');
+                }
+                else if (action === 'close-drawer') {
+                    e.preventDefault();
+                    closeDrawer();
+                }
+            });
+
+            backdrop.addEventListener('click', function (e) {
+                if (e.target === backdrop) closeDrawer();
+            });
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape' && !backdrop.hidden) closeDrawer();
+            });
+        })();
+    </script>
+}
+

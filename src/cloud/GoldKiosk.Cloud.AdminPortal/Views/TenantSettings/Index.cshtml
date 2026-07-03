@@ -1,0 +1,607 @@
+@using System.Globalization
+@using GoldKiosk.Cloud.AdminPortal.Models.Tenancy
+@model TenantSettingsViewModel
+@{
+    var inv = CultureInfo.InvariantCulture;
+
+    ViewBag.PageTitle = "Tenant <em>settings.</em>";
+    ViewBag.Eyebrow   = "Administration · Tenant";
+    ViewBag.Subtitle  = $"Branding, feature flags, data residency, activation keys, billing, and compliance posture for <strong>{Html.Encode(Model.General.LegalName)}</strong>.";
+    ViewBag.ActiveNav = "tenant-settings";
+    ViewBag.PageHeadActions =
+        "<span style=\"font-family:var(--font-mono); font-size:11px; color:var(--ink-faint);\">tenant_id: "
+        + Html.Encode(Model.TenantId.ToString())
+        + "</span>";
+
+    string TabClass(string t) => Model.ActiveTab == t ? "settings-tab active" : "settings-tab";
+    string PanelStyle(string t) => Model.ActiveTab == t ? "" : "display:none;";
+
+    // Retention buckets — drives the seg-control selection.
+    string SegActive(int actual, int candidate) => actual == candidate ? "active" : "";
+
+    // Branding accent palette — matches the prototype swatches.
+    var swatches = new (string Hex, string Label)[]
+    {
+        ("b8941f", "Champagne (default)"),
+        ("0a4a2a", "Emerald"),
+        ("6e1818", "Oxblood"),
+        ("1c3d5c", "Marine"),
+        ("2a2a2a", "Gunmetal"),
+    };
+    var accent = (Model.Branding.AccentHex ?? "b8941f").TrimStart('#').ToLowerInvariant();
+}
+
+<!-- Tab bar -->
+<div class="settings-tabs">
+    <button type="button" class="@TabClass("general")"    data-tab="general">General</button>
+    <button type="button" class="@TabClass("branding")"   data-tab="branding">Branding</button>
+    <button type="button" class="@TabClass("features")"   data-tab="features">Features</button>
+    <button type="button" class="@TabClass("keys")"       data-tab="keys">Activation keys</button>
+    <button type="button" class="@TabClass("billing")"    data-tab="billing">Billing</button>
+    <button type="button" class="@TabClass("compliance")" data-tab="compliance">Compliance</button>
+</div>
+
+<!-- ─── General ───────────────────────────────────────────────────────── -->
+<section class="settings-panel" data-panel="general" style="@PanelStyle("general")">
+    <form asp-action="SaveGeneral" method="post" autocomplete="off">
+        @Html.AntiForgeryToken()
+        <div class="split-2-1">
+            <section class="card">
+                <header class="card-head">
+                    <div>
+                        <h2 class="card-title">Identity &amp; legal</h2>
+                        <div class="card-meta" style="margin-top:6px;"><span>The legal entity on file with the activation contract</span></div>
+                    </div>
+                </header>
+                <div class="card-body" style="display:grid; grid-template-columns:repeat(2, 1fr); gap:18px;">
+                    <div class="field">
+                        <label asp-for="General.LegalName">Legal name</label>
+                        <input asp-for="General.LegalName" type="text" />
+                    </div>
+                    <div class="field">
+                        <label asp-for="General.TradingName">Trading name</label>
+                        <input asp-for="General.TradingName" type="text" />
+                    </div>
+                    <div class="field">
+                        <label asp-for="General.TradeLicenceNo">Trade licence no.</label>
+                        <input asp-for="General.TradeLicenceNo" type="text" />
+                    </div>
+                    <div class="field">
+                        <label asp-for="General.VatRegistration">VAT registration</label>
+                        <input asp-for="General.VatRegistration" type="text" />
+                    </div>
+                    <div class="field">
+                        <label asp-for="General.PrimaryAdmin">Primary admin</label>
+                        <input asp-for="General.PrimaryAdmin" type="text" disabled />
+                    </div>
+                    <div class="field">
+                        <label>Tenant tier</label>
+                        <div class="seg seg-bordered" data-radio-group="tier">
+                            <button type="button" class="@SegActive(Model.General.Tier == "standard" ? 1 : 0, 1)" data-value="standard">Standard</button>
+                            <button type="button" class="@SegActive(Model.General.Tier == "premium"  ? 1 : 0, 1)" data-value="premium">Premium</button>
+                            <button type="button" class="@SegActive(Model.General.Tier == "bank"     ? 1 : 0, 1)" data-value="bank">Bank</button>
+                        </div>
+                        <input type="hidden" asp-for="General.Tier" />
+                    </div>
+                    <div class="field">
+                        <label>Data residency region</label>
+                        <div class="seg seg-bordered" data-radio-group="region">
+                            <button type="button" class="@SegActive(Model.General.DataResidencyRegion == "MIDEAST" ? 1 : 0, 1)" data-value="MIDEAST">MIDEAST · UAE North</button>
+                            <button type="button" class="@SegActive(Model.General.DataResidencyRegion == "APAC"    ? 1 : 0, 1)" data-value="APAC">APAC</button>
+                            <button type="button" class="@SegActive(Model.General.DataResidencyRegion == "EMEA"    ? 1 : 0, 1)" data-value="EMEA">EMEA</button>
+                            <button type="button" class="@SegActive(Model.General.DataResidencyRegion == "NORTHAM" ? 1 : 0, 1)" data-value="NORTHAM">NORTHAM</button>
+                        </div>
+                        <input type="hidden" asp-for="General.DataResidencyRegion" />
+                    </div>
+                    <div class="field">
+                        <label>Default currency</label>
+                        <input type="text" value="@Model.General.DefaultCurrencyLabel" disabled />
+                        <input type="hidden" asp-for="General.DefaultCurrencyCode" />
+                    </div>
+                </div>
+                <div style="padding:0 22px 22px; display:flex; justify-content:flex-end; gap:8px;">
+                    <button type="submit" class="btn btn-primary btn-sm">Save general</button>
+                </div>
+            </section>
+
+            <section class="card">
+                <header class="card-head"><div><h2 class="card-title">Tenant facts</h2></div></header>
+                <div class="card-body">
+                    <dl class="fact-list">
+                        <div><dt>Tenant code</dt><dd class="mono">@Model.Facts.TenantCode</dd></div>
+                        <div><dt>Onboarded</dt><dd class="mono">@(Model.Facts.OnboardedAt?.ToString("dd MMM yyyy", inv) ?? "—")</dd></div>
+                        <div><dt>Days active</dt><dd class="mono">@Model.Facts.DaysActive day@(Model.Facts.DaysActive == 1 ? "" : "s")</dd></div>
+                        <div><dt>Status</dt><dd><span class="status-pill s-active">@Model.Facts.Status</span></dd></div>
+                        <div><dt>Region</dt><dd>@Model.Facts.RegionLabel</dd></div>
+                        <div><dt>Azure region</dt><dd class="mono">@Model.Facts.AzureRegion</dd></div>
+                        <div><dt>Kiosks deployed</dt><dd class="mono">@Model.Facts.KiosksDeployed / @Model.Facts.KiosksOrdered ordered</dd></div>
+                        <div><dt>Active users</dt><dd class="mono">@Model.Facts.ActiveUsers</dd></div>
+                        @if (!string.IsNullOrWhiteSpace(Model.Facts.CrmLeadCode))
+                        {
+                            <div><dt>CRM lead</dt><dd><a href="#" style="color:var(--accent);">@Model.Facts.CrmLeadCode</a></dd></div>
+                        }
+                    </dl>
+                </div>
+            </section>
+        </div>
+    </form>
+</section>
+
+<!-- ─── Branding ──────────────────────────────────────────────────────── -->
+<section class="settings-panel" data-panel="branding" style="@PanelStyle("branding")">
+    <form asp-action="SaveBranding" method="post" autocomplete="off">
+        @Html.AntiForgeryToken()
+        <div class="split-2-1">
+            <section class="card">
+                <header class="card-head">
+                    <div>
+                        <h2 class="card-title">Brand assets</h2>
+                        <div class="card-meta" style="margin-top:6px;"><span>Surfaces: kiosk attract-mode · admin · receipt · partner portal</span></div>
+                    </div>
+                </header>
+                <div class="card-body" style="display:grid; grid-template-columns:1fr 1fr; gap:22px;">
+                    <div>
+                        <div class="eyebrow" style="margin-bottom:10px;">Tenant logo</div>
+                        <div class="logo-drop">
+                            <img src="~/img/logo-mark-3d-opt.png" alt="logo" style="height:60px; opacity:0.85;" />
+                            <div style="font-size:12px; color:var(--ink-faint); margin-top:14px;">@(Model.Branding.LogoMeta ?? "Default Gold Kiosk mark")</div>
+                            <button type="button" class="btn btn-ghost btn-sm" style="margin-top:14px;">Replace</button>
+                        </div>
+                        <input type="hidden" asp-for="Branding.LogoUri" />
+                    </div>
+                    <div>
+                        <div class="eyebrow" style="margin-bottom:10px;">Accent colour</div>
+                        <div style="display:flex; gap:10px; flex-wrap:wrap;" data-swatches>
+                            @foreach (var sw in swatches)
+                            {
+                                var isActive = string.Equals(sw.Hex, accent, StringComparison.OrdinalIgnoreCase);
+                                <button type="button"
+                                        class="swatch @(isActive ? "active" : "")"
+                                        style="background:#@sw.Hex;"
+                                        title="@sw.Label"
+                                        data-hex="@sw.Hex"></button>
+                            }
+                            <button type="button" class="swatch"
+                                    style="background:linear-gradient(135deg,#fff 50%,#000 50%);"
+                                    title="Custom..."></button>
+                        </div>
+                        <input type="hidden" asp-for="Branding.AccentHex" />
+                        <div style="font-size:12px; color:var(--ink-faint); margin-top:14px;">Used on every surface as the primary accent. Champagne is the default — change only if the partner brand requires it.</div>
+                    </div>
+                    <div>
+                        <div class="eyebrow" style="margin-bottom:10px;">Display name on kiosk</div>
+                        <input asp-for="Branding.KioskDisplayName" type="text" style="width:100%;" />
+                        <div style="font-size:12px; color:var(--ink-faint); margin-top:8px;">Appears under the partner logo on the kiosk welcome screen.</div>
+                    </div>
+                    <div>
+                        <div class="eyebrow" style="margin-bottom:10px;">Receipt footer line</div>
+                        <input asp-for="Branding.ReceiptFooter" type="text" style="width:100%;" />
+                        <div style="font-size:12px; color:var(--ink-faint); margin-top:8px;">Printed on every cash-out receipt.</div>
+                    </div>
+                </div>
+                <div style="padding:0 22px 22px; display:flex; justify-content:flex-end; gap:8px;">
+                    <button type="submit" class="btn btn-primary btn-sm">Save branding</button>
+                </div>
+            </section>
+
+            <section class="card">
+                <header class="card-head"><div><h2 class="card-title">Live preview</h2><div class="card-meta" style="margin-top:6px;"><span>Kiosk welcome screen</span></div></div></header>
+                <div class="card-body">
+                    <div class="kiosk-preview" data-preview>
+                        <div class="kp-header">
+                            <img src="~/img/logo-mark-3d-opt.png" alt="logo" style="height:36px;" />
+                            <span style="font-family:var(--font-display); font-size:14px;">Gold <em style="color:var(--accent);">Kiosk</em></span>
+                        </div>
+                        <div class="kp-hero">
+                            <div class="kp-eyebrow">Welcome</div>
+                            <div class="kp-headline" data-preview-headline>@Model.Branding.KioskDisplayName.Split('·').FirstOrDefault()?.Trim()</div>
+                            <div class="kp-sub" data-preview-sub>@Model.Branding.KioskDisplayName</div>
+                            <button type="button" class="kp-cta">Start</button>
+                        </div>
+                        <div class="kp-foot" data-preview-foot>@Model.Branding.ReceiptFooter</div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </form>
+</section>
+
+<!-- ─── Features ──────────────────────────────────────────────────────── -->
+<section class="settings-panel" data-panel="features" style="@PanelStyle("features")">
+    <form asp-action="SaveFeatures" method="post" autocomplete="off">
+        @Html.AntiForgeryToken()
+        <section class="card">
+            <header class="card-head">
+                <div>
+                    <h2 class="card-title">Feature flags</h2>
+                    <div class="card-meta" style="margin-top:6px;"><span>@Model.Features.Count features available · @Model.Features.Count(f => f.Enabled) enabled</span></div>
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm">Save features</button>
+            </header>
+            <div class="feat-list">
+                @foreach (var f in Model.Features)
+                {
+                    <div class="feat-row">
+                        <div>
+                            <div class="feat-name">
+                                @f.DisplayName
+                                @if (!string.IsNullOrWhiteSpace(f.Tag))
+                                {
+                                    <span class="perm-tag @(f.TagIsWarn ? "warn" : "")">@f.Tag</span>
+                                }
+                            </div>
+                            <div class="feat-desc">@f.Description</div>
+                        </div>
+                        <label class="perm-toggle">
+                            <input type="checkbox"
+                                   name="flags[@f.Code]"
+                                   value="on"
+                                   @(f.Enabled ? "checked" : "") />
+                            <span>Enabled</span>
+                        </label>
+                    </div>
+                }
+            </div>
+        </section>
+    </form>
+</section>
+
+<!-- ─── Activation keys ───────────────────────────────────────────────── -->
+<section class="settings-panel" data-panel="keys" style="@PanelStyle("keys")">
+    <div class="kpi-strip">
+        <div class="kpi-cell"><div class="kpi-label">Live keys<span class="dot" style="background:var(--success);"></span></div><div class="kpi-value mono">@Model.Activation.LiveKeys</div><div class="kpi-foot"><span class="label-suffix">@(Model.Activation.LiveKeys == 0 ? "consumed at signup" : "ready to use")</span></div></div>
+        <div class="kpi-cell"><div class="kpi-label">Issued · all time<span class="dot"></span></div><div class="kpi-value mono">@Model.Activation.IssuedAllTime</div><div class="kpi-foot"><span class="label-suffix">@Model.Activation.ConsumedAllTime consumed, @Model.Activation.RevokedAllTime revoked</span></div></div>
+        <div class="kpi-cell"><div class="kpi-label">Days since onboarding<span class="dot"></span></div><div class="kpi-value mono">@Model.Activation.DaysSinceOnboarding</div><div class="kpi-foot"><span class="label-suffix">@(Model.Activation.LastConsumedAt is null ? "—" : "consumed " + Model.Activation.LastConsumedAt.Value.ToString("dd MMM HH:mm", inv))</span></div></div>
+        <div class="kpi-cell"><div class="kpi-label">Re-issue risk<span class="dot" style="background:var(--warning);"></span></div><div class="kpi-value">—</div><div class="kpi-foot"><span class="label-suffix">requires sales contact</span></div></div>
+    </div>
+
+    <div class="callout">
+        <span class="ico">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1L13 4V7C13 10.5 10.5 12.5 7 13C3.5 12.5 1 10.5 1 7V4L7 1Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+        </span>
+        <div class="body"><strong>Activation keys are one-time.</strong> Each key activates the primary admin account; subsequent users join via in-dashboard invitations. To onboard a second primary admin (rare — e.g. handover), request a re-issue from your Gold Kiosk account exec.</div>
+    </div>
+
+    <section class="card">
+        <header class="card-head">
+            <div>
+                <h2 class="card-title">Activation key history</h2>
+                <div class="card-meta" style="margin-top:6px;"><span>Immutable. Cleartext keys are never stored.</span></div>
+            </div>
+            <form asp-action="RequestKeyReissue" method="post" style="margin:0;">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="reason" value="primary-admin-handover" />
+                <button type="submit" style="background:transparent; border:none; font-size:13px; color:var(--accent); cursor:pointer; padding:0;">Request re-issue &rarr;</button>
+            </form>
+        </header>
+        <div style="overflow-x:auto;">
+            <table class="user-table">
+                <thead>
+                    <tr><th>Key prefix</th><th>Issued to</th><th>Issued</th><th>Expires</th><th>State</th><th>Source</th><th style="text-align:right; padding-right:22px;">Actions</th></tr>
+                </thead>
+                <tbody>
+                    @if (Model.Activation.History.Count == 0)
+                    {
+                        <tr><td colspan="7" style="text-align:center; color:var(--ink-faint); padding:32px 0;">No activation keys issued yet.</td></tr>
+                    }
+                    else
+                    {
+                        foreach (var k in Model.Activation.History)
+                        {
+                            var rowOpacity = (k.State == "Revoked" || k.State == "Expired") ? "opacity:0.6;" : "";
+                            string stateClass = k.State switch
+                            {
+                                "Consumed" => "s-active",
+                                "Revoked"  => "s-disabled",
+                                "Expired"  => "s-disabled",
+                                _          => "s-pending"
+                            };
+                            <tr style="@rowOpacity">
+                                <td class="mono">
+                                    <strong>@k.KeyPrefix</strong>-••••-••••
+                                    <span style="font-size:11px; color:var(--ink-faint);">sha256:@k.HashShort…</span>
+                                </td>
+                                <td>
+                                    <div style="font-weight:500;">@k.IssuedTo</div>
+                                    @if (!string.IsNullOrWhiteSpace(k.IssuedToName))
+                                    {
+                                        <div style="font-size:11px; color:var(--ink-faint);">@k.IssuedToName</div>
+                                    }
+                                </td>
+                                <td class="mono">@k.IssuedAt.ToString("dd MMM yyyy · HH:mm", inv)</td>
+                                <td class="mono" style="color:var(--ink-faint);">@k.ExpiresAt.ToString("dd MMM yyyy", inv)</td>
+                                <td>
+                                    <span class="status-pill @stateClass">@k.State</span>
+                                    @if (k.State == "Consumed" && k.ConsumedAt is not null)
+                                    {
+                                        <div style="font-size:11px; color:var(--ink-faint); margin-top:4px;">@k.ConsumedAt.Value.ToString("dd MMM · HH:mm", inv)@(string.IsNullOrWhiteSpace(k.ConsumedByName) ? "" : " by " + k.ConsumedByName)</div>
+                                    }
+                                    else if (k.State == "Revoked" && !string.IsNullOrWhiteSpace(k.RevokedReason))
+                                    {
+                                        <div style="font-size:11px; color:var(--ink-faint); margin-top:4px;">@k.RevokedReason</div>
+                                    }
+                                </td>
+                                <td><span class="role-pill r-analyst">@k.IssuedByActor</span></td>
+                                <td style="text-align:right; padding-right:22px;">
+                                    <a class="btn btn-ghost btn-sm" asp-controller="AuditLogs" asp-action="Index" asp-route-search="@k.Id">View audit</a>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+</section>
+
+<!-- ─── Billing ───────────────────────────────────────────────────────── -->
+<section class="settings-panel" data-panel="billing" style="@PanelStyle("billing")">
+    <div class="kpi-strip">
+        <div class="kpi-cell"><div class="kpi-label">Plan<span class="dot"></span></div><div class="kpi-value">@Model.Billing.PlanLabel</div><div class="kpi-foot"><span class="label-suffix">@Model.Billing.PlanTier</span></div></div>
+        <div class="kpi-cell"><div class="kpi-label">MRR<span class="dot" style="background:var(--success);"></span></div><div class="kpi-value"><span class="mono">@Model.Billing.MrrAed.ToString("N0", inv)</span><span class="unit">AED</span></div><div class="kpi-foot"><span class="delta delta-up">&#9650; <span class="mono">4,800</span></span><span class="label-suffix">on last kiosk add</span></div></div>
+        <div class="kpi-cell"><div class="kpi-label">Per-kiosk fee<span class="dot"></span></div><div class="kpi-value"><span class="mono">@Model.Billing.PerKioskFeeAed.ToString("N0", inv)</span><span class="unit">AED</span></div><div class="kpi-foot"><span class="label-suffix"><span class="mono">@Model.Billing.KioskCount</span> × <span class="mono">@Model.Billing.PerKioskFeeAed.ToString("N0", inv)</span> base</span></div></div>
+        <div class="kpi-cell"><div class="kpi-label">Next invoice<span class="dot" style="background:var(--info);"></span></div><div class="kpi-value"><span class="mono">@Model.Billing.DaysToNextInvoice</span><span class="unit">days</span></div><div class="kpi-foot"><span class="label-suffix">due @(Model.Billing.NextInvoiceDue?.ToString("d MMM", inv) ?? "—") · auto-debit</span></div></div>
+    </div>
+
+    <div class="split-2-1">
+        <section class="card">
+            <header class="card-head"><div><h2 class="card-title">Invoice history</h2></div><a href="#" style="font-size:13px; color:var(--accent);">View all &rarr;</a></header>
+            <div class="feed">
+                @foreach (var inv1 in Model.Billing.Invoices)
+                {
+                    <div class="feed-row" style="grid-template-columns:auto 1fr auto auto;">
+                        <span class="feed-code mono">@inv1.Code</span>
+                        <div class="feed-meta"><strong>@inv1.Description.Split('·').FirstOrDefault()?.Trim()</strong> · @string.Join(" · ", inv1.Description.Split('·').Skip(1).Select(s => s.Trim()))</div>
+                        <span class="feed-amount mono">AED @inv1.AmountAed.ToString("N0", inv)</span>
+                        <span class="status-pill @(inv1.Status == "pending" ? "s-pending" : "s-active")">@inv1.StatusLabel</span>
+                    </div>
+                }
+            </div>
+        </section>
+
+        <section class="card">
+            <header class="card-head"><div><h2 class="card-title">Payment method</h2></div></header>
+            <div class="card-body">
+                <div style="padding:16px; border:1px solid var(--line); border-radius:var(--radius-md); background:var(--canvas-sunken); margin-bottom:14px;">
+                    <div class="eyebrow" style="margin-bottom:8px;">Primary · auto-debit</div>
+                    <div style="font-family:var(--font-display); font-size:18px;" class="mono">@Model.Billing.PaymentMethodTitle</div>
+                    <div style="font-size:12px; color:var(--ink-faint); margin-top:2px;">@Model.Billing.PaymentMethodSub</div>
+                </div>
+                <button type="button" class="btn btn-ghost btn-sm" style="width:100%;">Change payment method</button>
+                <div style="margin-top:24px;">
+                    <div class="eyebrow" style="margin-bottom:10px;">Billing contact</div>
+                    <div style="font-size:14px;">@Model.Billing.BillingContactEmail</div>
+                    <div style="font-size:12px; color:var(--ink-faint); margin-top:2px;">@Model.Billing.BillingContactName</div>
+                </div>
+            </div>
+        </section>
+    </div>
+</section>
+
+<!-- ─── Compliance ────────────────────────────────────────────────────── -->
+<section class="settings-panel" data-panel="compliance" style="@PanelStyle("compliance")">
+    <form asp-action="SaveRetention" method="post" autocomplete="off">
+        @Html.AntiForgeryToken()
+        <div class="split-2-1">
+            <section class="card">
+                <header class="card-head">
+                    <div>
+                        <h2 class="card-title">Data retention</h2>
+                        <div class="card-meta" style="margin-top:6px;"><span>Drives PII auto-deletion + audit log retention</span></div>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm">Save retention</button>
+                </header>
+                <div class="card-body" style="display:grid; grid-template-columns:repeat(2, 1fr); gap:18px;">
+                    <div class="field">
+                        <label>Customer PII retention</label>
+                        <div class="seg seg-bordered" data-radio-group="pii">
+                            <button type="button" data-value="365"  class="@(Model.Retention.PiiRetentionDays == 365 ? "active" : "")">1 year</button>
+                            <button type="button" data-value="1095" class="@(Model.Retention.PiiRetentionDays == 1095 ? "active" : "")">3 years</button>
+                            <button type="button" data-value="1825" class="@(Model.Retention.PiiRetentionDays == 1825 ? "active" : "")">5 years</button>
+                            <button type="button" data-value="2555" class="@(Model.Retention.PiiRetentionDays == 2555 ? "active" : "")">7 years · DFSA</button>
+                        </div>
+                        <input type="hidden" asp-for="Retention.PiiRetentionDays" />
+                    </div>
+                    <div class="field">
+                        <label>Kiosk photo retention</label>
+                        <div class="seg seg-bordered" data-radio-group="photo">
+                            <button type="button" data-value="90"   class="@(Model.Retention.PhotoRetentionDays == 90 ? "active" : "")">90 days</button>
+                            <button type="button" data-value="180"  class="@(Model.Retention.PhotoRetentionDays == 180 ? "active" : "")">180 days</button>
+                            <button type="button" data-value="365"  class="@(Model.Retention.PhotoRetentionDays == 365 ? "active" : "")">1 year</button>
+                            <button type="button" data-value="1095" class="@(Model.Retention.PhotoRetentionDays == 1095 ? "active" : "")">3 years</button>
+                        </div>
+                        <input type="hidden" asp-for="Retention.PhotoRetentionDays" />
+                    </div>
+                    <div class="field">
+                        <label>Transaction record retention</label>
+                        <div class="seg seg-bordered" data-radio-group="tx">
+                            <button type="button" data-value="1825"  class="@(Model.Retention.TransactionRetentionDays == 1825 ? "active" : "")">5 years</button>
+                            <button type="button" data-value="2555"  class="@(Model.Retention.TransactionRetentionDays == 2555 ? "active" : "")">7 years · DFSA</button>
+                            <button type="button" data-value="36500" class="@(Model.Retention.TransactionRetentionDays == 36500 ? "active" : "")">10 years · forever</button>
+                        </div>
+                        <input type="hidden" asp-for="Retention.TransactionRetentionDays" />
+                    </div>
+                    <div class="field">
+                        <label>Audit log retention</label>
+                        <div class="seg seg-bordered" data-radio-group="audit">
+                            <button type="button" data-value="365"   class="@(Model.Retention.AuditRetentionDays == 365 ? "active" : "")">1 year</button>
+                            <button type="button" data-value="1095"  class="@(Model.Retention.AuditRetentionDays == 1095 ? "active" : "")">3 years</button>
+                            <button type="button" data-value="36500" class="@(Model.Retention.AuditRetentionDays == 36500 ? "active" : "")">7 years · forever</button>
+                        </div>
+                        <input type="hidden" asp-for="Retention.AuditRetentionDays" />
+                    </div>
+                </div>
+            </section>
+
+            <section class="card">
+                <header class="card-head"><div><h2 class="card-title">Regulatory posture</h2></div></header>
+                <div class="card-body">
+                    <dl class="fact-list">
+                        <div><dt>Primary regulator</dt><dd>@Model.Compliance.PrimaryRegulator</dd></div>
+                        <div><dt>Compliance frame</dt><dd>@Model.Compliance.ComplianceFrame</dd></div>
+                        <div><dt>AML licence on file</dt><dd>@(string.IsNullOrWhiteSpace(Model.Compliance.AmlLicence) ? "—" : "✓ " + Model.Compliance.AmlLicence)</dd></div>
+                        <div><dt>Lending licence</dt><dd>@(string.IsNullOrWhiteSpace(Model.Compliance.LendingLicence) ? "—" : "✓ " + Model.Compliance.LendingLicence)</dd></div>
+                        <div><dt>Crypto licence</dt><dd style="color:var(--ink-faint);">@(string.IsNullOrWhiteSpace(Model.Compliance.CryptoLicence) ? "— not requested" : "✓ " + Model.Compliance.CryptoLicence)</dd></div>
+                        <div><dt>Last compliance review</dt><dd class="mono">@(Model.Compliance.LastReviewOn?.ToString("yyyy-MM-dd", inv) ?? "—") · clean</dd></div>
+                        <div><dt>Next review due</dt><dd class="mono">@(Model.Compliance.NextReviewDue?.ToString("yyyy-MM-dd", inv) ?? "—")</dd></div>
+                    </dl>
+                </div>
+            </section>
+        </div>
+    </form>
+
+    <section class="card" style="margin-top:24px;">
+        <header class="card-head">
+            <div>
+                <h2 class="card-title">Data subject requests</h2>
+                <div class="card-meta" style="margin-top:6px;"><span>GDPR / PDPL / PDPA · 30-day SLA</span></div>
+            </div>
+            <button type="button" class="btn btn-ghost btn-sm">+ Log request</button>
+        </header>
+        <div class="feed">
+            @foreach (var dsr in Model.Compliance.DsrRequests)
+            {
+                var glyph = dsr.Status switch { "ok" => "✓", "pending" => "⏳", "fail" => "!", _ => "·" };
+                <div class="feed-row" style="grid-template-columns:auto 1fr auto auto;">
+                    <span class="feed-code mono">@dsr.Code</span>
+                    <div class="feed-meta"><strong>@dsr.Kind</strong> · customer @dsr.CustomerName · @dsr.AgeText</div>
+                    <span class="feed-amount" style="font-size:12px; color:var(--ink-faint);">@dsr.SlaText</span>
+                    <span class="feed-status @dsr.Status">@glyph</span>
+                </div>
+            }
+        </div>
+    </section>
+</section>
+
+@section Scripts {
+<script>
+    // Tab switching — preserves ?tab= in the URL so a soft reload keeps the active panel.
+    (function () {
+        var tabs   = document.querySelectorAll('.settings-tab');
+        var panels = document.querySelectorAll('.settings-panel');
+        tabs.forEach(function (t) {
+            t.addEventListener('click', function () {
+                var target = t.dataset.tab;
+                tabs.forEach(function (x) { x.classList.toggle('active', x.dataset.tab === target); });
+                panels.forEach(function (p) { p.style.display = p.dataset.panel === target ? '' : 'none'; });
+                try {
+                    var url = new URL(window.location.href);
+                    url.searchParams.set('tab', target);
+                    window.history.replaceState(null, '', url.toString());
+                } catch (e) { /* no-op */ }
+            });
+        });
+    })();
+
+    // Bind seg-bordered button groups to their adjacent hidden input.
+    (function () {
+        document.querySelectorAll('.seg-bordered[data-radio-group]').forEach(function (group) {
+            var hidden = group.parentElement.querySelector('input[type="hidden"]');
+            group.querySelectorAll('button[data-value]').forEach(function (b) {
+                b.addEventListener('click', function () {
+                    group.querySelectorAll('button').forEach(function (x) { x.classList.remove('active'); });
+                    b.classList.add('active');
+                    if (hidden) hidden.value = b.dataset.value;
+                });
+            });
+        });
+    })();
+
+    // Swatch picker → updates hidden field + repaints the live preview.
+    (function () {
+        var hex   = document.querySelector('input[name="Branding.AccentHex"]');
+        var box   = document.querySelector('[data-swatches]');
+        if (!hex || !box) return;
+        box.querySelectorAll('button.swatch[data-hex]').forEach(function (s) {
+            s.addEventListener('click', function () {
+                box.querySelectorAll('button.swatch').forEach(function (x) { x.classList.remove('active'); });
+                s.classList.add('active');
+                hex.value = s.dataset.hex;
+            });
+        });
+    })();
+
+    // Live preview — keep headline/sub/foot in sync as the user types.
+    (function () {
+        var dispInput  = document.querySelector('input[name="Branding.KioskDisplayName"]');
+        var footInput  = document.querySelector('input[name="Branding.ReceiptFooter"]');
+        var hl  = document.querySelector('[data-preview-headline]');
+        var sub = document.querySelector('[data-preview-sub]');
+        var ft  = document.querySelector('[data-preview-foot]');
+        if (dispInput && hl && sub) {
+            dispInput.addEventListener('input', function () {
+                var parts = dispInput.value.split('·');
+                hl.textContent  = (parts[0] || '').trim();
+                sub.textContent = dispInput.value;
+            });
+        }
+        if (footInput && ft) {
+            footInput.addEventListener('input', function () { ft.textContent = footInput.value; });
+        }
+    })();
+</script>
+}
+
+@section Head {
+<style>
+    /* ── Settings tabs ─────────────────────────────────────────────────── */
+    .settings-tabs { display:flex; gap:2px; border-bottom:1px solid var(--line); margin-bottom:28px; overflow-x:auto; }
+    .settings-tab  { padding:12px 18px; font-size:var(--fs-13); font-weight:500; color:var(--ink-faint); border:none; background:transparent; border-bottom:2px solid transparent; letter-spacing:var(--tracking-snug); transition:all var(--dur-fast); white-space:nowrap; cursor:pointer; }
+    .settings-tab:hover { color:var(--ink); }
+    .settings-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+    /* ── Bordered seg control (matches prototype) ──────────────────────── */
+    .seg.seg-bordered { border:1px solid var(--line-strong); border-radius:var(--radius-sm); display:inline-flex; overflow:hidden; }
+    .seg.seg-bordered button { border:none; background:transparent; padding:8px 14px; font-size:var(--fs-13); color:var(--ink-soft); cursor:pointer; border-right:1px solid var(--line); transition:background var(--dur-fast); white-space:nowrap; }
+    .seg.seg-bordered button:last-child { border-right:none; }
+    .seg.seg-bordered button.active { background:var(--ink); color:var(--canvas); }
+    .seg.seg-bordered button:hover:not(.active) { background:var(--canvas-elevated); color:var(--ink); }
+
+    /* ── Fact list ─────────────────────────────────────────────────────── */
+    .fact-list { display:flex; flex-direction:column; }
+    .fact-list > div { display:grid; grid-template-columns: 140px 1fr; gap:16px; padding:10px 0; border-bottom:1px solid var(--line); align-items:center; }
+    .fact-list > div:last-child { border-bottom:none; }
+    .fact-list dt { font-size:11px; text-transform:uppercase; letter-spacing:var(--tracking-wider); color:var(--ink-faint); font-weight:500; }
+    .fact-list dd { font-size:14px; color:var(--ink); margin:0; }
+
+    /* ── Branding ──────────────────────────────────────────────────────── */
+    .logo-drop { border:1px dashed var(--line-strong); border-radius:var(--radius-md); padding:24px; text-align:center; background:var(--canvas-sunken); }
+    .swatch    { width:36px; height:36px; border-radius:var(--radius-md); border:1px solid var(--line-strong); cursor:pointer; transition:transform var(--dur-fast); padding:0; }
+    .swatch:hover  { transform:scale(1.08); }
+    .swatch.active { box-shadow: 0 0 0 2px var(--canvas), 0 0 0 4px var(--accent); }
+
+    .kiosk-preview {
+        aspect-ratio: 9/16; max-width: 280px; margin: 0 auto;
+        border-radius: 22px;
+        background: linear-gradient(180deg, #fbfaf6 0%, #f4f2eb 100%);
+        border: 4px solid #0a0a0a;
+        box-shadow: 0 24px 48px rgba(0,0,0,0.18), inset 0 0 0 1px rgba(0,0,0,0.08);
+        padding: 28px 20px;
+        display: flex; flex-direction:column;
+        position: relative; overflow:hidden;
+    }
+    [data-theme="dark"] .kiosk-preview { background: linear-gradient(180deg, #1a1815 0%, #0a0a0a 100%); border-color: #1f1c18; }
+    .kp-header { display:flex; align-items:center; gap:8px; }
+    .kp-hero { flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; }
+    .kp-eyebrow { font-size:9px; text-transform:uppercase; letter-spacing:0.18em; color:var(--ink-faint); }
+    .kp-headline { font-family:var(--font-display); font-size:28px; font-weight:400; color:var(--accent); margin-top:8px; letter-spacing:var(--tracking-tight); }
+    .kp-sub { font-size:11px; color:var(--ink-soft); margin-top:6px; }
+    .kp-cta { margin-top:28px; padding:10px 28px; background: linear-gradient(180deg, var(--accent) 0%, var(--accent-hover) 100%); color:#fff; border:none; border-radius:var(--radius-full); font-size:13px; font-weight:500; box-shadow: 0 4px 12px var(--accent-ring); cursor:pointer; }
+    .kp-foot { font-size:8px; color:var(--ink-faint); text-align:center; }
+
+    /* ── Feature list ──────────────────────────────────────────────────── */
+    .feat-list { display:flex; flex-direction:column; }
+    .feat-row  { display:flex; justify-content:space-between; align-items:center; gap:24px; padding:18px 22px; border-bottom:1px solid var(--line); }
+    .feat-row:last-child { border-bottom:none; }
+    .feat-name { font-weight:500; font-size:14px; }
+    .feat-desc { font-size:12px; color:var(--ink-faint); margin-top:4px; line-height:1.5; }
+
+    .perm-toggle { display:inline-flex; align-items:center; gap:8px; font-size:12px; color:var(--ink-faint); cursor:pointer; }
+    .perm-toggle input { width:34px; height:20px; appearance:none; background:var(--canvas-sunken); border:1px solid var(--line-strong); border-radius:10px; position:relative; cursor:pointer; transition:background var(--dur-fast); flex-shrink:0; margin:0; }
+    .perm-toggle input::after { content:""; position:absolute; top:1px; left:1px; width:16px; height:16px; border-radius:50%; background:var(--canvas); box-shadow:0 1px 2px rgba(0,0,0,0.15); transition:left var(--dur-fast); }
+    .perm-toggle input:checked { background:var(--accent); border-color:var(--accent); }
+    .perm-toggle input:checked::after { left:15px; background:#fff; }
+    .perm-tag { font-family:var(--font-mono); font-size:10px; letter-spacing:0.04em; padding:1px 6px; border-radius:var(--radius-xs); background:var(--canvas-sunken); color:var(--ink-faint); margin-left:6px; text-transform:uppercase; }
+    .perm-tag.warn { background:var(--warning-soft); color:var(--warning); }
+</style>
+}

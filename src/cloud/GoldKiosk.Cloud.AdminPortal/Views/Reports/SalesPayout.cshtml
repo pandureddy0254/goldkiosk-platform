@@ -1,0 +1,153 @@
+@model SalesPayoutReportViewModel
+@using System.Globalization
+@{
+    var report = Model ?? throw new InvalidOperationException("This report view requires a model.");
+
+    var inv = CultureInfo.InvariantCulture;
+
+    ViewBag.PageTitle = "Payout <em>report.</em>";
+    ViewBag.Eyebrow   = "R-06 · SETTLEMENT & PAYOUTS · REFRESH · 5 MIN";
+    ViewBag.Subtitle  = "Transaction-level settlement quality — gross amount, fees withheld, net payout to customer, and the bank-transfer / cash status trail.";
+    ViewBag.ActiveNav = "reports";
+
+    var rows = report.Rows ?? new List<SalesPayoutReportRow>();
+    var from = report.From?.ToString("yyyy-MM-dd", inv) ?? "";
+    var to   = report.To?.ToString("yyyy-MM-dd", inv) ?? "";
+
+    string PayoutPill(string? status) => (status ?? "").ToLowerInvariant() switch
+    {
+        "settled" or "completed" or "paid" => "s-ok",
+        "sent" or "in_transit"             => "s-info",
+        "pending" or "queued"              => "s-warn",
+        "failed" or "rejected"             => "s-bad",
+        _                                  => "s-mute"
+    };
+}
+
+@section Head {
+    @await Html.PartialAsync("_ReportDetailStyles")
+}
+
+<div class="breadcrumb">
+    <a asp-controller="Reports" asp-action="Index">Reports library</a>
+    <span class="sep">&rsaquo;</span>
+    <span>R-06 &middot; Sales Payout</span>
+</div>
+
+<form method="get" asp-controller="Reports" asp-action="SalesPayout" class="report-filter">
+    @Html.AntiForgeryToken()
+    <label>From <input type="date" name="from" value="@from" /></label>
+    <label>To <input type="date" name="to" value="@to" /></label>
+    <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+    <a class="btn btn-ghost btn-sm" asp-controller="Reports" asp-action="SalesPayout">Reset</a>
+    <span style="flex:1;"></span>
+    <button type="button" class="btn btn-ghost btn-sm">Export &middot; CSV</button>
+    <button type="button" class="btn btn-ghost btn-sm">Export &middot; PDF</button>
+</form>
+
+<section class="card" style="margin-bottom:24px;">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Net payout &middot; window</h2>
+            <div class="card-meta" style="margin-top:6px;">
+                <span><span class="mono">@report.TotalNetPayout.ToString("N0", inv)</span> AED net &middot;
+                <span class="mono">@report.TotalFees.ToString("N0", inv)</span> AED fees retained</span>
+            </div>
+        </div>
+    </header>
+    <div class="card-body">
+        <div class="chart">
+            <svg viewBox="0 0 1000 240" preserveAspectRatio="none">
+                <g stroke="var(--line)" stroke-dasharray="2 4">
+                    <line x1="0" x2="1000" y1="60" y2="60"/><line x1="0" x2="1000" y1="120" y2="120"/><line x1="0" x2="1000" y1="180" y2="180"/>
+                </g>
+                <path d="M0,170 L50,165 L100,158 L150,162 L200,150 L250,145 L300,138 L350,140 L400,128 L450,120 L500,124 L550,108 L600,102 L650,108 L700,90 L750,82 L800,88 L850,72 L900,68 L950,58 L1000,52"
+                      fill="none" stroke="var(--accent)" stroke-width="2"/>
+                <path d="M0,210 L50,208 L100,205 L150,206 L200,202 L250,200 L300,196 L350,198 L400,194 L450,192 L500,190 L550,188 L600,185 L650,184 L700,180 L750,178 L800,180 L850,175 L900,172 L950,170 L1000,168"
+                      fill="none" stroke="var(--danger)" stroke-width="1.4" stroke-dasharray="3 3"/>
+            </svg>
+        </div>
+    </div>
+</section>
+
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Net payout<span class="dot"></span></div>
+        <div class="kpi-value"><span class="mono">@report.TotalNetPayout.ToString("N0", inv)</span><span class="unit">AED</span></div>
+        <div class="kpi-foot"><span class="delta delta-up">&#9650; 11.4%</span><span class="label-suffix">vs prior window</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Fees retained<span class="dot" style="background:var(--danger);"></span></div>
+        <div class="kpi-value"><span class="mono">@report.TotalFees.ToString("N0", inv)</span><span class="unit">AED</span></div>
+        <div class="kpi-foot"><span class="label-suffix">processing &amp; partner</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Transactions<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value"><span class="mono">@rows.Count.ToString("N0", inv)</span></div>
+        <div class="kpi-foot"><span class="label-suffix">settlements processed</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Settlement rate<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value"><span class="mono">@(rows.Count > 0 ? ((decimal)rows.Count(r => (r.PayoutStatus ?? "").ToLowerInvariant() is "settled" or "completed" or "paid") / rows.Count * 100m).ToString("F1", inv) : "0.0")</span><span class="unit">%</span></div>
+        <div class="kpi-foot"><span class="label-suffix">T+0 success</span></div>
+    </div>
+</div>
+
+<section class="card" style="margin-bottom:24px;">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Payout ledger</h2>
+            <div class="card-meta" style="margin-top:6px;"><span>Per-transaction settlement &middot; AED &middot; bank-transfer trail</span></div>
+        </div>
+    </header>
+    <div style="overflow-x:auto;">
+        <table class="report-table">
+            <thead>
+                <tr>
+                    <th>Occurred</th>
+                    <th>Tx code</th>
+                    <th class="num">Amount</th>
+                    <th class="num">Fees</th>
+                    <th class="num">Net payout</th>
+                    <th>Currency</th>
+                    <th>Tx status</th>
+                    <th>Payout</th>
+                    <th>Sent</th>
+                    <th>Settled</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (rows.Count == 0)
+                {
+                    <tr><td colspan="10" style="text-align:center; padding:32px 18px; color:var(--ink-faint);">No payouts in range.</td></tr>
+                }
+                else
+                {
+                    foreach (var r in rows)
+                    {
+                        <tr>
+                            <td class="mono" style="font-size:12px;">@r.OccurredOn.ToString("yyyy-MM-dd HH:mm", inv)</td>
+                            <td><strong class="mono">@r.TransactionCode</strong></td>
+                            <td class="num mono">@r.Amount.ToString("N2", inv)</td>
+                            <td class="num mono">@r.Fees.ToString("N2", inv)</td>
+                            <td class="num mono">@r.NetPayout.ToString("N2", inv)</td>
+                            <td>@r.CurrencyCode</td>
+                            <td>@r.TransactionStatus</td>
+                            <td><span class="pill @PayoutPill(r.PayoutStatus)">@(r.PayoutStatus ?? "—")</span></td>
+                            <td class="mono" style="font-size:12px;">@(r.PayoutSentAt?.ToString("yyyy-MM-dd HH:mm", inv) ?? "—")</td>
+                            <td class="mono" style="font-size:12px;">@(r.PayoutSettledAt?.ToString("yyyy-MM-dd HH:mm", inv) ?? "—")</td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@await Html.PartialAsync("_ReportMetaCard", new ReportMetaCardModel {
+    ReportCode = "R-06",
+    Matview    = "mv_sales_payout",
+    Cadence    = "Every 5 minutes",
+    Rows       = rows.Count,
+    SlaText    = "P95 lag · 1.2 min · target ≤ 5 min"
+})

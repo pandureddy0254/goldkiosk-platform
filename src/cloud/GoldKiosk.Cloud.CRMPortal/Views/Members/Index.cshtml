@@ -1,0 +1,142 @@
+@model IReadOnlyList<Profile>
+@{
+    ViewData["Title"] = "Members";
+    var flash = TempData["MemberFlash"] as string;
+    var error = TempData["MemberError"] as string;
+
+    int managers = Model.Count(p => p.Role == CrmRole.SalesManager);
+    int reps      = Model.Count(p => p.Role == CrmRole.SalesRep);
+    int admins    = Model.Count(p => p.Role == CrmRole.Superadmin);
+
+    string RoleCls(string role) => role switch
+    {
+        CrmRole.Superadmin   => "r-manager",
+        CrmRole.SalesManager => "r-manager",
+        _                    => "r-operator"
+    };
+    string RoleLabel(string role) => role switch
+    {
+        CrmRole.Superadmin   => "Superadmin",
+        CrmRole.SalesManager => "Sales Manager",
+        CrmRole.SalesRep     => "Sales Rep",
+        _                    => role
+    };
+}
+
+<div class="page-head">
+    <div class="page-title-block">
+        <div class="eyebrow">Administration · identity</div>
+        <h1 class="page-title">CRM <em>members.</em></h1>
+        <p class="page-subtitle">Superadmin-only · @Model.Count member@(Model.Count == 1 ? "" : "s") · create sales staff logins · passwords bcrypt-hashed in the database.</p>
+    </div>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(flash))
+{
+    <div class="card" style="border-color: rgba(57,135,86,0.35); background: rgba(57,135,86,0.06); margin-bottom:16px;">
+        <div class="card-body" style="display:flex; align-items:center; gap:10px;">
+            <span style="color:var(--success);">✓</span>
+            <span>@flash</span>
+        </div>
+    </div>
+}
+@if (!string.IsNullOrWhiteSpace(error))
+{
+    <div class="card" style="border-color: rgba(168,50,50,0.35); background: rgba(168,50,50,0.06); margin-bottom:16px;">
+        <div class="card-body" style="display:flex; align-items:center; gap:10px;">
+            <span style="color:var(--danger);">!</span>
+            <span>@error</span>
+        </div>
+    </div>
+}
+
+<div class="detail-rail">
+    <section style="display:flex; flex-direction:column; gap:16px;">
+        <section class="card">
+            <header class="card-head">
+                <div>
+                    <h2 class="card-title">Member roster</h2>
+                    <div class="card-meta" style="margin-top:6px;"><span>@managers manager@(managers == 1 ? "" : "s") · @reps rep@(reps == 1 ? "" : "s") · @admins superadmin@(admins == 1 ? "" : "s")</span></div>
+                </div>
+            </header>
+            <table class="user-table">
+                <thead><tr><th>Member</th><th>Role</th><th>Created</th></tr></thead>
+                <tbody>
+                @if (!Model.Any())
+                {
+                    <tr><td colspan="3" style="text-align:center; color:var(--ink-faint); padding:24px 0;">No members yet.</td></tr>
+                }
+                else
+                {
+                    foreach (var p in Model)
+                    {
+                        <tr>
+                            <td>
+                                <div class="user-cell">
+                                    <span class="avatar">@p.Initials</span>
+                                    <div class="meta">
+                                        <strong>@p.FullName</strong>
+                                        <span class="mono">@p.Email</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td><span class="role-pill @RoleCls(p.Role)">@RoleLabel(p.Role)</span></td>
+                            <td class="mono">@p.CreatedAt.ToString("dd MMM yyyy")</td>
+                        </tr>
+                    }
+                }
+                </tbody>
+            </table>
+        </section>
+    </section>
+
+    <section style="display:flex; flex-direction:column; gap:16px;">
+        <div class="card" id="create-member">
+            <header class="card-head">
+                <div>
+                    <h2 class="card-title">Create member</h2>
+                    <div class="card-meta" style="margin-top:6px;">Adds a sales_manager or sales_rep login. The password is hashed server-side via pgcrypto.</div>
+                </div>
+            </header>
+            <div class="card-body">
+                <form method="post" asp-action="Create" class="form-grid" style="grid-template-columns:1fr;">
+                    @Html.AntiForgeryToken()
+                    <div class="field">
+                        <label for="fullName">Full name</label>
+                        <input id="fullName" name="fullName" type="text" autocomplete="name" required />
+                    </div>
+                    <div class="field">
+                        <label for="email">Work email</label>
+                        <input id="email" name="email" type="email" autocomplete="email" placeholder="name@goldkiosk.com" required />
+                    </div>
+                    <div class="field">
+                        <label for="role">Role</label>
+                        <select id="role" name="role" required>
+                            <option value="sales_manager">Sales Manager</option>
+                            <option value="sales_rep" selected>Sales Rep</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="password">Temporary password</label>
+                        <input id="password" name="password" type="password" autocomplete="new-password" minlength="8" required />
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <button type="submit" class="btn btn-gold btn-sm">Create member</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="callout">
+            <div class="ico">i</div>
+            <div class="body">
+                <strong>Superadmin only.</strong> Only the bootstrap superadmin can mint CRM logins. Sales staff cannot self-onboard, and the partner-side RBAC roles live in the Admin Dashboard.
+            </div>
+        </div>
+    </section>
+</div>
+
+<footer class="crm-foot">
+    <span>Gold Kiosk · CRM · © AI Kiosks International Inc. 2026</span>
+    <span class="mono">members · @Model.Count internal · sso: managed · mfa: planned</span>
+</footer>

@@ -1,0 +1,85 @@
+@model IEnumerable<GoldKiosk.Cloud.CRMPortal.Models.Domain.SubscriptionPeriod>
+@{
+    ViewData["Title"] = "Invoices";
+    var subById  = (Dictionary<Guid, GoldKiosk.Cloud.CRMPortal.Models.Domain.Subscription>)(ViewBag.SubById ?? new Dictionary<Guid, GoldKiosk.Cloud.CRMPortal.Models.Domain.Subscription>());
+    var partners = (Dictionary<Guid, GoldKiosk.Cloud.CRMPortal.Models.Domain.Partner>)(ViewBag.Partners ?? new Dictionary<Guid, GoldKiosk.Cloud.CRMPortal.Models.Domain.Partner>());
+    var status   = (string)(ViewBag.Status ?? "all");
+
+    var rows  = Model.ToList();
+    var paid  = rows.Count(r => r.Status == "paid");
+    var pend  = rows.Count(r => r.Status == "pending");
+    var total = rows.Where(r => r.Status == "paid").Sum(r => r.Amount);
+    var ccyList = rows.Select(r => r.CurrencyCode).Distinct().ToList();
+    var ccy = ccyList.Count == 1 ? ccyList[0] : "mixed";
+}
+
+<div class="page-head">
+    <div class="page-title-block">
+        <div class="eyebrow">Billing · invoices</div>
+        <h1 class="page-title">Invoices <em>ledger.</em></h1>
+        <p class="page-subtitle">@paid paid · @pend pending · settled <span class="mono">@ccy @total.ToString("N0")</span> across @rows.Count rows.</p>
+    </div>
+</div>
+
+<div class="filter-bar">
+    <span class="filter-label">Status</span>
+    <a href="?status=all"     class="btn btn-ghost btn-sm @(status=="all"?"active":"")">All</a>
+    <a href="?status=pending" class="btn btn-ghost btn-sm @(status=="pending"?"active":"")">Pending</a>
+    <a href="?status=paid"    class="btn btn-ghost btn-sm @(status=="paid"?"active":"")">Paid</a>
+    <a href="?status=refunded" class="btn btn-ghost btn-sm @(status=="refunded"?"active":"")">Refunded</a>
+    <a href="?status=voided"  class="btn btn-ghost btn-sm @(status=="voided"?"active":"")">Voided</a>
+</div>
+
+<section class="card">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Invoice feed</h2>
+            <div class="card-meta" style="margin-top:6px;"><span>@rows.Count entries · newest first</span></div>
+        </div>
+    </header>
+    <div class="feed">
+        @if (!rows.Any())
+        {
+            <div class="feed-row"><div class="feed-meta">No invoices in this window.</div></div>
+        }
+        @foreach (var inv in rows)
+        {
+            subById.TryGetValue(inv.SubscriptionId, out var sub);
+            partners.TryGetValue(sub?.PartnerId ?? Guid.Empty, out var pp);
+            var pname = pp?.DisplayName ?? pp?.LegalName ?? "—";
+            string cls = inv.Status switch
+            {
+                "paid"     => "feed-status ok",
+                "pending"  => "feed-status pending",
+                "refunded" => "feed-status pending",
+                "voided"   => "feed-status fail",
+                _          => "feed-status pending"
+            };
+            string glyph = inv.Status switch
+            {
+                "paid"     => "✓",
+                "pending"  => "⏳",
+                "refunded" => "↺",
+                "voided"   => "!",
+                _          => "⏳"
+            };
+            <div class="feed-row">
+                <span class="feed-code">@(inv.ExternalInvoiceId ?? "—")</span>
+                <div class="feed-meta">
+                    <strong>@pname</strong> · @(sub?.PlanCode ?? "—") · @(sub?.BillingCycle ?? "—")
+                    <span class="secondary" style="margin-left:8px; color:var(--ink-faint);">
+                        @inv.PeriodStart.ToString("dd MMM yyyy") — @inv.PeriodEnd.ToString("dd MMM yyyy")
+                    </span>
+                </div>
+                <span class="feed-amount">@inv.CurrencyCode @inv.Amount.ToString("N0")</span>
+                <span class="@cls">@glyph</span>
+            </div>
+        }
+    </div>
+</section>
+
+<footer class="crm-foot">
+    <span>Gold Kiosk · CRM · © AI Kiosks International Inc. 2026</span>
+    @* TODO(GK-CRM-1): Stripe invoice ingestion not ported yet. *@
+    <span class="mono">invoices · source: subscription_periods · provider: stripe</span>
+</footer>

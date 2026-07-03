@@ -1,0 +1,142 @@
+@model WorthReportViewModel
+@using System.Globalization
+@{
+    var report = Model ?? throw new InvalidOperationException("This report view requires a model.");
+
+    var inv = CultureInfo.InvariantCulture;
+
+    ViewBag.PageTitle = "Worth <em>report.</em>";
+    ViewBag.Eyebrow   = "R-05 · INVENTORY MARK-TO-MARKET · POINT IN TIME";
+    ViewBag.Subtitle  = "Estimated worth of stock on hand at the chosen as-of date, marked against the latest LBMA / NSE spot rate per gram.";
+    ViewBag.ActiveNav = "reports";
+
+    var rows  = report.Rows ?? new List<WorthReportRow>();
+    var asOf  = report.AsOf.ToString("yyyy-MM-dd", inv) ?? "";
+}
+
+@section Head {
+    @await Html.PartialAsync("_ReportDetailStyles")
+}
+
+<div class="breadcrumb">
+    <a asp-controller="Reports" asp-action="Index">Reports library</a>
+    <span class="sep">&rsaquo;</span>
+    <span>R-05 &middot; Worth</span>
+</div>
+
+<form method="get" asp-controller="Reports" asp-action="Worth" class="report-filter">
+    @Html.AntiForgeryToken()
+    <label>As of <input type="date" name="asOf" value="@asOf" /></label>
+    <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+    <a class="btn btn-ghost btn-sm" asp-controller="Reports" asp-action="Worth">Reset</a>
+    <span style="flex:1;"></span>
+    <button type="button" class="btn btn-ghost btn-sm">Export &middot; CSV</button>
+    <button type="button" class="btn btn-ghost btn-sm">Export &middot; PDF</button>
+</form>
+
+<section class="card" style="margin-bottom:24px;">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Mark-to-market by metal</h2>
+            <div class="card-meta" style="margin-top:6px;">
+                <span><span class="mono">@report.TotalEstimatedWorth.ToString("N2", inv)</span> AED total worth &middot;
+                <span class="mono">@report.AsOf.ToString("yyyy-MM-dd", inv)</span> snapshot</span>
+            </div>
+        </div>
+    </header>
+    <div class="card-body">
+        <div class="chart">
+            <svg viewBox="0 0 1000 240" preserveAspectRatio="none">
+                @* Donut-style horizontal bar by metal *@
+                <g>
+                    <rect x="60" y="80" width="600" height="36" fill="var(--accent)" opacity="0.85"/>
+                    <rect x="660" y="80" width="180" height="36" fill="var(--info)" opacity="0.7"/>
+                    <rect x="840" y="80" width="100" height="36" fill="var(--ink-faint)" opacity="0.55"/>
+                </g>
+                <g font-family="var(--font-mono)" font-size="11" fill="var(--canvas)">
+                    <text x="80" y="103">Gold &middot; 22K / 21K / 18K</text>
+                    <text x="678" y="103">24K</text>
+                    <text x="858" y="103" fill="var(--ink)">Ag 999</text>
+                </g>
+                <g font-family="var(--font-mono)" font-size="10" fill="var(--ink-faint)">
+                    <text x="60" y="160">0</text>
+                    <text x="940" y="160" text-anchor="end">@report.TotalEstimatedWorth.ToString("N0", inv) AED</text>
+                </g>
+            </svg>
+        </div>
+    </div>
+</section>
+
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Total worth<span class="dot"></span></div>
+        <div class="kpi-value"><span class="mono">@report.TotalEstimatedWorth.ToString("N0", inv)</span><span class="unit">AED</span></div>
+        <div class="kpi-foot"><span class="label-suffix">mark-to-market</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Distinct metals<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value"><span class="mono">@rows.Count</span></div>
+        <div class="kpi-foot"><span class="label-suffix">in stock</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Total weight<span class="dot"></span></div>
+        <div class="kpi-value"><span class="mono">@rows.Sum(r => r.TotalWeightG).ToString("N0", inv)</span><span class="unit">g</span></div>
+        <div class="kpi-foot"><span class="label-suffix">on hand</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">As-of snapshot<span class="dot" style="background:var(--info);"></span></div>
+        <div class="kpi-value mono" style="font-size:24px;">@report.AsOf.ToString("dd MMM", inv)</div>
+        <div class="kpi-foot"><span class="label-suffix mono">@report.AsOf.ToString("yyyy-MM-dd", inv)</span></div>
+    </div>
+</div>
+
+<section class="card" style="margin-bottom:24px;">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Per-metal breakdown</h2>
+            <div class="card-meta" style="margin-top:6px;"><span>Spot rate &times; weight &middot; AED per gram</span></div>
+        </div>
+    </header>
+    <div style="overflow-x:auto;">
+        <table class="report-table">
+            <thead>
+                <tr>
+                    <th>Metal</th>
+                    <th>Avg carat</th>
+                    <th class="num">Weight (g)</th>
+                    <th class="num">Rate / g</th>
+                    <th class="num">Estimated worth</th>
+                    <th>Currency</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (rows.Count == 0)
+                {
+                    <tr><td colspan="6" style="text-align:center; padding:32px 18px; color:var(--ink-faint);">No inventory available.</td></tr>
+                }
+                else
+                {
+                    foreach (var r in rows)
+                    {
+                        <tr>
+                            <td><strong>@r.Metal</strong></td>
+                            <td class="mono">@(r.AvgCarat?.ToString("N2", inv) ?? "—")</td>
+                            <td class="num mono">@r.TotalWeightG.ToString("N3", inv)</td>
+                            <td class="num mono">@r.LatestRatePerGram.ToString("N2", inv)</td>
+                            <td class="num mono">@r.EstimatedWorth.ToString("N2", inv)</td>
+                            <td>@r.CurrencyCode</td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@await Html.PartialAsync("_ReportMetaCard", new ReportMetaCardModel {
+    ReportCode = "R-05",
+    Matview    = "vw_inventory_worth",
+    Cadence    = "Live view &middot; point-in-time",
+    Rows       = rows.Count,
+    SlaText    = "Rate freshness · LBMA latency ≤ 60s"
+})

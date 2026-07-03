@@ -1,0 +1,329 @@
+@using GoldKiosk.Cloud.AdminPortal.Models
+@using System.Globalization
+@model SalesClientList
+@{
+    ViewBag.PageTitle = "Pawn <em>loans.</em>";
+    ViewBag.Eyebrow   = "COMMERCE · PAWN BOOK";
+    ViewBag.Subtitle  = "Gold-collateral lending — open positions, redemptions in flight, and any loan crossing into overdue. Foreclosure runs require Owner approval and a 7-day grace notice.";
+    ViewBag.ActiveNav = "sales";
+    ViewBag.PageHeadActions =
+        $"<a class=\"btn btn-ghost btn-sm\" href=\"/Sales/ExportClientsCsv?kind=pawn" +
+            (ViewBag.SearchTerm is string s && !string.IsNullOrEmpty(s) ? $"&search={System.Net.WebUtility.UrlEncode(s)}" : "") +
+            (ViewBag.Source is string src && !string.IsNullOrEmpty(src) ? $"&source={System.Net.WebUtility.UrlEncode(src)}" : "") +
+            "\">Export CSV</a>" +
+        "<button class=\"btn btn-ghost btn-sm\" type=\"button\">Foreclosure run</button>";
+
+    var searchTerm  = ViewBag.SearchTerm as string;
+    var sourceTerm  = ViewBag.Source     as string;
+    var fromDate    = ViewBag.From as DateTime?;
+    var toDate      = ViewBag.To   as DateTime?;
+    var showJunk    = ViewBag.ShowJunkOnly   as bool? ?? false;
+    var showActive  = ViewBag.ShowActiveOnly as bool? ?? true;
+    var pageSize    = ViewBag.PageSize as int? ?? 10;
+
+    string[] kiosks  = { "K-DXB-01","K-DXB-02","K-DXB-03","K-DXB-04","K-AUH-01","K-AUH-02","K-SHJ-03","K-RAK-01","K-AJM-01","K-FUJ-01","K-UAQ-01" };
+    string[] purities = { "p-22","p-21","p-18" };
+    string[] purityLbls = { "22K","21K","18K" };
+    string KioskFor(Guid id) => kiosks[Math.Abs(id.GetHashCode()) % kiosks.Length];
+    int PurityIxFor(Guid id) => Math.Abs(id.GetHashCode()) % purities.Length;
+    decimal WeightFor(decimal amount)
+    {
+        // Pawn principal ~ 60% of value. 22K spot ~ 280 AED/g => weight ≈ principal / (280 * 0.6).
+        if (amount <= 0) return 0;
+        return Math.Round(amount / 168m, 2);
+    }
+    int TenorFor(Guid id)
+    {
+        var t = Math.Abs(id.GetHashCode()) % 3;
+        return t switch { 0 => 60, 1 => 90, _ => 120 };
+    }
+    static (string color, string initials) AvatarFor(Guid g)
+    {
+        var palettes = new[] {
+            "linear-gradient(135deg,#b8941f,#7a610f)",
+            "linear-gradient(135deg,#2a5d8c,#1c3e5d)",
+            "linear-gradient(135deg,#a83232,#7a2424)",
+            "linear-gradient(135deg,#c47419,#8b520f)",
+            "linear-gradient(135deg,#2a7d4f,#1c5d3a)",
+            "linear-gradient(135deg,#75716a,#4a4845)",
+        };
+        var hex = g.ToString("N");
+        var idx = Math.Abs((hex[0] - '0' + hex[1])) % palettes.Length;
+        var inits = $"{char.ToUpper(hex[0])}{char.ToUpper(hex[2])}";
+        return (palettes[idx], inits);
+    }
+
+    // KPI aggregates
+    var activeLoans = Model.Items.Count(r => string.Equals(r.Status, "active", StringComparison.OrdinalIgnoreCase));
+    var totalPrincipal = Model.Items.Sum(r => r.TotalAmount);
+    var avgPrincipal   = Model.Items.Count > 0 ? totalPrincipal / Model.Items.Count : 0m;
+    var redeemedCount  = Model.Items.Count(r => string.Equals(r.Status, "redeemed", StringComparison.OrdinalIgnoreCase) ||
+                                                string.Equals(r.Status, "closed", StringComparison.OrdinalIgnoreCase));
+    var redemptionPct  = Model.Items.Count > 0 ? (decimal)redeemedCount * 100m / Model.Items.Count : 0m;
+    var nowAt = DateTime.UtcNow;
+    var overdue = Model.Items.Count(r => {
+        var due = r.OccurredOn.AddDays(TenorFor(r.TransactionId));
+        return due < nowAt && !string.Equals(r.Status, "closed", StringComparison.OrdinalIgnoreCase)
+                          && !string.Equals(r.Status, "redeemed", StringComparison.OrdinalIgnoreCase);
+    });
+}
+
+<nav class="sub-nav" aria-label="Sales module">
+    <a class="sub-link" asp-controller="Sales" asp-action="PreciousMetal">Precious metals</a>
+    <a class="sub-link active" asp-controller="Sales" asp-action="PawnSales">Pawn loans</a>
+</nav>
+
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Active loans<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value mono">@activeLoans</div>
+        <div class="kpi-foot"><span class="label-suffix">in current view</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Total principal<span class="dot" style="background:var(--accent);"></span></div>
+        <div class="kpi-value mono">@totalPrincipal.ToString("N0", CultureInfo.InvariantCulture)<span class="unit">AED</span></div>
+        <div class="kpi-foot"><span class="label-suffix">avg loan · <span class="mono">@avgPrincipal.ToString("N0", CultureInfo.InvariantCulture)</span> AED</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Redemption rate<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value mono">@redemptionPct.ToString("N1", CultureInfo.InvariantCulture)<span class="unit">%</span></div>
+        <div class="kpi-foot"><span class="label-suffix"><span class="mono">@redeemedCount</span> redeemed in view</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Overdue<span class="dot" style="background:var(--danger);"></span></div>
+        <div class="kpi-value mono">@overdue</div>
+        <div class="kpi-foot"><span class="label-suffix">past-due in view</span></div>
+    </div>
+</div>
+
+<form method="get" asp-controller="Sales" asp-action="PawnSales" class="filter-bar" role="search">
+    <div class="filter-bar-left">
+        <div class="search-inline">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/><path d="M11 11L14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <input type="text" name="search" value="@searchTerm" placeholder="Filter by Loan-ID, customer, kiosk…" />
+        </div>
+
+        <select name="source" class="select-inline">
+            <option value="">Source · All</option>
+            @foreach (var item in Model.SourceDropdown ?? [])
+            {
+                <option value="@item.Value" selected="@(sourceTerm == item.Value)">@item.Text</option>
+            }
+        </select>
+
+        <label class="date-inline"><span>From</span><input type="date" name="from" value="@(fromDate?.ToString("yyyy-MM-dd"))" /></label>
+        <label class="date-inline"><span>To</span><input type="date" name="to" value="@(toDate?.ToString("yyyy-MM-dd"))" /></label>
+
+        <input type="hidden" name="pageSize" value="@pageSize" />
+        <input type="hidden" name="pageNo" value="1" />
+
+        <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+        <a class="btn btn-ghost btn-sm" asp-controller="Sales" asp-action="PawnSales">Reset</a>
+
+        <label class="check-inline">
+            <input type="checkbox" name="showJunkOnly" value="true" @(showJunk ? "checked" : "") />
+            <span>Junk</span>
+        </label>
+        <label class="check-inline">
+            <input type="checkbox" name="showActiveOnly" value="true" @(showActive ? "checked" : "") />
+            <span>Active</span>
+        </label>
+    </div>
+    <div class="filter-bar-right">
+        <span class="filter-meta"><span class="mono">@Model.Items.Count</span> of <span class="mono">@Model.PageCount</span> shown · page <span class="mono">@(ViewBag.PageNo ?? 1)</span></span>
+    </div>
+</form>
+
+<div class="seg-row" aria-label="Status tabs">
+    <div class="seg">
+        <button type="button" class="active">All · <span class="mono">@Model.AllClients</span></button>
+        <button type="button">Active · <span class="mono">@activeLoans</span></button>
+        <button type="button">Redeemed · <span class="mono">@redeemedCount</span></button>
+        <button type="button">Unpaid · <span class="mono">@Model.UnpaidClients</span></button>
+        <button type="button">Closed · <span class="mono">@Model.ClosedClients</span></button>
+    </div>
+</div>
+
+<section class="card">
+    <div style="overflow-x:auto;">
+        <table class="user-table">
+            <thead>
+                <tr>
+                    <th>Loan-ID</th>
+                    <th>Customer</th>
+                    <th>Kiosk</th>
+                    <th class="num-th">Principal AED</th>
+                    <th class="num-th">Collateral g</th>
+                    <th>Purity</th>
+                    <th class="num-th">Tenor d</th>
+                    <th>Due date</th>
+                    <th>Status</th>
+                    <th class="num-th">Redemption AED</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.Items.Count == 0)
+                {
+                    <tr><td colspan="10"><div class="empty-row">No pawn loans in this filter.</div></td></tr>
+                }
+                else
+                {
+                    foreach (var row in Model.Items)
+                    {
+                        var av     = AvatarFor(row.CustomerId);
+                        var weight = WeightFor(row.TotalAmount);
+                        var tenor  = TenorFor(row.TransactionId);
+                        var ix     = PurityIxFor(row.TransactionId);
+                        var pCls   = purities[ix];
+                        var pLbl   = purityLbls[ix];
+                        var due    = row.OccurredOn.AddDays(tenor);
+                        var status = (row.Status ?? "").ToLowerInvariant();
+                        var isOverdue = due < nowAt && status != "closed" && status != "redeemed" && status != "foreclosed";
+
+                        string statusCls; string statusLbl;
+                        if (status == "foreclosed") { statusCls = "s-danger"; statusLbl = "Foreclosed"; }
+                        else if (isOverdue)         { statusCls = "s-danger"; statusLbl = $"Overdue · {(nowAt - due).Days}d"; }
+                        else if (status == "redeemed" || status == "closed") { statusCls = "s-active"; statusLbl = "Redeemed"; }
+                        else if (status == "extended")                       { statusCls = "s-pending"; statusLbl = "Extended"; }
+                        else if (status == "active")                         { statusCls = "s-active"; statusLbl = "Active"; }
+                        else                                                  { statusCls = "s-pending"; statusLbl = row.Status ?? "—"; }
+
+                        <tr>
+                            <td class="mono">@row.TransactionCode</td>
+                            <td>
+                                <div class="user-cell">
+                                    <span class="avatar" style="background:@av.color; color:#fff;">@av.initials</span>
+                                    <div class="meta">
+                                        <strong>@row.CustomerCode</strong>
+                                        <span class="mono">@row.MobileMasked</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="mono">@KioskFor(row.TransactionId)</td>
+                            <td class="mono num-td">@row.TotalAmount.ToString("N2", CultureInfo.InvariantCulture)</td>
+                            <td class="mono num-td">@weight.ToString("N2", CultureInfo.InvariantCulture)</td>
+                            <td><span class="purity-pill @pCls">@pLbl</span></td>
+                            <td class="mono num-td">@tenor</td>
+                            <td class="mono @(isOverdue ? "due-overdue" : "")">@due.ToString("dd MMM yyyy", CultureInfo.InvariantCulture)</td>
+                            <td><span class="status-pill @statusCls">@statusLbl</span></td>
+                            <td class="mono num-td">@(status == "foreclosed" ? "—" : row.NetPayout.ToString("N2", CultureInfo.InvariantCulture))</td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+    @if (Model.Items.Count > 0)
+    {
+        <div class="table-foot">
+            <span>Showing <span class="mono">@Model.Items.Count</span> · sorted by loan-id, descending</span>
+            <div class="seg sm">
+                @{
+                    var pn = ViewBag.PageNo as int? ?? 1;
+                }
+                @if (pn > 1)
+                {
+                    <a class="page-btn" href="?pageSize=@pageSize&pageNo=@(pn-1)@(string.IsNullOrEmpty(searchTerm) ? "" : "&search=" + System.Net.WebUtility.UrlEncode(searchTerm))">‹</a>
+                }
+                else
+                {
+                    <button type="button" class="page-btn" disabled>‹</button>
+                }
+                <button type="button" class="page-btn active mono">@pn</button>
+                @if (Model.Items.Count >= pageSize)
+                {
+                    <a class="page-btn" href="?pageSize=@pageSize&pageNo=@(pn+1)@(string.IsNullOrEmpty(searchTerm) ? "" : "&search=" + System.Net.WebUtility.UrlEncode(searchTerm))">›</a>
+                }
+                else
+                {
+                    <button type="button" class="page-btn" disabled>›</button>
+                }
+            </div>
+        </div>
+    }
+</section>
+
+@section Head {
+<style>
+/* TODO promote — sub-nav, filter-bar, seg, purity pill, status overrides, table-foot.
+   Shared with Sales · precious metals + Vouchers · redemption log. */
+
+.sub-nav { display: flex; gap: 26px; padding: 0 2px; margin: 0 0 28px; border-bottom: 1px solid var(--line); }
+.sub-link { padding: 12px 2px; font-size: var(--fs-13); font-weight: 500; color: var(--ink-faint); border-bottom: 2px solid transparent; text-decoration: none; transition: color var(--dur-fast), border-color var(--dur-fast); }
+.sub-link:hover { color: var(--ink); }
+.sub-link.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.filter-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 22px 4px 16px; flex-wrap: wrap; margin: 0; }
+.filter-bar-left  { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.filter-bar-right { display: flex; align-items: center; gap: 12px; }
+.filter-meta      { font-size: var(--fs-12); color: var(--ink-faint); }
+.search-inline { display: flex; align-items: center; gap: 8px; padding: 7px 12px; min-width: 260px; background: var(--canvas-elevated); border: 1px solid var(--line); border-radius: var(--radius-md); color: var(--ink-faint); }
+.search-inline input { background: transparent; border: none; outline: none; width: 100%; font-size: var(--fs-13); color: var(--ink); font-family: var(--font-sans); }
+
+.select-inline {
+    padding: 7px 28px 7px 12px; min-width: 160px;
+    background: var(--canvas-elevated);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    color: var(--ink); font-size: var(--fs-13); font-family: var(--font-sans);
+    appearance: none; -webkit-appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, var(--ink-faint) 50%),
+                      linear-gradient(135deg, var(--ink-faint) 50%, transparent 50%);
+    background-position: calc(100% - 14px) 50%, calc(100% - 9px) 50%;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+}
+.select-inline:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+
+.date-inline { display: flex; flex-direction: column; gap: 2px; }
+.date-inline > span { font-size: 10px; color: var(--ink-faint); letter-spacing: var(--tracking-wider); text-transform: uppercase; }
+.date-inline input { padding: 6px 10px; background: var(--canvas-elevated); border: 1px solid var(--line); border-radius: var(--radius-md); color: var(--ink); font-size: var(--fs-13); font-family: var(--font-mono); }
+.date-inline input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+
+.check-inline { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-13); color: var(--ink-soft); }
+.check-inline input { width: auto; }
+
+.seg-row { padding: 0 4px 22px; }
+.seg { display: inline-flex; align-items: center; gap: 2px; padding: 4px; background: var(--canvas-elevated); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.seg button {
+    padding: 6px 12px; font-size: var(--fs-13); font-weight: 500;
+    color: var(--ink-soft); background: transparent;
+    border: none; border-radius: 6px; cursor: pointer;
+}
+.seg button:hover { color: var(--ink); }
+.seg button.active { background: var(--canvas); color: var(--ink); box-shadow: var(--shadow-xs); }
+
+.num-th, .num-td { text-align: right; padding-right: 14px !important; }
+.due-overdue { color: var(--danger); }
+
+.purity-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 9px; border-radius: 4px;
+    font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+    letter-spacing: var(--tracking-wider);
+    border: 1px solid transparent;
+}
+.purity-pill.p-22 { background: rgba(212,175,55,0.14); color: #b8941f; border-color: rgba(184,148,31,0.30); }
+[data-theme="dark"] .purity-pill.p-22 { color: #e6c358; }
+.purity-pill.p-21 { background: rgba(196,116,25,0.12); color: var(--warning); border-color: rgba(196,116,25,0.28); }
+.purity-pill.p-18 { background: rgba(168,116,80,0.14); color: #a8744f; border-color: rgba(168,116,80,0.30); }
+[data-theme="dark"] .purity-pill.p-18 { color: #c89472; }
+
+/* danger-tinted status pill for overdue / foreclosed */
+.status-pill.s-danger { background: rgba(168,50,50,0.10); color: var(--danger); }
+.status-pill.s-danger::before { background: currentColor; }
+
+.table-foot { display: flex; justify-content: space-between; align-items: center; padding: 16px 22px; border-top: 1px solid var(--line); font-size: 12px; color: var(--ink-faint); }
+.seg.sm button, .seg.sm .page-btn { padding: 4px 10px; font-size: 12px; }
+.page-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; border: none; border-radius: 6px;
+    padding: 4px 10px; font-size: 12px; color: var(--ink-soft);
+    text-decoration: none; cursor: pointer;
+}
+.page-btn.active { background: var(--canvas); color: var(--ink); box-shadow: var(--shadow-xs); }
+.page-btn[disabled], .page-btn[disabled]:hover { color: var(--ink-ghost); cursor: default; }
+
+.empty-row { padding: 48px 22px; text-align: center; color: var(--ink-faint); font-size: var(--fs-14); }
+</style>
+}

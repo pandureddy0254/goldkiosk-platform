@@ -1,0 +1,195 @@
+@model GoldKiosk.Cloud.AdminPortal.Models.KioskInventorySnapshotList
+@using System.Globalization
+@{
+    var inv = CultureInfo.InvariantCulture;
+
+    ViewBag.PageTitle = "Live <em>metals rates.</em>";
+    ViewBag.Eyebrow   = "MONITORING · PRECIOUS-METALS FEEDS";
+    ViewBag.Subtitle  = "Streaming spot prices for gold and silver, source-of-truth feeds, and the kiosk-level inventory snapshots driving working stock.";
+    ViewBag.ActiveNav = "monitoring";
+
+    var pageSize  = (int)(ViewBag.PageSize ?? 10);
+    var pageNo    = (int)(ViewBag.PageNo ?? 1);
+    var totalPage = Model?.TotalPage ?? 0;
+    var items     = Model?.Items ?? new List<GoldKiosk.Cloud.AdminPortal.Models.KioskInventorySnapshotViewModel>();
+    var searchTerm = (string?)ViewBag.SearchTerm;
+    var metalFilter = (string?)ViewBag.Metal;
+}
+
+@section Head {
+    <style>
+        /* TODO promote — monitoring page-scoped helpers */
+        .seg.seg-tabs { display:inline-flex; border:1px solid var(--line-strong); border-radius:var(--radius-md); overflow:hidden; background:var(--canvas-elevated); }
+        .seg.seg-tabs a { padding:8px 14px; font-size:13px; color:var(--ink-soft); border-right:1px solid var(--line); text-decoration:none; transition: all var(--dur-fast); }
+        .seg.seg-tabs a:last-child { border-right:none; }
+        .seg.seg-tabs a.active { background: var(--ink); color: var(--canvas); }
+        .seg.seg-tabs a:hover:not(.active) { background: var(--canvas-sunken); color: var(--ink); }
+        .rate-grid { display:grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 28px; }
+        @@media (max-width: 1180px) { .rate-grid { grid-template-columns: repeat(2, 1fr); } }
+        .rate-card { position:relative; background: var(--canvas-elevated); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 20px 22px; overflow:hidden; }
+        .rate-card::before { content:""; position:absolute; top:0; left:0; width: 40px; height:2px; background: var(--accent); }
+        .rate-head { display:flex; justify-content:space-between; align-items:center; font-size:11px; letter-spacing:0.14em; text-transform:uppercase; color:var(--ink-faint); margin-bottom:12px; }
+        .rate-name { display:flex; align-items:baseline; gap:10px; margin-bottom: 10px; }
+        .rate-name .purity { font-family: var(--font-mono); font-size:12px; padding: 2px 8px; background: var(--accent-soft); color: var(--accent); border-radius: var(--radius-xs); letter-spacing:0.06em; }
+        .rate-value { font-family: var(--font-mono); font-size: 38px; font-weight:500; letter-spacing:-0.01em; line-height:1.1; margin-bottom:4px; }
+        .rate-delta { font-family: var(--font-mono); font-size: 13px; margin-bottom: 10px; }
+        .rate-delta.delta-up span { color: var(--success); }
+        .rate-delta.delta-down span { color: var(--danger); }
+        .rate-delta.delta-flat span { color: var(--ink-faint); }
+        .rate-spark { width: 100%; height: 50px; display:block; opacity: 0.7; }
+    </style>
+}
+
+<!-- Monitoring sub-nav -->
+<div style="display:flex; justify-content:flex-end; margin-bottom:24px;">
+    <div class="seg seg-tabs">
+        <a asp-controller="Monitoring" asp-action="ApiHealthMonitoring">API health</a>
+        <a asp-controller="Monitoring" asp-action="ExceptionMonitoring">Exceptions</a>
+        <a asp-controller="Monitoring" asp-action="UserActivityLog">User activity</a>
+        <a class="active" asp-controller="Monitoring" asp-action="PreciousMetalMonitoring">Metals rates</a>
+    </div>
+</div>
+
+<!-- Rate cards -->
+<div class="rate-grid">
+    <div class="rate-card">
+        <div class="rate-head"><span class="rate-source">LBMA &middot; per gram &middot; AED</span><span class="dot-pulse" style="background:var(--accent);"></span></div>
+        <div class="rate-name"><span style="font-family:var(--font-display); font-size:22px;">Gold</span><span class="purity">24K</span></div>
+        <div class="rate-value mono">295.42</div>
+        <div class="rate-delta delta-down"><span>&#9660; 0.42 (&minus;0.14%)</span></div>
+        <svg class="rate-spark" viewBox="0 0 200 50" preserveAspectRatio="none"><path d="M0,28 L20,22 L40,25 L60,18 L80,22 L100,16 L120,24 L140,20 L160,28 L180,32 L200,38" fill="none" stroke="var(--danger)" stroke-width="1.6" stroke-linecap="round"/></svg>
+    </div>
+    <div class="rate-card">
+        <div class="rate-head"><span class="rate-source">LBMA &middot; per gram &middot; AED</span><span class="dot-pulse" style="background:var(--accent);"></span></div>
+        <div class="rate-name"><span style="font-family:var(--font-display); font-size:22px;">Gold</span><span class="purity">22K</span></div>
+        <div class="rate-value mono">270.80</div>
+        <div class="rate-delta delta-down"><span>&#9660; 0.38 (&minus;0.14%)</span></div>
+        <svg class="rate-spark" viewBox="0 0 200 50" preserveAspectRatio="none"><path d="M0,26 L20,20 L40,24 L60,17 L80,21 L100,15 L120,23 L140,19 L160,27 L180,31 L200,36" fill="none" stroke="var(--danger)" stroke-width="1.6" stroke-linecap="round"/></svg>
+    </div>
+    <div class="rate-card">
+        <div class="rate-head"><span class="rate-source">NSE &middot; per gram &middot; AED</span><span class="dot-pulse" style="background:var(--accent);"></span></div>
+        <div class="rate-name"><span style="font-family:var(--font-display); font-size:22px;">Gold</span><span class="purity">21K</span></div>
+        <div class="rate-value mono">258.40</div>
+        <div class="rate-delta delta-flat"><span>&plusmn; 0.00 (0.00%)</span></div>
+        <svg class="rate-spark" viewBox="0 0 200 50" preserveAspectRatio="none"><path d="M0,25 L20,24 L40,26 L60,22 L80,25 L100,23 L120,26 L140,24 L160,25 L180,24 L200,25" fill="none" stroke="var(--ink-faint)" stroke-width="1.6" stroke-linecap="round"/></svg>
+    </div>
+    <div class="rate-card">
+        <div class="rate-head"><span class="rate-source">Spot AED &middot; per gram</span><span class="dot-pulse" style="background:var(--accent);"></span></div>
+        <div class="rate-name"><span style="font-family:var(--font-display); font-size:22px;">Silver</span><span class="purity">999</span></div>
+        <div class="rate-value mono">3.62</div>
+        <div class="rate-delta delta-up"><span>&#9650; 0.04 (+1.12%)</span></div>
+        <svg class="rate-spark" viewBox="0 0 200 50" preserveAspectRatio="none"><path d="M0,38 L20,36 L40,34 L60,30 L80,32 L100,26 L120,24 L140,22 L160,20 L180,18 L200,16" fill="none" stroke="var(--success)" stroke-width="1.6" stroke-linecap="round"/></svg>
+    </div>
+</div>
+
+<!-- 30-day chart -->
+<section class="card" style="margin-bottom:32px;">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Rate history &middot; last 30 days</h2>
+            <div class="card-meta" style="margin-top:6px;"><span>AED per gram &middot; variance vs 30d mean</span></div>
+        </div>
+        <div style="display:flex; gap:6px;">
+            <button class="btn btn-ghost btn-sm" style="border-color:var(--accent); color:var(--accent);">Gold 24K</button>
+            <button class="btn btn-ghost btn-sm">Gold 22K</button>
+            <button class="btn btn-ghost btn-sm">Gold 21K</button>
+            <button class="btn btn-ghost btn-sm">Silver 999</button>
+        </div>
+    </header>
+    <div class="card-body">
+        <div class="chart">
+            <svg viewBox="0 0 800 280" preserveAspectRatio="none">
+                <defs>
+                    <linearGradient id="metalGrad" x1="0" x2="0" y1="0" y2="1">
+                        <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.32"/>
+                        <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/>
+                    </linearGradient>
+                </defs>
+                <g stroke="var(--line)" stroke-dasharray="2 4">
+                    <line x1="0" x2="800" y1="50" y2="50"/><line x1="0" x2="800" y1="120" y2="120"/><line x1="0" x2="800" y1="190" y2="190"/>
+                </g>
+                <path d="M0,180 L30,170 L60,165 L90,150 L120,160 L150,140 L180,145 L210,130 L240,135 L270,120 L300,110 L330,125 L360,105 L390,95 L420,90 L450,80 L480,85 L510,70 L540,75 L570,60 L600,55 L630,65 L660,50 L690,55 L720,40 L750,45 L780,35 L800,30 L800,280 L0,280 Z" fill="url(#metalGrad)"/>
+                <path d="M0,180 L30,170 L60,165 L90,150 L120,160 L150,140 L180,145 L210,130 L240,135 L270,120 L300,110 L330,125 L360,105 L390,95 L420,90 L450,80 L480,85 L510,70 L540,75 L570,60 L600,55 L630,65 L660,50 L690,55 L720,40 L750,45 L780,35 L800,30" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+                <circle cx="800" cy="30" r="5" fill="var(--canvas)" stroke="var(--accent)" stroke-width="2"/>
+                <circle cx="800" cy="30" r="2" fill="var(--accent)"/>
+                <g font-family="var(--font-mono)" font-size="10" fill="var(--ink-faint)">
+                    <text x="0" y="272">Apr 24</text><text x="200" y="272">May 02</text><text x="400" y="272">May 10</text><text x="600" y="272">May 18</text><text x="790" y="272" text-anchor="end">today</text>
+                    <text x="6" y="48">300</text><text x="6" y="118">285</text><text x="6" y="188">270</text>
+                </g>
+            </svg>
+        </div>
+    </div>
+</section>
+
+<!-- Kiosk inventory snapshots -->
+<section class="card" style="margin-bottom:32px;">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Kiosk inventory snapshots</h2>
+            <div class="card-meta" style="margin-top:6px;">
+                <span class="dot-pulse" style="background:var(--success);"></span>
+                <span>Captured by each kiosk on settle &middot; weight × purity</span>
+            </div>
+        </div>
+        <form method="get" asp-controller="Monitoring" asp-action="PreciousMetalMonitoring"
+              style="display:flex; gap:8px; align-items:center;">
+            <input type="text" name="search" value="@searchTerm" placeholder="Search kiosk code…"
+                   style="font-family:var(--font-mono); font-size:12px; padding:7px 10px; border:1px solid var(--line-strong); background:var(--canvas-elevated); color:var(--ink); border-radius:var(--radius-sm); min-width:200px;" />
+            <select name="metal" style="font-family:var(--font-sans); font-size:13px; padding:7px 10px; border:1px solid var(--line-strong); background:var(--canvas-elevated); color:var(--ink); border-radius:var(--radius-sm);">
+                <option value="">All metals</option>
+                @foreach (var item in (ViewBag.MetalDropdown as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>) ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>())
+                {
+                    <option value="@item.Value" selected="@(metalFilter == item.Value)">@item.Text</option>
+                }
+            </select>
+            <button type="submit" class="btn btn-ghost btn-sm">Search</button>
+        </form>
+    </header>
+    <div style="overflow-x:auto;">
+        <table class="user-table">
+            <thead>
+                <tr>
+                    <th>Kiosk</th>
+                    <th>Metal</th>
+                    <th style="text-align:right;">Weight (g)</th>
+                    <th style="text-align:right;">Carat</th>
+                    <th>Captured at</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (items.Count == 0)
+                {
+                    <tr><td colspan="5" style="text-align:center; padding:32px 18px; color:var(--ink-faint);">No inventory snapshots yet.</td></tr>
+                }
+                else
+                {
+                    foreach (var s in items)
+                    {
+                        <tr>
+                            <td class="mono"><strong>@s.KioskCode</strong></td>
+                            <td>@s.Metal</td>
+                            <td class="mono" style="text-align:right;">@s.WeightG.ToString("N3", inv)</td>
+                            <td class="mono" style="text-align:right;">@(s.Carat?.ToString("N2", inv) ?? "—")</td>
+                            <td class="mono" style="font-size:12px;">@s.CapturedAt.ToString("yyyy-MM-dd HH:mm:ss", inv)</td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (totalPage > 1)
+    {
+        <div style="padding:14px 18px; display:flex; justify-content:flex-end; gap:8px; border-top:1px solid var(--line);">
+            @if (pageNo > 1)
+            {
+                <a class="btn btn-ghost btn-sm" href="?pageSize=@pageSize&pageNo=@(pageNo-1)&search=@searchTerm&metal=@metalFilter">Previous</a>
+            }
+            <span class="mono" style="font-size:12px; color:var(--ink-faint); align-self:center;">Page @pageNo / @totalPage</span>
+            @if (pageNo < totalPage)
+            {
+                <a class="btn btn-ghost btn-sm" href="?pageSize=@pageSize&pageNo=@(pageNo+1)&search=@searchTerm&metal=@metalFilter">Next</a>
+            }
+        </div>
+    }
+</section>

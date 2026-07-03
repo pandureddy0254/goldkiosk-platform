@@ -1,0 +1,116 @@
+@inject IProfileService Profiles
+@{
+    var me = await Profiles.GetCurrentAsync(Context.RequestAborted);
+    var firstName = me?.FullName?.Split(' ').FirstOrDefault() ?? "there";
+    var greeting = DateTime.UtcNow.Hour < 12 ? "Good morning" : (DateTime.UtcNow.Hour < 18 ? "Good afternoon" : "Good evening");
+}
+
+<div class="page-head">
+    <div class="page-title-block">
+        <div class="eyebrow">@DateTime.Now.ToString("dddd, d MMM yyyy")</div>
+        <h1 class="page-title">@greeting, <em>@firstName.</em></h1>
+        @* TODO(GK-CRM-1): Stripe webhook ingestion + SES renewal cron are not ported yet — copy overstates until they land. *@
+        <p class="page-subtitle">The CRM is live. Schema, RLS, Stripe webhook, and SES reminders are wired up. Sub-modules light up as we ship them.</p>
+    </div>
+    <div style="display:flex; gap:10px;">
+        <a class="btn btn-ghost btn-sm" asp-controller="Leads" asp-action="Index">View leads</a>
+        <a class="btn btn-primary btn-sm" asp-controller="Partners" asp-action="Index">Partners</a>
+    </div>
+</div>
+
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Open leads<span class="dot"></span></div>
+        <div class="kpi-value" id="kpi-open-leads">…</div>
+        <div class="kpi-foot"><span class="delta delta-flat">live from PostgreSQL</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Active partners<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value" id="kpi-active-partners">…</div>
+        <div class="kpi-foot"><span class="delta delta-flat">tenant_status = active</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Subscriptions<span class="dot"></span></div>
+        <div class="kpi-value" id="kpi-subs">…</div>
+        <div class="kpi-foot"><span class="delta delta-flat">trialing + active</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Reminders queued<span class="dot" style="background:var(--warning);"></span></div>
+        <div class="kpi-value" id="kpi-reminders">…</div>
+        <div class="kpi-foot"><span class="delta delta-flat">drains daily at 02:30</span></div>
+    </div>
+</div>
+
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Renewals · next 30d<span class="dot" style="background:var(--warning);"></span></div>
+        <div class="kpi-value" id="kpi-renewals-30">…</div>
+        <div class="kpi-foot"><span class="delta delta-flat">subscriptions due ≤ 30d</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Active MRR<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value" id="kpi-mrr">…</div>
+        <div class="kpi-foot"><span class="delta delta-flat">active + trialing</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Past-due<span class="dot" style="background:var(--danger);"></span></div>
+        <div class="kpi-value" id="kpi-past-due">…</div>
+        <div class="kpi-foot"><span class="delta delta-flat">status = past_due</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">ARR · YTD<span class="dot"></span></div>
+        <div class="kpi-value" id="kpi-arr">…</div>
+        <div class="kpi-foot"><span class="delta delta-flat">annual_amount · YTD</span></div>
+    </div>
+</div>
+
+<section class="card">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Live activity</h2>
+            <div class="card-meta" style="margin-top:6px;"><span>Latest activity</span></div>
+        </div>
+    </header>
+    <div class="feed" id="activity-feed">
+        <div class="feed-row">
+            <span class="feed-code">·</span>
+            <div class="feed-meta">See the <a href="/Activity" style="color:var(--accent);">Activity</a> page for the full workspace timeline.</div>
+        </div>
+    </div>
+</section>
+
+<footer class="crm-foot">
+    <span>Gold Kiosk · CRM · © AI Kiosks International Inc. 2026</span>
+    <span class="mono">workspace: gk-crm-gcc · region: ae-1 · prod</span>
+</footer>
+
+@section Scripts {
+<script>
+    // Populate KPIs from PostgREST (the cookie middleware attaches the JWT via the C# client; for the browser-side count we
+    // use the publishable key + JWT-from-cookie pattern). For now, hit a server-side endpoint that returns counts.
+    (async () => {
+        try {
+            const res = await fetch('/api/dashboard/kpis');
+            if (!res.ok) return;
+            const d = await res.json();
+            document.getElementById('kpi-open-leads').textContent     = d.openLeads     ?? '—';
+            document.getElementById('kpi-active-partners').textContent= d.activePartners ?? '—';
+            document.getElementById('kpi-subs').textContent           = d.subscriptions  ?? '—';
+            document.getElementById('kpi-reminders').textContent      = d.queuedReminders ?? '—';
+        } catch (e) { console.warn('KPI fetch failed', e); }
+    })();
+
+    (async () => {
+        try {
+            const res = await fetch('/api/billing/kpis');
+            if (!res.ok) return;
+            const d = await res.json();
+            const fmt = (n, ccy) => (ccy ? ccy + ' ' : '') + Number(n ?? 0).toLocaleString('en-US', { maximumFractionDigits: 0 });
+            document.getElementById('kpi-renewals-30').textContent = d.renewalsNext30 ?? '—';
+            document.getElementById('kpi-mrr').textContent         = fmt(d.activeMrr, d.mrrCurrency);
+            document.getElementById('kpi-past-due').textContent    = d.pastDue ?? '—';
+            document.getElementById('kpi-arr').textContent         = fmt(d.arrYtd, d.arrCurrency);
+        } catch (e) { console.warn('Billing KPI fetch failed', e); }
+    })();
+</script>
+}

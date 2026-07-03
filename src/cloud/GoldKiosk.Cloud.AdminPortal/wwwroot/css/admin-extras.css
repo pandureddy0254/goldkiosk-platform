@@ -1,0 +1,230 @@
+/* ============================================================================
+   admin-extras.css — Razor-port-only additions to the design system.
+   These layer on top of main.css. Anything genuinely reusable should be
+   promoted into main.css after design review.
+   ============================================================================ */
+
+/* ── User chip popover (header) ───────────────────────────────────────── */
+.user-menu { position: relative; }
+.user-menu-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 240px;
+  background: var(--canvas);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: 6px;
+  z-index: 80;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: opacity var(--dur-fast), visibility var(--dur-fast), transform var(--dur-fast);
+}
+.user-menu.open .user-menu-popover {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+}
+.user-menu-head {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 6px;
+}
+.user-menu-head .avatar-lg { width: 40px; height: 40px; font-size: 13px; }
+.user-menu-name {
+  font-weight: 500;
+  font-size: var(--fs-14);
+  color: var(--ink);
+}
+.user-menu-role { margin-top: 4px; }
+.user-menu-item {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  font-size: var(--fs-13);
+  color: var(--ink-soft);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+.user-menu-item:hover { background: var(--canvas-sunken); color: var(--ink); }
+.user-menu-item svg { flex-shrink: 0; opacity: 0.7; }
+.user-menu-divider {
+  height: 1px;
+  background: var(--line);
+  margin: 6px 4px;
+}
+.user-menu-danger:hover {
+  background: var(--danger-soft) !important;
+  color: var(--danger) !important;
+}
+.user-menu-form { margin: 0; }
+
+/* ── Page footer pinned to bottom of <main> ───────────────────────────── */
+.app-footer {
+  margin-top: 48px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--fs-12);
+  color: var(--ink-faint);
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+/* ── Flash toasts (TempData) ──────────────────────────────────────────── */
+.flash {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 200;
+  padding: 14px 18px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  font-size: var(--fs-14);
+  font-weight: 500;
+  max-width: 380px;
+  animation: flash-in var(--dur-med) var(--ease-out-expo);
+}
+.flash-success {
+  background: var(--success);
+  color: #fff;
+}
+.flash-error {
+  background: var(--danger);
+  color: #fff;
+}
+@keyframes flash-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ── Validation summary (model errors) ────────────────────────────────── */
+.validation-summary {
+  margin-bottom: 22px;
+  padding: 14px 16px;
+  border: 1px solid rgba(168,50,50,0.3);
+  background: var(--danger-soft);
+  border-radius: var(--radius-md);
+  color: var(--danger);
+  font-size: var(--fs-13);
+}
+.validation-summary ul { margin: 0; padding-left: 18px; line-height: 1.6; }
+.field .field-validation-error {
+  display: block;
+  margin-top: 6px;
+  font-size: var(--fs-12);
+  color: var(--danger);
+}
+.field input.input-validation-error {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px var(--danger-soft);
+}
+
+/* ── Right-side drawer ─────────────────────────────────────────────────── */
+.drawer-backdrop {
+  position: fixed; inset: 0; z-index: 90;
+  background: rgba(10,10,10,0.42);
+  display: flex; justify-content: flex-end;
+  backdrop-filter: blur(2px);
+}
+/* display:flex above overrides the UA [hidden]{display:none} — re-enforce it */
+.drawer-backdrop[hidden] { display: none; }
+.drawer-panel {
+  width: min(480px, 100%);
+  background: var(--canvas);
+  border-left: 1px solid var(--line);
+  height: 100vh;
+  display: flex; flex-direction: column;
+  box-shadow: var(--shadow-lg);
+}
+.drawer-head {
+  padding: 22px 22px 18px;
+  border-bottom: 1px solid var(--line);
+  display: flex; justify-content: space-between; align-items: flex-start;
+}
+.drawer-title {
+  font-family: var(--font-display);
+  font-size: var(--fs-24);
+  margin: 4px 0 0;
+  letter-spacing: var(--tracking-snug);
+}
+.drawer-title em { font-style: italic; color: var(--accent); font-weight: 400; }
+.drawer-body { padding: 22px; overflow-y: auto; flex: 1; }
+.drawer-actions {
+  display: flex; gap: 10px; justify-content: flex-end;
+  margin-top: 18px; padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+/* ── Form fields (drawer / modal) ──────────────────────────────────────── */
+.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+.field label { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-faint); }
+.field input, .field select {
+  background: var(--canvas-sunken);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  font: 14px var(--font-sans);
+  color: var(--ink);
+  outline: none;
+  transition: border-color 180ms, box-shadow 180ms;
+}
+.field input:focus, .field select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+.field input[readonly] { background: var(--canvas-elevated); color: var(--ink-faint); }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.callout {
+  font-size: 13px; color: var(--ink-soft);
+  background: var(--warning-soft);
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+}
+
+/* ── Kiosk fleet table ─────────────────────────────────────────────────── */
+.kiosk-chip.chip-online  { background: var(--success-soft); color: var(--success); position: relative; padding-left: 18px; }
+.kiosk-chip.chip-offline { background: var(--danger-soft);  color: var(--danger);  position: relative; padding-left: 18px; }
+.kiosk-chip.chip-maint   { background: var(--warning-soft); color: var(--warning); position: relative; padding-left: 18px; }
+.kiosk-chip[class*="chip-"]::before {
+  content: ""; position: absolute; left: 8px; top: 50%; transform: translateY(-50%);
+  width: 6px; height: 6px; border-radius: 50%; background: currentColor;
+}
+.fleet-table tr[data-row-code] { cursor: default; }
+.fleet-table tr:hover td { background: var(--canvas-sunken); }
+.fleet-table .row-code { font-family: var(--font-mono); color: var(--accent); font-weight: 500; }
+.fleet-table .row-sub  { font-size: 11px; color: var(--ink-faint); margin-top: 2px; }
+
+/* ── Inline search inside filter toolbars ──────────────────────────────── */
+.inline-search {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--canvas-sunken);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  padding: 6px 10px;
+  color: var(--ink-faint);
+}
+.inline-search input {
+  background: transparent; border: none; outline: none;
+  font: 13px var(--font-sans); color: var(--ink);
+  min-width: 220px;
+}
+.inline-search input::placeholder { color: var(--ink-faint); }
+
+/* ── Table footer + pager ──────────────────────────────────────────────── */
+.table-foot {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 22px; border-top: 1px solid var(--line);
+  font-size: 12px; color: var(--ink-faint);
+}
+.pager { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.pager .btn[disabled] { opacity: 0.4; cursor: not-allowed; }

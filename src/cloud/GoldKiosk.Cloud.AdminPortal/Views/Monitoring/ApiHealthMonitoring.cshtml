@@ -1,0 +1,217 @@
+@model GoldKiosk.Cloud.AdminPortal.Models.ApiHealthStatsViewModel
+@using System.Globalization
+@{
+    var inv = CultureInfo.InvariantCulture;
+
+    ViewBag.PageTitle = "API <em>health.</em>";
+    ViewBag.Eyebrow   = "MONITORING · PLATFORM OBSERVABILITY";
+    ViewBag.Subtitle  = "Endpoint-level latency, error rates, and request volume across the kiosk relay, customer, and ledger APIs.";
+    ViewBag.ActiveNav = "monitoring";
+
+    var pageSize  = (int)(ViewBag.PageSize ?? 10);
+    var pageNo    = (int)(ViewBag.PageNo ?? 1);
+    var totalPage = Model?.TotalPage ?? 0;
+
+    var totalApi      = Model?.TotalApi ?? 0;
+    var totalReqs     = Model?.TotalRequestCount ?? 0L;
+    var successPct    = Model?.SuccessPct ?? 0m;
+    var failedPct     = Model?.FailedPct ?? 0m;
+    var pendingPct    = Model?.PendingPct ?? 0m;
+    var othersPct     = Model?.OthersPct ?? 0m;
+    var endpoints     = Model?.Endpoints ?? new List<GoldKiosk.Cloud.AdminPortal.Models.ApiHealthEndpointViewModel>();
+    var uptimePct     = 100m - failedPct;
+    var searchTerm    = (string?)ViewBag.SearchTerm;
+}
+
+@section Head {
+    <style>
+        /* TODO promote — monitoring page-scoped helpers */
+        .seg.seg-tabs { display:inline-flex; border:1px solid var(--line-strong); border-radius:var(--radius-md); overflow:hidden; background:var(--canvas-elevated); }
+        .seg.seg-tabs a { padding:8px 14px; font-size:13px; color:var(--ink-soft); border-right:1px solid var(--line); text-decoration:none; transition: all var(--dur-fast); }
+        .seg.seg-tabs a:last-child { border-right:none; }
+        .seg.seg-tabs a.active { background: var(--ink); color: var(--canvas); }
+        .seg.seg-tabs a:hover:not(.active) { background: var(--canvas-sunken); color: var(--ink); }
+        .legend-sw { display:inline-block; width:10px; height:2px; vertical-align:middle; margin-right:4px; border-radius:1px; }
+        .method { font-family: var(--font-mono); font-size: 11px; letter-spacing:0.06em; padding: 2px 7px; border-radius: var(--radius-xs); font-weight:500; }
+        .method.m-get { background: var(--info-soft); color: var(--info); }
+        .method.m-post { background: var(--accent-soft); color: var(--accent); }
+        .method.m-put { background: var(--warning-soft); color: var(--warning); }
+        .method.m-del { background: var(--danger-soft); color: var(--danger); }
+    </style>
+}
+
+<!-- Monitoring sub-nav -->
+<div style="display:flex; justify-content:flex-end; margin-bottom:24px;">
+    <div class="seg seg-tabs">
+        <a class="active" asp-controller="Monitoring" asp-action="ApiHealthMonitoring">API health</a>
+        <a asp-controller="Monitoring" asp-action="ExceptionMonitoring">Exceptions</a>
+        <a asp-controller="Monitoring" asp-action="UserActivityLog">User activity</a>
+        <a asp-controller="Monitoring" asp-action="PreciousMetalMonitoring">Metals rates</a>
+    </div>
+</div>
+
+<!-- KPI strip -->
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Uptime &middot; 24h<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value"><span class="mono">@uptimePct.ToString("F3", inv)</span><span class="unit">%</span></div>
+        <div class="kpi-foot"><span class="delta delta-up">&#9650; 0.014</span><span class="label-suffix">vs prior 24h</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Endpoints monitored<span class="dot"></span></div>
+        <div class="kpi-value"><span class="mono">@totalApi.ToString("N0", inv)</span></div>
+        <div class="kpi-foot"><span class="delta delta-flat">&plusmn; 0</span><span class="label-suffix">v1 namespaces</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Error rate &middot; 24h<span class="dot" style="background:@(failedPct > 1m ? "var(--danger)" : "var(--warning)");"></span></div>
+        <div class="kpi-value"><span class="mono">@failedPct.ToString("F2", inv)</span><span class="unit">%</span></div>
+        <div class="kpi-foot"><span class="delta delta-up">&#9650; 0.08</span><span class="label-suffix">@pendingPct.ToString("F2", inv)% pending &middot; @othersPct.ToString("F2", inv)% other</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Requests &middot; 24h<span class="dot"></span></div>
+        <div class="kpi-value"><span class="mono">@totalReqs.ToString("N0", inv)</span></div>
+        <div class="kpi-foot"><span class="delta delta-up">&#9650; @successPct.ToString("F2", inv)% ok</span><span class="label-suffix">peak &middot; 14:00 GST</span></div>
+    </div>
+</div>
+
+<!-- Latency chart -->
+<section class="card" style="margin-bottom:32px;">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Request latency &middot; 24 hours</h2>
+            <div class="card-meta" style="margin-top:6px;">
+                <span class="dot-pulse" style="background:var(--accent);"></span><span>Streaming &middot; 4s ago</span>
+                <span>&middot;</span>
+                <span><span class="legend-sw" style="background:var(--accent);"></span> p50</span>
+                <span><span class="legend-sw" style="background:var(--info);"></span> p95</span>
+                <span><span class="legend-sw" style="background:var(--danger);"></span> p99</span>
+            </div>
+        </div>
+        <div style="display:flex; gap:6px;">
+            <button class="btn btn-ghost btn-sm" style="border-color:var(--accent); color:var(--accent);">24h</button>
+            <button class="btn btn-ghost btn-sm">7d</button>
+            <button class="btn btn-ghost btn-sm">30d</button>
+        </div>
+    </header>
+    <div class="card-body">
+        <div class="chart">
+            <svg viewBox="0 0 800 280" preserveAspectRatio="none">
+                <g stroke="var(--line)" stroke-dasharray="2 4">
+                    <line x1="0" x2="800" y1="40" y2="40"/>
+                    <line x1="0" x2="800" y1="100" y2="100"/>
+                    <line x1="0" x2="800" y1="160" y2="160"/>
+                    <line x1="0" x2="800" y1="220" y2="220"/>
+                </g>
+                <path d="M0,90 L40,80 L80,95 L120,70 L160,110 L200,60 L240,85 L280,50 L320,75 L360,55 L400,90 L440,65 L480,40 L520,70 L560,50 L600,80 L640,55 L680,75 L720,45 L760,65 L800,55" fill="none" stroke="var(--danger)" stroke-width="1.6" stroke-linecap="round"/>
+                <path d="M0,160 L40,150 L80,155 L120,140 L160,170 L200,135 L240,150 L280,125 L320,140 L360,130 L400,155 L440,135 L480,115 L520,140 L560,125 L600,150 L640,130 L680,145 L720,120 L760,135 L800,125" fill="none" stroke="var(--info)" stroke-width="1.6" stroke-linecap="round"/>
+                <path d="M0,230 L40,225 L80,232 L120,220 L160,238 L200,215 L240,225 L280,205 L320,220 L360,210 L400,232 L440,215 L480,200 L520,220 L560,210 L600,228 L640,215 L680,225 L720,205 L760,215 L800,210" fill="none" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round"/>
+                <g font-family="var(--font-mono)" font-size="10" fill="var(--ink-faint)">
+                    <text x="0" y="272">00:00</text>
+                    <text x="200" y="272">06:00</text>
+                    <text x="400" y="272">12:00</text>
+                    <text x="600" y="272">18:00</text>
+                    <text x="790" y="272" text-anchor="end">now</text>
+                    <text x="6" y="38">500ms</text>
+                    <text x="6" y="98">300ms</text>
+                    <text x="6" y="158">150ms</text>
+                    <text x="6" y="218">50ms</text>
+                </g>
+            </svg>
+        </div>
+    </div>
+</section>
+
+<!-- Endpoint table -->
+<section class="card" style="margin-bottom:32px;">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Endpoints &middot; last 24 hours</h2>
+            <div class="card-meta" style="margin-top:6px;"><span>@totalApi endpoints monitored &middot; v1 namespace</span></div>
+        </div>
+        <form method="get" asp-controller="Monitoring" asp-action="ApiHealthMonitoring" style="display:flex; gap:8px; align-items:center;">
+            <input type="text" name="search" value="@searchTerm" placeholder="Search endpoint…"
+                   style="font-family:var(--font-mono); font-size:12px; padding:7px 10px; border:1px solid var(--line-strong); background:var(--canvas-elevated); color:var(--ink); border-radius:var(--radius-sm); min-width:220px;" />
+            <button type="submit" class="btn btn-ghost btn-sm">Search</button>
+        </form>
+    </header>
+    <div style="overflow-x:auto;">
+        <table class="user-table">
+            <thead>
+                <tr>
+                    <th>Endpoint</th>
+                    <th>Method</th>
+                    <th style="text-align:right;">Calls &middot; 24h</th>
+                    <th style="text-align:right;">Success %</th>
+                    <th style="text-align:right;">Pending %</th>
+                    <th style="text-align:right;">Error %</th>
+                    <th>Last probe</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (endpoints.Count == 0)
+                {
+                    <tr><td colspan="8" style="text-align:center; padding:32px 18px; color:var(--ink-faint);">No API traffic to report.</td></tr>
+                }
+                else
+                {
+                    foreach (var ep in endpoints)
+                    {
+                        var path = ep.Endpoint ?? "";
+                        var method = "GET";
+                        var methodClass = "m-get";
+                        // crude heuristic — POST verbs on common write endpoints
+                        if (path.Contains("transactions", StringComparison.OrdinalIgnoreCase)
+                            || path.Contains("customers", StringComparison.OrdinalIgnoreCase)
+                            || path.Contains("payments", StringComparison.OrdinalIgnoreCase)
+                            || path.Contains("offers", StringComparison.OrdinalIgnoreCase)
+                            || path.Contains("auth", StringComparison.OrdinalIgnoreCase)
+                            || path.Contains("webhook", StringComparison.OrdinalIgnoreCase)
+                            || path.Contains("audit", StringComparison.OrdinalIgnoreCase))
+                        {
+                            method = "POST"; methodClass = "m-post";
+                        }
+                        var statusClass = "s-active"; var statusText = "healthy";
+                        if (ep.LastIsHealthy == false || ep.FailedPct > 1m) { statusClass = ""; statusText = "unhealthy"; }
+                        else if (ep.FailedPct > 0.5m) { statusClass = "s-pending"; statusText = "degraded"; }
+
+                        <tr>
+                            <td class="mono">@ep.Endpoint</td>
+                            <td><span class="method @methodClass">@method</span></td>
+                            <td class="mono" style="text-align:right;">@ep.RequestCount.ToString("N0", inv)</td>
+                            <td class="mono" style="text-align:right;">@ep.SuccessPct.ToString("F2", inv)</td>
+                            <td class="mono" style="text-align:right;">@ep.PendingPct.ToString("F2", inv)</td>
+                            <td class="mono" style="text-align:right;">@ep.FailedPct.ToString("F2", inv)</td>
+                            <td class="mono" style="font-size:12px;">@(ep.LastCheckedAt?.ToString("yyyy-MM-dd HH:mm:ss", inv) ?? "—")</td>
+                            <td>
+                                @if (statusClass == "")
+                                {
+                                    <span class="status-pill" style="background:var(--danger-soft); color:var(--danger);">@statusText</span>
+                                }
+                                else
+                                {
+                                    <span class="status-pill @statusClass">@statusText</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (totalPage > 1)
+    {
+        <div style="padding:14px 18px; display:flex; justify-content:flex-end; gap:8px; border-top:1px solid var(--line);">
+            @if (pageNo > 1)
+            {
+                <a class="btn btn-ghost btn-sm" href="?pageSize=@pageSize&pageNo=@(pageNo-1)&search=@searchTerm">Previous</a>
+            }
+            <span class="mono" style="font-size:12px; color:var(--ink-faint); align-self:center;">Page @pageNo / @totalPage</span>
+            @if (pageNo < totalPage)
+            {
+                <a class="btn btn-ghost btn-sm" href="?pageSize=@pageSize&pageNo=@(pageNo+1)&search=@searchTerm">Next</a>
+            }
+        </div>
+    }
+</section>

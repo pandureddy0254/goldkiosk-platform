@@ -1,0 +1,218 @@
+/* ============================================================
+   Responsive overrides — tablet + mobile.
+
+   Desktop styles live in main.css; this file only kicks in
+   below 1024px to collapse the sidebar into a slide-in drawer,
+   tighten the header, wrap filter bars, and let tables scroll
+   horizontally instead of breaking the grid.
+
+   Rules:
+   - Token-only colour references. Never raw hex.
+   - Never touches main.css selectors with structural !important
+     unless we explicitly need to override a tightly-bound rule.
+   - Mobile-first additions live here; the base (desktop) cascade
+     in main.css is left intact above the breakpoint.
+   ============================================================ */
+
+/* ---------- Hamburger button (header) ---------- */
+.hamburger {
+    display: none;                       /* visible only on tablet/mobile */
+    background: transparent;
+    border: 0;
+    padding: 8px;
+    margin-right: 4px;
+    cursor: pointer;
+    color: var(--ink);
+    border-radius: var(--radius-sm);
+    line-height: 0;
+}
+.hamburger:hover { background: var(--canvas-sunken); }
+.hamburger svg   { display: block; }
+
+/* ---------- Sidebar backdrop (drawer overlay) ---------- */
+.sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 90;
+}
+body.sidebar-open .sidebar-backdrop { display: block; }
+
+/* ============================================================
+   Tablet and below (max-width: 1023px)
+   ============================================================ */
+@media (max-width: 1023px) {
+    .hamburger {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Layout collapses to single column; header stays full-width,
+       main content fills below it. Sidebar is taken out of the grid
+       and absolutely positioned as a drawer. */
+    .app {
+        grid-template-columns: 1fr;
+        grid-template-rows: var(--header-h) 1fr;
+        grid-template-areas:
+            "header"
+            "main";
+    }
+    .app > .header  { grid-area: header; }
+    .app > .main    { grid-area: main; }
+
+    /* Sidebar becomes a slide-in drawer below the header.
+       Note: main.css has `.sidebar { display: none; }` at ≤ 760px — we
+       restore display:block here so the drawer can render at all viewport sizes
+       below the desktop breakpoint. */
+    .sidebar {
+        display: block !important;
+        position: fixed;
+        top: var(--header-h);
+        left: 0;
+        height: calc(100vh - var(--header-h));
+        width: min(var(--sidebar-w), 88vw);
+        z-index: 100;
+        transform: translateX(-100%);
+        transition: transform 0.22s ease;
+        box-shadow: var(--shadow-md);
+        background: var(--canvas-sunken);
+        overflow-y: auto;
+    }
+    body.sidebar-open .sidebar { transform: translateX(0); }
+
+    /* Header re-flows: hamburger | brand | flex spacer | actions */
+    .header { padding: 0 16px; gap: 10px; }
+    .header .search { display: none; }   /* search input hidden — use icon if needed in v2 */
+    .brand-suffix    { display: none; }   /* hide the "CRM · Internal sales portal" tagline */
+    .brand-name      { gap: 0; }
+
+    /* Main content tighter side padding */
+    .main { padding: 16px; }
+
+    /* Tables: let them scroll horizontally instead of breaking the layout */
+    .data-table {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        max-width: 100%;
+    }
+    .data-table thead, .data-table tbody { display: table; width: 100%; min-width: 720px; }
+
+    /* KPI strips/grids collapse to 2 columns */
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .kpi-strip { flex-wrap: wrap; }
+    .kpi-strip .kpi-cell {
+        flex: 1 1 calc(50% - 8px);
+        min-width: 0;
+    }
+
+    /* Split layouts → single column on tablet */
+    .split-2-1, .split-1-2 { grid-template-columns: 1fr; }
+    .detail-rail           { grid-template-columns: 1fr; }
+
+    /* Page head wraps — title block on top, action buttons drop below */
+    .page-head { flex-wrap: wrap; gap: 12px; }
+    .page-head > * { min-width: 0; }
+
+    /* Filter bars wrap */
+    .filter-bar       { flex-wrap: wrap; gap: 8px; }
+    .filter-bar input,
+    .filter-bar select { flex: 1 1 180px; min-width: 0; }
+
+    /* Kanban: horizontal scroll instead of overflow */
+    .kanban {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scroll-snap-type: x mandatory;
+    }
+    .kb-col {
+        min-width: 240px;
+        scroll-snap-align: start;
+    }
+
+    /* Modals fit viewport */
+    .modal-overlay  { padding: 12px; align-items: flex-start; }
+    .modal          { max-width: 100% !important; width: 100%; max-height: 92vh; }
+    .modal-body     { max-height: 70vh; overflow-y: auto; }
+
+    /* Side drawers shrink to viewport */
+    .drawer { width: min(420px, 92vw); }
+
+    /* Popovers anchored within viewport, not overflowing right edge */
+    .user-menu-panel, .notif-panel {
+        right: 8px;
+        max-width: calc(100vw - 16px);
+    }
+}
+
+/* ============================================================
+   Mobile (max-width: 767px)
+   ============================================================ */
+@media (max-width: 767px) {
+    /* Compact header controls */
+    .icon-btn { padding: 4px; }
+    .theme-toggle { padding: 4px; }
+    .user-chip {
+        padding: 4px 8px;
+        gap: 6px;
+        font-size: 12px;
+    }
+    .user-chip .label { display: none; }     /* avatar + chevron only */
+    .user-chip .chevron { width: 10px; height: 10px; }
+
+    /* Brand wordmark compacts; show only "Gold Kiosk" not the suffix */
+    .brand-primary { font-size: 15px; }
+
+    /* KPI grid → 1 column for narrow screens */
+    .kpi-grid { grid-template-columns: 1fr; }
+    .kpi-strip .kpi-cell { flex: 1 1 100%; }
+
+    /* Filter bar — each control on its own row */
+    .filter-bar input,
+    .filter-bar select,
+    .filter-bar .filter-label { flex: 1 1 100%; }
+
+    /* Page title softer scaling */
+    .page-title    { font-size: 22px; line-height: 1.15; }
+    .page-subtitle { font-size: 13px; }
+
+    /* Tighten card spacing */
+    .card          { padding: 12px; }
+    .card-head     { gap: 8px; }
+    .card-title    { font-size: 14px; }
+
+    /* Form grid inside modals → 1 column */
+    .form-grid { grid-template-columns: 1fr; }
+    .field.full { grid-column: auto; }
+
+    /* Popovers: panel takes near-full width and slides down from header */
+    .user-menu-panel, .notif-panel {
+        right: 8px;
+        left: 8px;
+        width: auto;
+        max-width: none;
+    }
+
+    /* Footer of pages */
+    .crm-foot {
+        flex-direction: column;
+        gap: 4px;
+        align-items: flex-start;
+        font-size: 11px;
+    }
+
+    /* Sidebar drawer can take the full screen width comfortably on phones */
+    .sidebar { width: min(280px, 86vw); }
+}
+
+/* ============================================================
+   Touch / no-hover devices: bigger tap targets
+   ============================================================ */
+@media (hover: none) and (pointer: coarse) {
+    .nav-link, .btn, .icon-btn, .theme-toggle, .hamburger {
+        min-height: 40px;
+    }
+    .row-link { padding: 4px 0; display: inline-block; }
+}

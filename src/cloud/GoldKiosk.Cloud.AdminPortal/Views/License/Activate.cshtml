@@ -1,0 +1,129 @@
+@using GoldKiosk.Cloud.AdminPortal.Services.Licensing
+@model GoldKiosk.Cloud.AdminPortal.Models.Licensing.LicenseActivationViewModel
+@{
+    Layout = "~/Views/Shared/_LoginLayout.cshtml";
+    ViewBag.Title = "Activate licence";
+    var existing = ViewData["ExistingLicense"] as License;
+}
+
+<div class="login-shell">
+
+    <!-- ============== LEFT: editorial hero ============== -->
+    <aside class="login-art">
+        <div class="filigree"></div>
+
+        <div class="corner-mark">
+            <span>CRM · cryptographic licence · offline verify</span>
+        </div>
+
+        <div class="login-art-top">
+            <span class="brand-mark"></span>
+            <div class="wordmark">
+                Gold <em>Kiosk</em>
+                <span class="corp">Operator portal · partner activation</span>
+            </div>
+        </div>
+
+        <div class="kiosk-hero">
+            <img src="~/img/kiosk-hero.png" alt="Gold Kiosk · precious-metals self-service terminal" />
+            <span class="shimmer"></span>
+        </div>
+
+        <div class="hero-tag t1"><span class="dot"></span><span class="line"></span><span>Ed25519 · offline</span></div>
+        <div class="hero-tag t2"><span>Per-tenant entitlements</span><span class="line"></span><span class="dot"></span></div>
+        <div class="hero-tag t3"><span class="dot"></span><span class="line"></span><span>Air-gap supported</span></div>
+
+        <div class="login-art-stats">
+            <div class="login-art-stat">
+                <div class="num">256</div>
+                <div class="lbl">bit signature</div>
+            </div>
+            <div class="login-art-stat">
+                <div class="num">∞</div>
+                <div class="lbl">Offline verifications</div>
+            </div>
+            <div class="login-art-stat">
+                <div class="num">1h</div>
+                <div class="lbl">Revocation refresh</div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ============== RIGHT: activation form ============== -->
+    <main class="login-form-shell">
+        <div class="login-form">
+
+            <form class="auth-panel"
+                  asp-controller="License"
+                  asp-action="Activate"
+                  method="post"
+                  autocomplete="off"
+                  novalidate>
+                @Html.AntiForgeryToken()
+
+                <div class="eyebrow">Bind a licence to this dashboard</div>
+                <h1 style="font-family:var(--font-display); font-size:var(--fs-40); font-weight:400; letter-spacing:var(--tracking-tight); margin:12px 0 12px; line-height:1.04;">
+                    Activate your <em style="font-style:italic; color:var(--accent); font-weight:400;">licence.</em>
+                </h1>
+                <p class="lede" style="color:var(--ink-faint); margin-bottom:24px; font-size:var(--fs-15);">
+                    Paste the <strong style="color:var(--ink); font-weight:500;">AIKI-</strong> licence token from your activation email.
+                    The dashboard verifies it locally against the CRM's public key — no credentials, no network round-trip per request.
+                </p>
+
+                @if (existing is not null)
+                {
+                    <div class="callout" style="margin-bottom:20px;">
+                        <span class="ico">
+                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1L13 4V7C13 10.5 10.5 12.5 7 13C3.5 12.5 1 10.5 1 7V4L7 1Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M5 7L6.5 8.5L9 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </span>
+                        <div class="body">
+                            <strong>@existing.LegalName</strong> is currently licensed
+                            (plan&nbsp;<span class="mono">@existing.PlanCode</span> ·
+                            @existing.KioskCap kiosks · expires @existing.ExpiresOn.ToString("dd MMM yyyy")).
+                            Pasting a new token replaces it.
+                        </div>
+                    </div>
+                }
+
+                @if (ViewData.ModelState.ErrorCount > 0)
+                {
+                    <div class="validation-summary" role="alert">
+                        @Html.ValidationSummary(false)
+                    </div>
+                }
+
+                <div class="callout">
+                    <span class="ico">
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M7 4V7.5M7 9V9.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    </span>
+                    <div class="body">
+                        Tokens look like <span class="mono" style="color:var(--ink);">AIKI-eyJ&hellip;.MEUCIQ&hellip;</span>.
+                        They're long — paste, don't type.
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label asp-for="LicenseToken">License token</label>
+                    <textarea asp-for="LicenseToken"
+                              rows="6"
+                              spellcheck="false"
+                              autocomplete="off"
+                              placeholder="AIKI-eyJpc3MiOi&hellip;.MEUCIQD&hellip;"
+                              style="width:100%; padding:14px; font-family:var(--font-mono); font-size:var(--fs-13); line-height:1.5; resize:vertical; border:1px solid var(--ink-ghost); border-radius:8px; background:var(--surface); color:var(--ink); word-break:break-all;"></textarea>
+                    <span asp-validation-for="LicenseToken" class="field-validation-error"></span>
+                </div>
+
+                <button class="btn btn-gold btn-block" type="submit">
+                    Verify &amp; activate
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8H13M13 8L9 4M13 8L9 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                </button>
+
+                <div class="login-foot">
+                    <span>Don't have a token? <a href="mailto:partner-success@goldkiosk.ai" style="color:var(--accent);">Email partner success</a></span>
+                </div>
+            </form>
+
+        </div>
+    </main>
+
+</div>

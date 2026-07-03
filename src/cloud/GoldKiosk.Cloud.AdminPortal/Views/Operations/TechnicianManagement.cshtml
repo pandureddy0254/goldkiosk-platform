@@ -1,0 +1,142 @@
+@{
+    ViewBag.PageTitle = "Technician <em>roster.</em>";
+    ViewBag.Eyebrow   = "Operations · Workforce";
+    ViewBag.Subtitle  = "Field-engineering team across the GCC, with live status, today's job count, and skills coverage. Schedule and reassign work orders directly.";
+    ViewBag.ActiveNav = "operations";
+}
+
+<div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin: -16px 0 22px;">
+    <div class="seg seg-tabs">
+        <a asp-controller="Operations" asp-action="CollectionTickets">Collections</a>
+        <a asp-controller="Operations" asp-action="MaintenanceTickets">Maintenance</a>
+        <a class="active" asp-controller="Operations" asp-action="TechnicianManagement">Technicians</a>
+        <a asp-controller="Operations" asp-action="SystemHealthCheck">System health</a>
+        <a asp-controller="Operations" asp-action="DeploymentTickets">Deployment</a>
+        <a asp-controller="Operations" asp-action="LocationConfiguration">Locations</a>
+    </div>
+    <span style="flex:1;"></span>
+    <button type="button" class="btn btn-primary btn-sm" data-action="open-modal" data-target="addTechModal">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 3V11M3 7H11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Add technician
+    </button>
+</div>
+
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Active technicians<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value mono">10</div>
+        <div class="kpi-foot"><span class="label-suffix">8 on-shift now</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">On-route now<span class="dot" style="background:var(--accent);"></span></div>
+        <div class="kpi-value mono">4</div>
+        <div class="kpi-foot"><span class="label-suffix">DXB · AUH · SHJ · RAK</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Avg. travel<span class="dot"></span></div>
+        <div class="kpi-value mono">1.8<span class="unit">h</span></div>
+        <div class="kpi-foot"><span class="delta delta-down">&#9660; 0.2h</span><span class="label-suffix">vs 30d avg</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Jobs completed · 7d<span class="dot"></span></div>
+        <div class="kpi-value mono">82</div>
+        <div class="kpi-foot"><span class="delta delta-up">&#9650; 11</span><span class="label-suffix">11.7 / tech avg</span></div>
+    </div>
+</div>
+
+@* ── Technician card grid ──────────────────────────────────────────── *@
+<div class="tech-grid">
+    <div class="tech-card"><div class="tech-top"><div class="avatar tech-avatar">HN</div><span class="tech-stat s-onroute">On-route</span></div><div class="tech-name">Hassan Al Naqbi</div><div class="tech-region">SHJ · Northern emirates</div><div class="tech-meta"><span class="mono">3 jobs today</span><span>&rarr; K-DXB-02</span></div><div class="tech-skills"><span class="skill">XRF</span><span class="skill">General</span></div></div>
+    <div class="tech-card"><div class="tech-top"><div class="avatar tech-avatar">KM</div><span class="tech-stat s-onsite">Onsite</span></div><div class="tech-name">Khalid Mohammed</div><div class="tech-region">AUH · Capital region</div><div class="tech-meta"><span class="mono">4 jobs today</span><span>K-AUH-02</span></div><div class="tech-skills"><span class="skill">Cash</span><span class="skill">General</span></div></div>
+    <div class="tech-card"><div class="tech-top"><div class="avatar tech-avatar">RK</div><span class="tech-stat s-idle">Idle</span></div><div class="tech-name">Raj Kumar</div><div class="tech-region">DXB · Marina</div><div class="tech-meta"><span class="mono">2 jobs today</span><span>next 17:00</span></div><div class="tech-skills"><span class="skill">ID</span><span class="skill">General</span></div></div>
+    <div class="tech-card"><div class="tech-top"><div class="avatar tech-avatar">VS</div><span class="tech-stat s-onroute">On-route</span></div><div class="tech-name">Vinod Sharma</div><div class="tech-region">DXB · Deira</div><div class="tech-meta"><span class="mono">3 jobs today</span><span>&rarr; K-RAK-01</span></div><div class="tech-skills"><span class="skill">Scale</span><span class="skill">General</span></div></div>
+    <div class="tech-card"><div class="tech-top"><div class="avatar tech-avatar">MA</div><span class="tech-stat s-idle">Idle</span></div><div class="tech-name">Mohamed Ashraf</div><div class="tech-region">DXB · Bur Dubai</div><div class="tech-meta"><span class="mono">1 job today</span><span>next 14:00</span></div><div class="tech-skills"><span class="skill">ID</span><span class="skill">General</span></div></div>
+    <div class="tech-card"><div class="tech-top"><div class="avatar tech-avatar">AH</div><span class="tech-stat s-onsite">Onsite</span></div><div class="tech-name">Ali Hassan</div><div class="tech-region">AUH · Corniche</div><div class="tech-meta"><span class="mono">2 jobs today</span><span>K-AUH-03</span></div><div class="tech-skills"><span class="skill">ID</span><span class="skill">XRF</span></div></div>
+    <div class="tech-card"><div class="tech-top"><div class="avatar tech-avatar">SM</div><span class="tech-stat s-onroute">On-route</span></div><div class="tech-name">Salim Al Mazroui</div><div class="tech-region">FUJ · Eastern emirates</div><div class="tech-meta"><span class="mono">2 jobs today</span><span>&rarr; K-FUJ-01</span></div><div class="tech-skills"><span class="skill">Cash</span><span class="skill">General</span></div></div>
+    <div class="tech-card"><div class="tech-top"><div class="avatar tech-avatar">PN</div><span class="tech-stat s-idle">Idle</span></div><div class="tech-name">Pradeep Nair</div><div class="tech-region">AJM · Northern emirates</div><div class="tech-meta"><span class="mono">1 job today</span><span>next tomorrow</span></div><div class="tech-skills"><span class="skill">XRF</span><span class="skill">General</span></div></div>
+    <div class="tech-card"><div class="tech-top"><div class="avatar tech-avatar">MY</div><span class="tech-stat s-offduty">Off duty</span></div><div class="tech-name">Mohammed Yusuf</div><div class="tech-region">SHJ · Al Wahda</div><div class="tech-meta"><span class="mono">&mdash; jobs</span><span>shift starts 18:00</span></div><div class="tech-skills"><span class="skill">General</span></div></div>
+    <div class="tech-card"><div class="tech-top"><div class="avatar tech-avatar">AK</div><span class="tech-stat s-onroute">On-route</span></div><div class="tech-name">Ahmed Khalifa</div><div class="tech-region">DXB · Downtown</div><div class="tech-meta"><span class="mono">3 jobs today</span><span>&rarr; K-DXB-03</span></div><div class="tech-skills"><span class="skill">Cash</span><span class="skill">XRF</span></div></div>
+</div>
+
+@* ── Daily heatmap ────────────────────────────────────────────────── *@
+<section class="card" style="margin-bottom:32px;">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Daily schedule · today</h2>
+            <div class="card-meta" style="margin-top:6px;"><span>Technician &times; hour · UAE Standard Time</span></div>
+        </div>
+        <div style="display:flex; gap:6px;">
+            <button type="button" class="btn btn-ghost btn-sm" style="border-color:var(--accent); color:var(--accent);">Today</button>
+            <button type="button" class="btn btn-ghost btn-sm">Tomorrow</button>
+            <button type="button" class="btn btn-ghost btn-sm">Week</button>
+        </div>
+    </header>
+    <div class="card-body" style="overflow-x:auto;">
+        <table class="heatmap">
+            <thead>
+                <tr><th></th><th>08</th><th>09</th><th>10</th><th>11</th><th>12</th><th>13</th><th>14</th><th>15</th><th>16</th><th>17</th><th>18</th><th>19</th></tr>
+            </thead>
+            <tbody>
+                <tr><th>Hassan Al Naqbi</th><td class="h h-1"></td><td class="h h-2"></td><td class="h h-3"></td><td class="h h-2"></td><td class="h h-1"></td><td class="h h-0"></td><td class="h h-3"></td><td class="h h-3"></td><td class="h h-2"></td><td class="h h-1"></td><td class="h h-0"></td><td class="h h-0"></td></tr>
+                <tr><th>Khalid Mohammed</th><td class="h h-0"></td><td class="h h-2"></td><td class="h h-3"></td><td class="h h-3"></td><td class="h h-2"></td><td class="h h-1"></td><td class="h h-2"></td><td class="h h-3"></td><td class="h h-3"></td><td class="h h-2"></td><td class="h h-1"></td><td class="h h-0"></td></tr>
+                <tr><th>Raj Kumar</th><td class="h h-0"></td><td class="h h-1"></td><td class="h h-1"></td><td class="h h-0"></td><td class="h h-0"></td><td class="h h-0"></td><td class="h h-0"></td><td class="h h-0"></td><td class="h h-2"></td><td class="h h-3"></td><td class="h h-1"></td><td class="h h-0"></td></tr>
+                <tr><th>Vinod Sharma</th><td class="h h-1"></td><td class="h h-2"></td><td class="h h-2"></td><td class="h h-3"></td><td class="h h-2"></td><td class="h h-1"></td><td class="h h-2"></td><td class="h h-2"></td><td class="h h-1"></td><td class="h h-0"></td><td class="h h-0"></td><td class="h h-0"></td></tr>
+                <tr><th>Mohamed Ashraf</th><td class="h h-0"></td><td class="h h-0"></td><td class="h h-1"></td><td class="h h-1"></td><td class="h h-0"></td><td class="h h-0"></td><td class="h h-2"></td><td class="h h-2"></td><td class="h h-0"></td><td class="h h-0"></td><td class="h h-0"></td><td class="h h-0"></td></tr>
+                <tr><th>Ali Hassan</th><td class="h h-0"></td><td class="h h-1"></td><td class="h h-2"></td><td class="h h-2"></td><td class="h h-1"></td><td class="h h-0"></td><td class="h h-2"></td><td class="h h-3"></td><td class="h h-2"></td><td class="h h-1"></td><td class="h h-0"></td><td class="h h-0"></td></tr>
+                <tr><th>Salim Al Mazroui</th><td class="h h-1"></td><td class="h h-3"></td><td class="h h-3"></td><td class="h h-2"></td><td class="h h-2"></td><td class="h h-1"></td><td class="h h-1"></td><td class="h h-2"></td><td class="h h-2"></td><td class="h h-1"></td><td class="h h-0"></td><td class="h h-0"></td></tr>
+                <tr><th>Pradeep Nair</th><td class="h h-0"></td><td class="h h-1"></td><td class="h h-2"></td><td class="h h-1"></td><td class="h h-0"></td><td class="h h-0"></td><td class="h h-0"></td><td class="h h-0"></td><td class="h h-0"></td><td class="h h-0"></td><td class="h h-0"></td><td class="h h-0"></td></tr>
+                <tr><th>Mohammed Yusuf</th><td class="h h-0"></td><td class="h h-0"></td><td class="h h-0"></td><td class="h h-0"></td><td class="h h-0"></td><td class="h h-0"></td><td class="h h-0"></td><td class="h h-0"></td><td class="h h-0"></td><td class="h h-0"></td><td class="h h-1"></td><td class="h h-2"></td></tr>
+                <tr><th>Ahmed Khalifa</th><td class="h h-0"></td><td class="h h-2"></td><td class="h h-3"></td><td class="h h-2"></td><td class="h h-1"></td><td class="h h-1"></td><td class="h h-3"></td><td class="h h-3"></td><td class="h h-2"></td><td class="h h-2"></td><td class="h h-1"></td><td class="h h-0"></td></tr>
+            </tbody>
+        </table>
+        <div style="display:flex; gap:14px; margin-top:18px; font-size:11px; color:var(--ink-faint); letter-spacing:0.06em;">
+            <span style="text-transform:uppercase;">Load</span>
+            <span style="display:inline-flex; align-items:center; gap:4px;"><span class="legend-h h-0"></span>idle</span>
+            <span style="display:inline-flex; align-items:center; gap:4px;"><span class="legend-h h-1"></span>1 job</span>
+            <span style="display:inline-flex; align-items:center; gap:4px;"><span class="legend-h h-2"></span>2 jobs</span>
+            <span style="display:inline-flex; align-items:center; gap:4px;"><span class="legend-h h-3"></span>3+ jobs</span>
+        </div>
+    </div>
+</section>
+
+@* Hidden form to allow Add technician to wire later. *@
+<form asp-controller="Operations" asp-action="AddTechnician" method="post" style="display:none;" id="addTechForm">
+    @Html.AntiForgeryToken()
+</form>
+
+@* TODO promote: tech-card grid + heatmap — already live in prototype CSS;
+    repeated here so the page renders standalone. *@
+<style>
+    .seg.seg-tabs { display:inline-flex; border:1px solid var(--line-strong); border-radius:var(--radius-md); overflow:hidden; background:var(--canvas-elevated); flex-wrap:wrap; }
+    .seg.seg-tabs a { padding:8px 14px; font-size:13px; color:var(--ink-soft); border-right:1px solid var(--line); text-decoration:none; }
+    .seg.seg-tabs a:last-child { border-right:none; }
+    .seg.seg-tabs a.active { background: var(--ink); color: var(--canvas); }
+    .seg.seg-tabs a:hover:not(.active) { background: var(--canvas-sunken); color: var(--ink); }
+    .tech-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; margin-bottom: 32px; }
+    .tech-card { position: relative; background: var(--canvas-elevated); border:1px solid var(--line); border-radius: var(--radius-lg); padding: 18px 20px; min-height: 160px; transition: border-color var(--dur-fast); }
+    .tech-card:hover { border-color: var(--accent); }
+    .tech-top { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+    .tech-avatar { width: 38px; height: 38px; background: var(--accent-soft); color: var(--accent); font-weight:500; }
+    .tech-stat { display:inline-flex; align-items:center; gap:4px; font-size:11px; padding: 2px 8px; border-radius: var(--radius-full); letter-spacing:0.06em; }
+    .tech-stat::before { content:""; width:6px; height:6px; border-radius:50%; background: currentColor; display:inline-block; }
+    .tech-stat.s-idle    { background: var(--info-soft);    color: var(--info); }
+    .tech-stat.s-onroute { background: var(--accent-soft);  color: var(--accent); }
+    .tech-stat.s-onsite  { background: var(--success-soft); color: var(--success); }
+    .tech-stat.s-offduty { background: var(--canvas-sunken); color: var(--ink-faint); }
+    .tech-name { font-family: var(--font-display); font-size: 18px; line-height: 1.2; margin-bottom: 4px; }
+    .tech-region { font-size: 12px; color: var(--ink-faint); margin-bottom: 12px; }
+    .tech-meta { display:flex; justify-content:space-between; font-size:12px; color: var(--ink-soft); padding: 8px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); margin-bottom: 10px; }
+    .tech-skills { display:flex; gap:6px; flex-wrap:wrap; }
+    .skill { font-family: var(--font-mono); font-size: 10px; padding: 2px 8px; background: var(--canvas-sunken); border-radius: var(--radius-xs); color: var(--ink-soft); letter-spacing:0.04em; }
+    .heatmap { width: 100%; border-collapse: separate; border-spacing: 3px; }
+    .heatmap th { font-size: 11px; color: var(--ink-faint); font-weight: 400; text-align: center; padding: 4px 0; font-family: var(--font-mono); letter-spacing: 0.04em; }
+    .heatmap tbody th { text-align: left; padding-right: 14px; font-size: 12px; color: var(--ink-soft); font-family: var(--font-sans); white-space: nowrap; }
+    .h { width: 36px; height: 22px; border-radius: var(--radius-xs); background: var(--canvas-sunken); }
+    .h.h-0 { background: var(--canvas-sunken); }
+    .h.h-1 { background: var(--accent-soft); }
+    .h.h-2 { background: rgba(184,148,31,0.4); }
+    [data-theme="dark"] .h.h-2 { background: rgba(212,175,55,0.4); }
+    .h.h-3 { background: var(--accent); }
+    .legend-h { display:inline-block; width:14px; height:10px; border-radius:2px; }
+    .legend-h.h-0 { background: var(--canvas-sunken); border:1px solid var(--line); }
+</style>

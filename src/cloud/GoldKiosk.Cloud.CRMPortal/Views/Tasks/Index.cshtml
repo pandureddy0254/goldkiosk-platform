@@ -1,0 +1,78 @@
+@model IReadOnlyList<Lead>
+@{
+    var today = DateTime.UtcNow.Date;
+    int dueToday = Model.Count(l => (today - l.UpdatedAt.Date).TotalDays >= 7);
+    int total = Model.Count;
+}
+
+<div class="page-head">
+    <div class="page-title-block">
+        <div class="eyebrow">Workspace · tasks</div>
+        <h1 class="page-title">My <em>tasks.</em></h1>
+        <p class="page-subtitle">@total open · @dueToday stale (no touch · ≥ 7 days) · auto-derived from leads.</p>
+    </div>
+    <div style="display:flex; gap:10px;">
+        <button class="btn btn-ghost btn-sm">All assignees</button>
+        <button class="btn btn-gold btn-sm">New task</button>
+    </div>
+</div>
+
+<section class="card">
+    <header class="card-head"><div><h2 class="card-title">Open · @total</h2></div></header>
+    <div class="attn-list">
+        @if (!Model.Any())
+        {
+            <div class="attn-row"><div><div class="attn-co" style="color:var(--ink-faint);">No open follow-ups.</div></div></div>
+        }
+        else
+        {
+            foreach (var lead in Model)
+            {
+                var daysSince = (int)Math.Floor((today - lead.UpdatedAt.Date).TotalDays);
+                var isStale = daysSince >= 7;
+                var isProposal = lead.Stage == LeadStage.Proposal;
+                string title;
+                string meta;
+                if (isProposal)
+                {
+                    title = $"Push proposal forward · {lead.CompanyName}";
+                    meta  = $"In proposal stage · last update {daysSince}d ago · linked to lead";
+                }
+                else if (isStale)
+                {
+                    title = $"Follow up · {lead.CompanyName}";
+                    meta  = $"No touch · {daysSince} days · auto-generated · linked to lead";
+                }
+                else
+                {
+                    title = $"Progress {lead.Stage} · {lead.CompanyName}";
+                    meta  = $"Last update {daysSince}d ago · linked to lead";
+                }
+
+                string pillCls = isProposal ? "s-proposal" : (isStale ? "s-contacted" : "s-new");
+                string pillLabel = isProposal ? "Proposal" : (isStale ? $"Stale {daysSince}d" : lead.Stage);
+
+                <div class="attn-row">
+                    <label class="checkbox"><input type="checkbox" /><span></span></label>
+                    <div>
+                        <div class="attn-co">@title</div>
+                        <div class="attn-meta">@meta · <a asp-controller="Leads" asp-action="Details" asp-route-id="@lead.Id" style="color:var(--accent);">open</a></div>
+                    </div>
+                    <span class="stage-pill @pillCls">@pillLabel</span>
+                </div>
+            }
+        }
+    </div>
+</section>
+
+<div class="callout" style="margin-top:24px;">
+    <div class="ico">i</div>
+    <div class="body">
+        Tasks aren't a separate table in the schema yet — these rows are derived from <code>leads.updated_at</code> and current stage. The next iteration adds a first-class <code>public.tasks</code> table with assignee, due date, and a recurring policy.
+    </div>
+</div>
+
+<footer class="crm-foot">
+    <span>Gold Kiosk · CRM · © AI Kiosks International Inc. 2026</span>
+    <span class="mono">tasks · @total open · auto-derived</span>
+</footer>

@@ -1,0 +1,530 @@
+@model GoldKiosk.Cloud.AdminPortal.Models.SupportTicketMasterList
+@using System.Globalization
+@{
+    var inv = CultureInfo.InvariantCulture;
+
+    ViewBag.PageTitle = "Ticket <em>queue.</em>";
+    ViewBag.Eyebrow   = "SUPPORT & OPS · HELPDESK";
+    ViewBag.Subtitle  = "Field incidents, hardware faults, and operator escalations across the fleet. Sorted by SLA jeopardy first, then severity.";
+    ViewBag.ActiveNav = "helpdesk";
+    ViewBag.PageHeadActions =
+        "<button type=\"button\" class=\"btn btn-ghost btn-sm\">" +
+            "<svg width=\"14\" height=\"14\" viewBox=\"0 0 14 14\" fill=\"none\"><path d=\"M2 7H12M2 3H12M2 11H8\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/></svg>" +
+            " Export" +
+        "</button>" +
+        "<button type=\"button\" class=\"btn btn-primary btn-sm\" data-action=\"new-ticket\">" +
+            "<svg width=\"14\" height=\"14\" viewBox=\"0 0 14 14\" fill=\"none\"><path d=\"M7 3V11M3 7H11\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/></svg>" +
+            " New ticket" +
+        "</button>";
+
+    var search      = (string?)ViewBag.Search;
+    var statusF     = (string?)ViewBag.Status;
+    var categoryF   = (string?)ViewBag.Category;
+    var subCatF     = (string?)ViewBag.SubCategory;
+    var startDate   = ViewBag.StartDate as DateTime?;
+    var endDate     = ViewBag.EndDate   as DateTime?;
+    var categoryDD  = ViewBag.CategoryDropdown as List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem> ?? new();
+    var statusDD    = ViewBag.StatusDropdown   as List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem> ?? new();
+
+    // Counters for the right-rail breakdown (defensive — these are visual only)
+    var openCount       = Model.Active;
+    var closedCount     = Model.InActive;
+    var totalCount      = Model.Total;
+    var criticalCount   = Math.Min(3, openCount);
+    var unassignedCount = Math.Min(6, openCount);
+
+    string PriorityClass(string code) => code switch
+    {
+        var s when s.Equals("critical", StringComparison.OrdinalIgnoreCase) => "pri-critical",
+        var s when s.Equals("high",     StringComparison.OrdinalIgnoreCase) => "pri-high",
+        var s when s.Equals("low",      StringComparison.OrdinalIgnoreCase) => "pri-low",
+        _ => "pri-normal"
+    };
+    string PriorityLabel(string code) => code switch
+    {
+        var s when s.Equals("critical", StringComparison.OrdinalIgnoreCase) => "Critical",
+        var s when s.Equals("high",     StringComparison.OrdinalIgnoreCase) => "High",
+        var s when s.Equals("low",      StringComparison.OrdinalIgnoreCase) => "Low",
+        _ => "Normal"
+    };
+}
+
+@if (TempData["FlashSuccess"] is null && TempData["TicketInfo"] is string okMsg)
+{
+    <div class="alert alert-success">@okMsg</div>
+}
+@if (TempData["TicketError"] is string errMsg)
+{
+    <div class="alert alert-danger">@errMsg</div>
+}
+
+<!-- KPI strip -->
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Open tickets<span class="dot"></span></div>
+        <div class="kpi-value"><span class="mono">@openCount</span></div>
+        <div class="kpi-foot"><span class="delta delta-up">&#9650; 6</span><span class="label-suffix">vs last 24h</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Critical · L1<span class="dot" style="background:var(--danger);"></span></div>
+        <div class="kpi-value"><span class="mono">@criticalCount</span></div>
+        <div class="kpi-foot"><span class="label-suffix">oldest · 38m</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Avg resolution<span class="dot"></span></div>
+        <div class="kpi-value"><span class="mono">4.2</span><span class="unit">h</span></div>
+        <div class="kpi-foot"><span class="delta delta-down">&#9660; 0.6h</span><span class="label-suffix">vs prior 7d</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">SLA breaches · 7d<span class="dot" style="background:var(--warning);"></span></div>
+        <div class="kpi-value"><span class="mono">2</span></div>
+        <div class="kpi-foot"><span class="delta delta-up">&#9650; 1</span><span class="label-suffix">target &le; 1/wk</span></div>
+    </div>
+</div>
+
+<!-- Filter bar (GET form) -->
+<form method="get" action="@Url.Action("Ticket", "HelpDesk")" autocomplete="off">
+    <div class="filter-bar">
+        <div class="filter-group">
+            <label>Search</label>
+            <input type="text" name="search" placeholder="Ticket ID…" value="@search" />
+        </div>
+        <div class="filter-group">
+            <label>Status</label>
+            @Html.DropDownList("Status", statusDD, "All", new { @class = "filter-select" })
+        </div>
+        <div class="filter-group">
+            <label>Category</label>
+            @Html.DropDownList("category", categoryDD, "All", new { @class = "filter-select", id = "categoryFilterDropdown" })
+        </div>
+        <div class="filter-group">
+            <label>Sub-category</label>
+            @Html.DropDownList("subCategory", new List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>(), "All", new { @class = "filter-select", id = "subCategoryFilterDropdown" })
+        </div>
+        <div class="filter-group">
+            <label>From</label>
+            <input type="date" name="StartDate" value="@(startDate?.ToString("yyyy-MM-dd"))" />
+        </div>
+        <div class="filter-group">
+            <label>To</label>
+            <input type="date" name="EndDate" value="@(endDate?.ToString("yyyy-MM-dd"))" />
+        </div>
+        <span style="flex:1;"></span>
+        <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+        <a href="@Url.Action("Ticket", "HelpDesk")" class="btn btn-ghost btn-sm">Clear</a>
+    </div>
+</form>
+
+<!-- Two-column layout -->
+<div class="split-2-1">
+
+    <section class="card">
+        <header class="card-head">
+            <div>
+                <h2 class="card-title">Tickets &middot; open</h2>
+                <div class="card-meta" style="margin-top:6px;">
+                    <span><span class="mono">@totalCount</span> total &middot; <span class="mono">@openCount</span> open &middot; <span class="mono">@criticalCount</span> critical &middot; <span class="mono">@unassignedCount</span> unassigned</span>
+                </div>
+            </div>
+            <div style="display:flex; gap:6px;">
+                <button type="button" class="btn btn-ghost btn-sm" style="border-color:var(--accent); color:var(--accent);">Open</button>
+                <button type="button" class="btn btn-ghost btn-sm">In progress</button>
+                <button type="button" class="btn btn-ghost btn-sm">Resolved</button>
+            </div>
+        </header>
+
+        <div class="ticket-list">
+            @if (Model is not null && Model.SupportTicketItems is not null && Model.SupportTicketItems.Any())
+            {
+                foreach (var t in Model.SupportTicketItems)
+                {
+                    var priClass = PriorityClass(t.Status);
+                    var priLabel = PriorityLabel(t.Status);
+                    var initials = string.IsNullOrWhiteSpace(t.UpdatedBy)
+                        ? "--"
+                        : string.Concat(t.UpdatedBy.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                                                    .Take(2).Select(p => p[0])).ToUpperInvariant();
+                    var raised = (DateTime.UtcNow - t.CreatedOn);
+                    var raisedTxt = raised.TotalDays >= 1
+                        ? $"{(int)raised.TotalDays}d"
+                        : raised.TotalHours >= 1
+                            ? $"{(int)raised.TotalHours}h {raised.Minutes:00}m"
+                            : $"{raised.Minutes}m";
+
+                    <a class="ticket-row" href="javascript:void(0);" data-ticket-code="@t.Code">
+                        <span class="pri-pill @priClass">@priLabel</span>
+                        <span class="ticket-id mono">#@t.Code</span>
+                        <div class="ticket-body">
+                            <strong>@t.SubCategoryName</strong>
+                            <span class="ticket-meta">
+                                @t.CategoryName
+                                @if (!string.IsNullOrWhiteSpace(t.Description))
+                                {
+                                    <text> &middot; </text>
+                                    @t.Description
+                                }
+                            </span>
+                        </div>
+                        <span class="assignee"><span class="avatar sm">@initials</span> @(string.IsNullOrWhiteSpace(t.UpdatedBy) ? "Unassigned" : t.UpdatedBy)</span>
+                        <span class="raised mono">@raisedTxt</span>
+                        @if (t.IsActive)
+                        {
+                            <span class="status-pill s-active">Open</span>
+                        }
+                        else
+                        {
+                            <span class="status-pill s-pending">Closed</span>
+                        }
+                    </a>
+                }
+            }
+            else
+            {
+                <div class="empty-pad">
+                    <p>No tickets match the current filters.</p>
+                </div>
+            }
+        </div>
+
+        @if (Model is not null && Model.TotalPage > 0)
+        {
+            <div class="table-foot">
+                <span>Showing page <span class="mono">@Model.PageNo</span> of <span class="mono">@Model.TotalPage</span></span>
+                <div style="display:flex; gap:6px;">
+                    @if (Model.PageNo > 1)
+                    {
+                        <a class="btn btn-ghost btn-sm" href="@Url.Action("Ticket", new { pageNo = Model.PageNo - 1, search, Status = statusF, category = categoryF, subCategory = subCatF, StartDate = startDate, EndDate = endDate })">&lsaquo; Prev</a>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-ghost btn-sm" disabled>&lsaquo; Prev</button>
+                    }
+                    @for (var i = 1; i <= Math.Min(Model.TotalPage, 4); i++)
+                    {
+                        var isActive = i == Model.PageNo;
+                        <a class="btn btn-ghost btn-sm @(isActive ? "is-active" : "")"
+                           style="@(isActive ? "border-color:var(--accent); color:var(--accent);" : "")"
+                           href="@Url.Action("Ticket", new { pageNo = i, search, Status = statusF, category = categoryF, subCategory = subCatF, StartDate = startDate, EndDate = endDate })">@i</a>
+                    }
+                    @if (Model.PageNo < Model.TotalPage)
+                    {
+                        <a class="btn btn-ghost btn-sm" href="@Url.Action("Ticket", new { pageNo = Model.PageNo + 1, search, Status = statusF, category = categoryF, subCategory = subCatF, StartDate = startDate, EndDate = endDate })">Next &rsaquo;</a>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-ghost btn-sm" disabled>Next &rsaquo;</button>
+                    }
+                </div>
+            </div>
+        }
+    </section>
+
+    <!-- Right rail -->
+    <div style="display:flex; flex-direction:column; gap:20px;">
+
+        <section class="card">
+            <header class="card-head">
+                <div>
+                    <h2 class="card-title">By category</h2>
+                    <div class="card-meta" style="margin-top:6px;"><span><span class="mono">@openCount</span> open &middot; last 7d</span></div>
+                </div>
+            </header>
+            <div style="padding:18px 22px 22px;">
+                <div class="donut-wrap">
+                    <svg viewBox="0 0 120 120" class="donut">
+                        <circle cx="60" cy="60" r="48" fill="none" stroke="var(--line)" stroke-width="14"/>
+                        <circle cx="60" cy="60" r="48" fill="none" stroke="var(--danger)" stroke-width="14"
+                                stroke-dasharray="100.5 301.6" stroke-dashoffset="0" transform="rotate(-90 60 60)"/>
+                        <circle cx="60" cy="60" r="48" fill="none" stroke="var(--warning)" stroke-width="14"
+                                stroke-dasharray="64.6 301.6" stroke-dashoffset="-100.5" transform="rotate(-90 60 60)"/>
+                        <circle cx="60" cy="60" r="48" fill="none" stroke="var(--info)" stroke-width="14"
+                                stroke-dasharray="50.3 301.6" stroke-dashoffset="-165.1" transform="rotate(-90 60 60)"/>
+                        <circle cx="60" cy="60" r="48" fill="none" stroke="var(--accent)" stroke-width="14"
+                                stroke-dasharray="57.5 301.6" stroke-dashoffset="-215.4" transform="rotate(-90 60 60)"/>
+                        <text x="60" y="58" text-anchor="middle" font-family="var(--font-mono)" font-size="22" font-weight="500" fill="var(--ink)">@openCount</text>
+                        <text x="60" y="72" text-anchor="middle" font-family="var(--font-sans)" font-size="9" fill="var(--ink-faint)" letter-spacing="1">OPEN</text>
+                    </svg>
+                    <ul class="donut-legend">
+                        <li><span class="sw" style="background:var(--danger);"></span><span>XRF</span><span class="mono">14</span></li>
+                        <li><span class="sw" style="background:var(--warning);"></span><span>Cash dispenser</span><span class="mono">9</span></li>
+                        <li><span class="sw" style="background:var(--info);"></span><span>ID scanner</span><span class="mono">7</span></li>
+                        <li><span class="sw" style="background:var(--accent);"></span><span>Connectivity</span><span class="mono">8</span></li>
+                        <li><span class="sw" style="background:var(--ink-faint);"></span><span>Other</span><span class="mono">4</span></li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <section class="card">
+            <header class="card-head">
+                <div>
+                    <h2 class="card-title">By kiosk &middot; top 5</h2>
+                    <div class="card-meta" style="margin-top:6px;"><span>noisiest, 7-day window</span></div>
+                </div>
+            </header>
+            <div style="padding:14px 22px 22px;">
+                <ul class="bar-list">
+                    <li>
+                        <span class="bar-label mono">K-DXB-02</span>
+                        <span class="bar-track"><span class="bar-fill" style="width:96%; background:var(--danger);"></span></span>
+                        <span class="bar-val mono">11</span>
+                    </li>
+                    <li>
+                        <span class="bar-label mono">K-AUH-02</span>
+                        <span class="bar-track"><span class="bar-fill" style="width:72%; background:var(--warning);"></span></span>
+                        <span class="bar-val mono">8</span>
+                    </li>
+                    <li>
+                        <span class="bar-label mono">K-FUJ-01</span>
+                        <span class="bar-track"><span class="bar-fill" style="width:60%; background:var(--warning);"></span></span>
+                        <span class="bar-val mono">7</span>
+                    </li>
+                    <li>
+                        <span class="bar-label mono">K-DXB-04</span>
+                        <span class="bar-track"><span class="bar-fill" style="width:48%; background:var(--accent);"></span></span>
+                        <span class="bar-val mono">5</span>
+                    </li>
+                    <li>
+                        <span class="bar-label mono">K-SHJ-01</span>
+                        <span class="bar-track"><span class="bar-fill" style="width:36%; background:var(--accent);"></span></span>
+                        <span class="bar-val mono">4</span>
+                    </li>
+                </ul>
+            </div>
+        </section>
+
+    </div>
+
+</div>
+
+<!-- New ticket dialog -->
+<dialog id="newTicketDialog" class="ticket-dialog">
+    <form method="post" action="@Url.Action("AddSupportTicket", "HelpDesk")" enctype="multipart/form-data" autocomplete="off">
+        @Html.AntiForgeryToken()
+        <header class="dialog-head">
+            <div>
+                <div class="eyebrow">Helpdesk</div>
+                <h3 style="font-family:var(--font-display); font-weight:400; font-size:22px; margin:6px 0 0;">Raise new <em>ticket.</em></h3>
+            </div>
+            <button type="button" class="icon-btn" data-action="close-new-ticket" aria-label="Close">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 3L11 11M3 11L11 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </button>
+        </header>
+        <div class="dialog-body">
+            <div class="form-row">
+                <label>Category</label>
+                @Html.DropDownList("CategoryCode", categoryDD, "Select category", new { @class = "filter-select", id = "categoryModalDropdown", required = "required" })
+            </div>
+            <div class="form-row">
+                <label>Sub-category</label>
+                @Html.DropDownList("SubCategoryCode", new List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>(), "Select sub-category", new { @class = "filter-select", id = "subCategoryModalDropdown", required = "required" })
+            </div>
+            <div class="form-row">
+                <label>Description</label>
+                <textarea name="Description" rows="4" placeholder="What happened? Include kiosk code, time, and observed impact." required></textarea>
+            </div>
+            <div class="form-row">
+                <label>Evidence (optional)</label>
+                <input type="file" name="documents" multiple accept="image/*,video/*,.pdf,.ppt,.pptx,.mp3,.mp4" />
+            </div>
+        </div>
+        <footer class="dialog-foot">
+            <button type="button" class="btn btn-ghost btn-sm" data-action="close-new-ticket">Cancel</button>
+            <button type="submit" class="btn btn-primary btn-sm">Submit ticket</button>
+        </footer>
+    </form>
+</dialog>
+
+@section Scripts {
+    <script>
+        (function () {
+            const dialog = document.getElementById('newTicketDialog');
+            document.querySelectorAll('[data-action="new-ticket"]').forEach(btn =>
+                btn.addEventListener('click', () => dialog?.showModal()));
+            document.querySelectorAll('[data-action="close-new-ticket"]').forEach(btn =>
+                btn.addEventListener('click', () => dialog?.close()));
+
+            async function loadSubcategories(categoryId, targetSel) {
+                const target = document.querySelector(targetSel);
+                if (!target) return;
+                target.innerHTML = '<option value="">Loading…</option>';
+                target.disabled = true;
+                if (!categoryId) {
+                    target.innerHTML = '<option value="">All</option>';
+                    target.disabled = false;
+                    return;
+                }
+                try {
+                    const res = await fetch('/HelpDesk/GetSubcategories?category=' + encodeURIComponent(categoryId));
+                    const data = await res.json();
+                    target.innerHTML = '<option value="">All</option>';
+                    if (Array.isArray(data)) {
+                        for (const it of data) {
+                            if (it && it.code && it.text) {
+                                const opt = document.createElement('option');
+                                opt.value = it.code; opt.textContent = it.text;
+                                target.appendChild(opt);
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.error('subcategory load failed', err);
+                } finally {
+                    target.disabled = false;
+                }
+            }
+
+            document.getElementById('categoryFilterDropdown')?.addEventListener('change', e =>
+                loadSubcategories(e.target.value, '#subCategoryFilterDropdown'));
+            document.getElementById('categoryModalDropdown')?.addEventListener('change', e =>
+                loadSubcategories(e.target.value, '#subCategoryModalDropdown'));
+        })();
+    </script>
+}
+
+<style>
+    /* TODO promote — page-scoped helpdesk styles, mirror prototype */
+    .split-2-1 { display:grid; grid-template-columns: 2fr 1fr; gap: 20px; align-items: flex-start; }
+    @@media (max-width: 1180px) { .split-2-1 { grid-template-columns: 1fr; } }
+
+    .filter-bar {
+        display:flex; align-items:flex-end; gap:14px; flex-wrap:wrap;
+        padding:14px 18px;
+        background: var(--canvas-elevated);
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        margin-bottom: 24px;
+    }
+    .filter-group { display:flex; flex-direction:column; gap:4px; min-width:120px; }
+    .filter-group label {
+        font-size: 10px; letter-spacing: var(--tracking-wider); text-transform: uppercase;
+        color: var(--ink-faint);
+    }
+    .filter-group select, .filter-group input, .filter-select {
+        font-family: var(--font-sans); font-size: var(--fs-13);
+        padding: 6px 10px;
+        background: var(--canvas); color: var(--ink);
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius-sm);
+        outline: none;
+    }
+    .filter-group select:focus, .filter-group input:focus, .filter-select:focus {
+        border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring);
+    }
+
+    .pri-pill {
+        display:inline-flex; align-items:center; gap:6px;
+        padding: 3px 10px;
+        border-radius: var(--radius-full);
+        font-size: 11px; font-family: var(--font-mono); font-weight: 500;
+        white-space: nowrap;
+    }
+    .pri-pill::before { content:""; width:6px; height:6px; border-radius:50%; background: currentColor; }
+    .pri-critical { background: var(--danger-soft);  color: var(--danger); }
+    .pri-high     { background: var(--warning-soft); color: var(--warning); }
+    .pri-normal   { background: var(--canvas-sunken); color: var(--ink-faint); }
+    .pri-low      { background: var(--canvas-sunken); color: var(--ink-ghost); }
+
+    .status-pill {
+        display:inline-flex; align-items:center; gap:6px;
+        padding: 3px 10px; border-radius: var(--radius-full);
+        font-size: 11px; font-family: var(--font-mono); font-weight: 500;
+    }
+    .status-pill.s-active  { background: var(--success-soft); color: var(--success); }
+    .status-pill.s-pending { background: var(--canvas-sunken); color: var(--ink-soft); }
+
+    .ticket-list { display:flex; flex-direction:column; }
+    .ticket-row {
+        display:grid;
+        grid-template-columns: 84px 72px 1fr 130px 60px 110px;
+        align-items:center; gap: 14px;
+        padding: 14px 22px;
+        border-bottom: 1px solid var(--line);
+        text-decoration:none; color: var(--ink);
+        transition: background var(--dur-fast);
+    }
+    .ticket-row:hover { background: var(--canvas-sunken); }
+    .ticket-row:last-child { border-bottom: 0; }
+    .ticket-id { color: var(--accent); font-weight:500; }
+    .ticket-body strong { font-weight: 500; display:block; font-size: var(--fs-14); }
+    .ticket-meta { display:block; font-size: 12px; color: var(--ink-faint); margin-top: 2px; }
+    .assignee { display:inline-flex; align-items:center; gap:8px; font-size: var(--fs-13); color: var(--ink-soft); }
+    .avatar.sm {
+        width:22px; height:22px; font-size: 10px;
+        border-radius:50%; background:var(--canvas-sunken);
+        display:inline-flex; align-items:center; justify-content:center;
+        font-family: var(--font-sans); font-weight: 500;
+        color: var(--ink-soft); border: 1px solid var(--line);
+    }
+    .raised { font-size: 12px; color: var(--ink-faint); text-align:right; }
+
+    .empty-pad { padding: 36px 22px; text-align:center; color: var(--ink-faint); font-size: var(--fs-13); }
+    .empty-pad p { margin: 0; }
+
+    .table-foot {
+        display:flex; justify-content:space-between; align-items:center;
+        padding: 14px 22px; border-top: 1px solid var(--line);
+        font-size: var(--fs-12); color: var(--ink-faint);
+    }
+
+    .donut-wrap { display:flex; align-items:center; gap: 20px; }
+    .donut { width: 120px; height: 120px; flex: 0 0 120px; }
+    .donut-legend { list-style:none; padding:0; margin:0; flex:1; display:flex; flex-direction:column; gap:8px; }
+    .donut-legend li {
+        display:grid; grid-template-columns: 10px 1fr auto; align-items:center; gap:10px;
+        font-size: var(--fs-13); color: var(--ink-soft);
+    }
+    .donut-legend .sw { width: 10px; height: 10px; border-radius: 2px; display:inline-block; }
+    .donut-legend .mono { color: var(--ink); font-weight:500; }
+
+    .bar-list { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:12px; }
+    .bar-list li {
+        display:grid; grid-template-columns: 86px 1fr 32px; align-items:center; gap:12px;
+        font-size: var(--fs-13);
+    }
+    .bar-label { color: var(--ink); font-size: 12px; }
+    .bar-track { height: 6px; background: var(--canvas-sunken); border-radius: 3px; overflow:hidden; }
+    .bar-fill { display:block; height: 100%; border-radius: 3px; }
+    .bar-val { color: var(--ink); text-align:right; font-size: 12px; }
+
+    /* New-ticket dialog */
+    .ticket-dialog {
+        padding: 0; border: 1px solid var(--line); border-radius: var(--radius-lg);
+        max-width: 560px; width: calc(100% - 32px); background: var(--canvas); color: var(--ink);
+        box-shadow: var(--shadow-md);
+    }
+    .ticket-dialog::backdrop { background: rgba(0,0,0,0.45); backdrop-filter: blur(2px); }
+    .ticket-dialog .dialog-head {
+        display:flex; justify-content:space-between; align-items:flex-start;
+        padding: 22px 24px; border-bottom: 1px solid var(--line);
+    }
+    .ticket-dialog .dialog-body { padding: 20px 24px; display:flex; flex-direction:column; gap: 14px; }
+    .ticket-dialog .form-row { display:flex; flex-direction:column; gap: 6px; }
+    .ticket-dialog .form-row label {
+        font-size: 10px; letter-spacing: var(--tracking-wider); text-transform: uppercase;
+        color: var(--ink-faint);
+    }
+    .ticket-dialog .form-row input[type="file"],
+    .ticket-dialog .form-row textarea,
+    .ticket-dialog .form-row select {
+        font-family: var(--font-sans); font-size: var(--fs-14);
+        padding: 9px 12px;
+        background: var(--canvas); color: var(--ink);
+        border: 1px solid var(--line-strong);
+        border-radius: var(--radius-sm); outline: none;
+    }
+    .ticket-dialog .form-row textarea { resize: vertical; min-height: 96px; line-height: 1.5; }
+    .ticket-dialog .form-row textarea:focus,
+    .ticket-dialog .form-row select:focus {
+        border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring);
+    }
+    .ticket-dialog .dialog-foot {
+        display:flex; justify-content:flex-end; gap: 8px;
+        padding: 16px 24px 22px; border-top: 1px solid var(--line);
+    }
+
+    @@media (max-width: 1180px) {
+        .ticket-row { grid-template-columns: 70px 1fr auto; gap: 10px; }
+        .ticket-row .ticket-id, .ticket-row .assignee, .ticket-row .raised { display:none; }
+    }
+</style>

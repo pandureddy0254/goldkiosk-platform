@@ -1,0 +1,490 @@
+@using GoldKiosk.Cloud.AdminPortal.Models
+@using System.Globalization
+@model VoucherList
+@{
+    ViewBag.PageTitle = "Voucher <em>catalogue.</em>";
+    ViewBag.Eyebrow   = "COMMERCE · VOUCHERS";
+    ViewBag.Subtitle  = "Create and tune promo codes redeemable at every kiosk. Each voucher is bound by a redemption policy — see the policies tab to control eligibility.";
+    ViewBag.ActiveNav = "vouchers";
+    ViewBag.PageHeadActions =
+        "<button class=\"btn btn-ghost btn-sm\" type=\"button\" data-action=\"open-import\">Import CSV</button>" +
+        "<button class=\"btn btn-primary btn-sm\" type=\"button\" data-action=\"open-add-voucher\">" +
+            "<svg width=\"14\" height=\"14\" viewBox=\"0 0 14 14\" fill=\"none\"><path d=\"M7 3V11M3 7H11\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/></svg>" +
+            "Create voucher" +
+        "</button>";
+
+    var discountDropdown = ViewBag.DiscountTypeDropdown as List<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>
+                           ?? PortalHelpers.GetVoucherDiscountTypeDropdown();
+    var searchTerm = ViewBag.SearchTerm as string;
+    var statTerm   = ViewBag.Stat as string;
+    var scheduled  = Math.Max(0, Model.Total - Model.Active - Model.InActive);
+
+    // Karat-tone palette helper for voucher cards.
+    string VTone(int i) => (i % 3) switch { 0 => "v-gold", 1 => "v-rose", _ => "v-jade" };
+}
+
+@if (TempData["VoucherInfo"] is string ok)
+{
+    <div class="flash flash-success" style="position:static; margin-bottom:18px;">@ok</div>
+}
+@if (TempData["VoucherError"] is string err)
+{
+    <div class="flash flash-error" style="position:static; margin-bottom:18px;">@err</div>
+}
+
+<nav class="sub-nav" aria-label="Vouchers module">
+    <a class="sub-link active" asp-controller="VoucherManagement" asp-action="VoucherConfiguration">Catalogue</a>
+    <a class="sub-link" asp-controller="VoucherManagement" asp-action="RedemptionPolicies">Redemption policies</a>
+    <a class="sub-link" asp-controller="VoucherManagement" asp-action="VoucherTransaction">Redemption log</a>
+</nav>
+
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Active vouchers<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value mono">@Model.Active</div>
+        <div class="kpi-foot">
+            <span class="label-suffix"><span class="mono">@scheduled</span> scheduled · <span class="mono">@Model.InActive</span> paused</span>
+        </div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Catalogue total<span class="dot" style="background:var(--warning);"></span></div>
+        <div class="kpi-value mono">@Model.Total</div>
+        <div class="kpi-foot"><span class="label-suffix">across all states</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">% Active<span class="dot"></span></div>
+        <div class="kpi-value mono">@(Model.Total == 0 ? "0" : ((decimal)Model.Active * 100m / Model.Total).ToString("F1", CultureInfo.InvariantCulture))<span class="unit">%</span></div>
+        <div class="kpi-foot"><span class="label-suffix">of total catalogue</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Filter<span class="dot" style="background:var(--accent);"></span></div>
+        <div class="kpi-value" style="font-family:var(--font-display); font-size:24px;">@(string.IsNullOrEmpty(statTerm) ? "All" : (statTerm == "active" ? "Active" : "Paused"))</div>
+        <div class="kpi-foot"><span class="label-suffix"><span class="mono">@Model.Items.Count</span> shown</span></div>
+    </div>
+</div>
+
+<form method="get" class="filter-bar" role="search">
+    <div class="filter-bar-left">
+        <div class="search-inline">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/><path d="M11 11L14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            <input type="text" name="search" value="@searchTerm" placeholder="Filter by code, name…" />
+        </div>
+        <div class="seg" role="tablist">
+            <button type="submit" name="stat" value="" class="@(string.IsNullOrEmpty(statTerm) ? "active" : "")">All · <span class="mono">@Model.Total</span></button>
+            <button type="submit" name="stat" value="active" class="@(statTerm == "active" ? "active" : "")">Active · <span class="mono">@Model.Active</span></button>
+            <button type="submit" name="stat" value="inactive" class="@(statTerm == "inactive" ? "active" : "")">Paused · <span class="mono">@Model.InActive</span></button>
+        </div>
+    </div>
+    <div class="filter-bar-right">
+        <span class="filter-meta"><span class="mono">@Model.Items.Count</span> of <span class="mono">@Model.Total</span> shown</span>
+    </div>
+</form>
+
+@if (Model.Items.Any())
+{
+    <div class="voucher-grid">
+        @{ var i = 0; }
+        @foreach (var v in Model.Items)
+        {
+            var pillClass = v.IsActive ? "s-active" : "s-disabled";
+            var pillLabel = v.IsActive ? "Live" : "Paused";
+            var isPercent = (v.DiscountType ?? "percent") == "percent";
+            var discValRaw = isPercent
+                ? v.DiscountValue.ToString("0.##", CultureInfo.InvariantCulture) + "%"
+                : v.DiscountValue.ToString("N0", CultureInfo.InvariantCulture);
+            var usedText  = v.UsageLimit.HasValue
+                ? $"{v.UsedCount} / {v.UsageLimit.Value}"
+                : $"{v.UsedCount} / ∞";
+            <article class="voucher-card @VTone(i)">
+                <header class="vc-head">
+                    <span class="vc-code mono">@v.Code</span>
+                    <span class="status-pill @pillClass">@pillLabel</span>
+                </header>
+                <h3 class="vc-name">@v.Name</h3>
+                <div class="vc-disc">
+                    @if (isPercent)
+                    {
+                        <span class="vc-disc-val">@discValRaw</span>
+                    }
+                    else
+                    {
+                        <span class="vc-disc-val">@discValRaw <span class="mono" style="font-size:14px;">@(string.IsNullOrEmpty(v.CurrencyCode) ? "AED" : v.CurrencyCode)</span></span>
+                    }
+                    <span class="vc-disc-lbl">@(string.IsNullOrEmpty(v.Description) ? (isPercent ? "off making charges" : "credit on sale") : v.Description)</span>
+                </div>
+                <div class="vc-foot">
+                    <span><strong>Used:</strong> <span class="mono">@usedText</span></span>
+                    <span><strong>Until:</strong> <span class="mono">@v.ValidityEnd.ToString("dd MMM yyyy", CultureInfo.InvariantCulture)</span></span>
+                </div>
+                <div class="vc-actions">
+                    <button type="button" class="btn-link-sm" data-action="edit-voucher"
+                            data-id="@v.Id" data-code="@v.Code" data-name="@v.Name"
+                            data-desc="@v.Description" data-type="@v.DiscountType"
+                            data-value="@v.DiscountValue.ToString(CultureInfo.InvariantCulture)" data-currency="@v.CurrencyCode"
+                            data-vstart="@v.ValidityStart.ToString("yyyy-MM-dd")"
+                            data-vend="@v.ValidityEnd.ToString("yyyy-MM-dd")"
+                            data-limit="@v.UsageLimit" data-active="@v.IsActive.ToString().ToLower()">
+                        Edit
+                    </button>
+                    <form method="post" asp-action="DeleteVoucher" class="vc-del-form"
+                          onsubmit="return confirm('Deactivate voucher @v.Code ?');">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@v.Id" />
+                        <button type="submit" class="btn-link-sm danger">Deactivate</button>
+                    </form>
+                </div>
+            </article>
+            i++;
+        }
+    </div>
+}
+else
+{
+    <section class="card">
+        <div class="empty">
+            <div class="empty-title">No vouchers in this filter.</div>
+            <div class="empty-meta">Clear the filter or create a new voucher to populate the catalogue.</div>
+        </div>
+    </section>
+}
+
+<!-- ── Add voucher modal ──────────────────────────────────────────────── -->
+<div class="modal-shell" id="modal-add-voucher" aria-hidden="true">
+    <div class="modal-panel" role="dialog" aria-labelledby="addVoucherTitle">
+        <form method="post" asp-action="AddVoucher">
+            @Html.AntiForgeryToken()
+            <header class="modal-head">
+                <h2 class="modal-title" id="addVoucherTitle">Create <em>voucher.</em></h2>
+                <button type="button" class="icon-btn" data-action="close-modal" aria-label="Close">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 3L11 11M11 3L3 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </button>
+            </header>
+            <div class="modal-body grid-2">
+                <label class="field"><span>Code</span><input type="text" name="Code" required placeholder="EID2026" /></label>
+                <label class="field"><span>Name</span><input type="text" name="Name" required placeholder="Eid Al-Fitr · making charges" /></label>
+                <label class="field span-2"><span>Description</span><input type="text" name="Description" placeholder="20% off making charges" /></label>
+                <label class="field"><span>Discount type</span>
+                    <select name="DiscountType">
+                        @foreach (var d in discountDropdown)
+                        {
+                            <option value="@d.Value">@d.Text</option>
+                        }
+                    </select>
+                </label>
+                <label class="field"><span>Discount value</span><input type="number" step="0.01" name="DiscountValue" required /></label>
+                <label class="field"><span>Currency</span><input type="text" name="CurrencyCode" maxlength="3" placeholder="AED" /></label>
+                <label class="field"><span>Valid from</span><input type="date" name="ValidityStart" required /></label>
+                <label class="field"><span>Valid until</span><input type="date" name="ValidityEnd" required /></label>
+                <label class="field"><span>Usage limit (optional)</span><input type="number" name="UsageLimit" min="0" /></label>
+                <label class="field check span-2">
+                    <input type="hidden" name="IsActive" value="false" />
+                    <input type="checkbox" name="IsActive" value="true" checked />
+                    <span>Active on save</span>
+                </label>
+            </div>
+            <footer class="modal-foot">
+                <button type="button" class="btn btn-ghost btn-sm" data-action="close-modal">Cancel</button>
+                <button type="submit" class="btn btn-primary btn-sm">Create voucher</button>
+            </footer>
+        </form>
+    </div>
+</div>
+
+<!-- ── Edit voucher modal ─────────────────────────────────────────────── -->
+<div class="modal-shell" id="modal-edit-voucher" aria-hidden="true">
+    <div class="modal-panel" role="dialog" aria-labelledby="editVoucherTitle">
+        <form method="post" asp-action="EditVoucher">
+            @Html.AntiForgeryToken()
+            <header class="modal-head">
+                <h2 class="modal-title" id="editVoucherTitle">Edit <em>voucher.</em></h2>
+                <button type="button" class="icon-btn" data-action="close-modal" aria-label="Close">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 3L11 11M11 3L3 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </button>
+            </header>
+            <div class="modal-body grid-2">
+                <input type="hidden" name="Id" id="evId" />
+                <label class="field"><span>Code</span><input type="text" name="Code" id="evCode" readonly /></label>
+                <label class="field"><span>Name</span><input type="text" name="Name" id="evName" required /></label>
+                <label class="field span-2"><span>Description</span><input type="text" name="Description" id="evDesc" /></label>
+                <label class="field"><span>Discount type</span>
+                    <select name="DiscountType" id="evType">
+                        @foreach (var d in discountDropdown)
+                        {
+                            <option value="@d.Value">@d.Text</option>
+                        }
+                    </select>
+                </label>
+                <label class="field"><span>Discount value</span><input type="number" step="0.01" name="DiscountValue" id="evValue" /></label>
+                <label class="field"><span>Currency</span><input type="text" name="CurrencyCode" id="evCurrency" maxlength="3" /></label>
+                <label class="field"><span>Valid from</span><input type="date" name="ValidityStart" id="evStart" /></label>
+                <label class="field"><span>Valid until</span><input type="date" name="ValidityEnd" id="evEnd" /></label>
+                <label class="field"><span>Usage limit</span><input type="number" name="UsageLimit" id="evLimit" /></label>
+                <label class="field check span-2">
+                    <input type="hidden" name="IsActive" value="false" />
+                    <input type="checkbox" name="IsActive" value="true" id="evActive" />
+                    <span>Active</span>
+                </label>
+            </div>
+            <footer class="modal-foot">
+                <button type="button" class="btn btn-ghost btn-sm" data-action="close-modal">Cancel</button>
+                <button type="submit" class="btn btn-primary btn-sm">Save changes</button>
+            </footer>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    // Modal open/close
+    function openModal(id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.setAttribute('aria-hidden', 'false');
+        el.classList.add('open');
+    }
+    function closeAll() {
+        document.querySelectorAll('.modal-shell.open').forEach(function (m) {
+            m.classList.remove('open');
+            m.setAttribute('aria-hidden', 'true');
+        });
+    }
+    document.addEventListener('click', function (e) {
+        var t = e.target.closest('[data-action]');
+        if (!t) return;
+        var a = t.getAttribute('data-action');
+        if (a === 'open-add-voucher')       openModal('modal-add-voucher');
+        else if (a === 'open-import')       alert('CSV import is not yet wired in this build.');
+        else if (a === 'close-modal')       closeAll();
+        else if (a === 'edit-voucher')      prepEdit(t);
+    });
+    document.querySelectorAll('.modal-shell').forEach(function (m) {
+        m.addEventListener('click', function (e) { if (e.target === m) closeAll(); });
+    });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAll(); });
+
+    function prepEdit(btn) {
+        document.getElementById('evId').value       = btn.getAttribute('data-id');
+        document.getElementById('evCode').value     = btn.getAttribute('data-code');
+        document.getElementById('evName').value     = btn.getAttribute('data-name');
+        document.getElementById('evDesc').value     = btn.getAttribute('data-desc') || '';
+        document.getElementById('evType').value     = btn.getAttribute('data-type');
+        document.getElementById('evValue').value    = btn.getAttribute('data-value');
+        document.getElementById('evCurrency').value = btn.getAttribute('data-currency') || '';
+        document.getElementById('evStart').value    = btn.getAttribute('data-vstart');
+        document.getElementById('evEnd').value      = btn.getAttribute('data-vend');
+        document.getElementById('evLimit').value    = btn.getAttribute('data-limit') || '';
+        document.getElementById('evActive').checked = btn.getAttribute('data-active') === 'true';
+        openModal('modal-edit-voucher');
+    }
+})();
+</script>
+}
+
+@section Head {
+<style>
+/* TODO promote — voucher catalogue, sub-nav, filter-bar, voucher-card grid, modal shell.
+   These are shared with Redemption policies, Redemption log, and Sales views. */
+
+.sub-nav {
+    display: flex; gap: 26px; padding: 0 2px;
+    margin: 0 0 28px;
+    border-bottom: 1px solid var(--line);
+}
+.sub-link {
+    padding: 12px 2px;
+    font-size: var(--fs-13); font-weight: 500;
+    color: var(--ink-faint); border-bottom: 2px solid transparent;
+    text-decoration: none;
+    transition: color var(--dur-fast), border-color var(--dur-fast);
+}
+.sub-link:hover { color: var(--ink); }
+.sub-link.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.filter-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; padding: 22px 4px 22px; flex-wrap: wrap; margin: 0;
+}
+.filter-bar-left  { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.filter-bar-right { display: flex; align-items: center; gap: 12px; }
+.filter-meta      { font-size: var(--fs-12); color: var(--ink-faint); font-family: var(--font-sans); }
+
+.search-inline {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 12px; min-width: 280px;
+    background: var(--canvas-elevated);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    color: var(--ink-faint);
+}
+.search-inline svg   { flex-shrink: 0; }
+.search-inline input {
+    background: transparent; border: none; outline: none;
+    width: 100%; font-size: var(--fs-13); color: var(--ink);
+    font-family: var(--font-sans);
+}
+
+.seg {
+    display: inline-flex; align-items: center; gap: 2px;
+    padding: 4px;
+    background: var(--canvas-elevated);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+}
+.seg button {
+    padding: 6px 12px;
+    font-size: var(--fs-13); font-weight: 500;
+    color: var(--ink-soft);
+    background: transparent; border: none; border-radius: 6px;
+    cursor: pointer;
+    transition: background var(--dur-fast), color var(--dur-fast);
+}
+.seg button:hover { color: var(--ink); }
+.seg button.active {
+    background: var(--canvas);
+    color: var(--ink);
+    box-shadow: var(--shadow-xs);
+}
+
+.voucher-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 18px; margin-bottom: 8px;
+}
+.voucher-card {
+    position: relative; overflow: hidden;
+    padding: 22px 22px 18px;
+    background: var(--canvas-elevated);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    min-height: 200px;
+    display: flex; flex-direction: column;
+    transition: transform var(--dur-fast), box-shadow var(--dur-fast);
+}
+.voucher-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.voucher-card::after,
+.voucher-card::before {
+    content: ""; position: absolute; top: 50%; width: 24px; height: 24px;
+    background: var(--canvas); border-radius: 50%;
+    transform: translateY(-50%);
+    border: 1px solid var(--line);
+}
+.voucher-card::after  { left:  -12px; }
+.voucher-card::before { right: -12px; }
+.voucher-card.v-gold { border-top: 3px solid var(--accent); }
+.voucher-card.v-rose { border-top: 3px solid #a8326e; }
+.voucher-card.v-jade { border-top: 3px solid var(--success); }
+
+.vc-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.vc-code {
+    font-size: 12px; font-weight: 600; letter-spacing: var(--tracking-wider);
+    padding: 4px 10px; border-radius: 4px;
+    background: var(--canvas-sunken); color: var(--ink);
+    border: 1px dashed var(--line-strong);
+}
+.vc-name {
+    font-family: var(--font-display);
+    font-size: 18px; font-weight: 400;
+    line-height: 1.25; margin: 0 0 12px;
+}
+.vc-disc { display: flex; align-items: baseline; gap: 10px; flex: 1; }
+.vc-disc-val {
+    font-family: var(--font-display);
+    font-size: 36px; font-weight: 500;
+    color: var(--accent);
+    letter-spacing: -0.02em; line-height: 1;
+}
+.vc-disc-lbl { font-size: 12px; color: var(--ink-faint); }
+.vc-foot {
+    display: flex; justify-content: space-between; gap: 8px;
+    margin-top: 14px; padding-top: 12px;
+    border-top: 1px dashed var(--line);
+    font-size: 11px; color: var(--ink-faint);
+}
+.vc-foot strong { color: var(--ink-soft); font-weight: 500; }
+.vc-actions {
+    display: flex; gap: 14px; align-items: center;
+    margin-top: 10px; padding-top: 10px;
+    border-top: 1px dashed var(--line);
+}
+.vc-del-form { margin: 0; }
+.btn-link-sm {
+    background: none; border: none; padding: 0;
+    font-size: 11px; font-weight: 500;
+    color: var(--ink-soft); cursor: pointer;
+    letter-spacing: var(--tracking-wider);
+    text-transform: uppercase;
+}
+.btn-link-sm:hover  { color: var(--accent); }
+.btn-link-sm.danger { color: var(--danger); }
+
+/* Empty card */
+.empty { padding: 60px 22px; text-align: center; }
+.empty-title { font-family: var(--font-display); font-size: 22px; color: var(--ink); }
+.empty-meta  { margin-top: 6px; font-size: var(--fs-13); color: var(--ink-faint); }
+
+/* ── Modal shell (shared) ─────────────────────────────────────────────── */
+.modal-shell {
+    position: fixed; inset: 0;
+    background: rgba(10, 10, 10, 0.55);
+    display: none; align-items: center; justify-content: center;
+    z-index: 200;
+    backdrop-filter: blur(2px);
+}
+.modal-shell.open { display: flex; }
+[data-theme="dark"] .modal-shell { background: rgba(0, 0, 0, 0.7); }
+.modal-panel {
+    width: min(720px, calc(100vw - 32px));
+    max-height: calc(100vh - 64px);
+    background: var(--canvas);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+}
+.modal-head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 20px 22px;
+    border-bottom: 1px solid var(--line);
+}
+.modal-title { font-family: var(--font-display); font-size: 24px; font-weight: 400; margin: 0; }
+.modal-title em { font-style: italic; color: var(--accent); font-weight: 400; }
+.modal-body { padding: 22px; overflow-y: auto; }
+.modal-body.grid-2 {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+}
+.modal-foot {
+    display: flex; justify-content: flex-end; gap: 10px;
+    padding: 16px 22px;
+    border-top: 1px solid var(--line);
+    background: var(--canvas-sunken);
+}
+.field { display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-13); }
+.field.span-2 { grid-column: span 2; }
+.field > span {
+    font-size: var(--fs-12); color: var(--ink-faint);
+    letter-spacing: var(--tracking-wide); text-transform: uppercase;
+    font-weight: 500;
+}
+.field input, .field select, .field textarea {
+    padding: 9px 12px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-md);
+    background: var(--canvas);
+    color: var(--ink);
+    font-size: var(--fs-14); font-family: var(--font-sans);
+    outline: none;
+    transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+}
+.field input:focus, .field select:focus, .field textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-ring);
+}
+.field input[readonly] { background: var(--canvas-sunken); color: var(--ink-faint); }
+.field.check {
+    flex-direction: row; align-items: center; gap: 10px;
+}
+.field.check input { width: auto; }
+.field.check > span { text-transform: none; letter-spacing: 0; font-size: var(--fs-13); color: var(--ink); font-weight: 400; }
+</style>
+}

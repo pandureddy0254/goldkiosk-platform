@@ -1,0 +1,328 @@
+@model GoldKiosk.Cloud.AdminPortal.Models.TransactionHistoryList
+@using System.Globalization
+@{
+    var searchTerm   = (string?)ViewBag.SearchTerm;
+    var stat         = (string?)ViewBag.Stat;
+    var customerCode = (string?)ViewBag.CustomerCode ?? Model.CustomerCode;
+    var pageSize     = (int?)ViewBag.PageSize ?? 10;
+    var pageNo       = (int?)ViewBag.PageNo   ?? 1;
+
+    ViewBag.PageTitle = "Transaction <em>register.</em>";
+    ViewBag.Eyebrow   = "Commerce · Transaction register";
+    ViewBag.Subtitle  = string.IsNullOrWhiteSpace(customerCode)
+        ? "Every offer, every settlement. Filterable by status, customer and TX-ID — exportable for finance and audit."
+        : $"Transactions for customer <span class=\"mono\">{customerCode}</span> · sortable, exportable, reversible.";
+    ViewBag.ActiveNav = "customers";
+    ViewBag.PageHeadActions =
+        "<button type=\"button\" class=\"btn btn-ghost btn-sm\">" +
+        "<svg width=\"14\" height=\"14\" viewBox=\"0 0 14 14\" fill=\"none\"><path d=\"M2 4H12M4 7H10M6 10H8\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/></svg>" +
+        "Export CSV</button>" +
+        "<button type=\"button\" class=\"btn btn-primary btn-sm\">" +
+        "<svg width=\"14\" height=\"14\" viewBox=\"0 0 14 14\" fill=\"none\"><path d=\"M2 2H12V12H2V2Z\" stroke=\"currentColor\" stroke-width=\"1.5\"/><path d=\"M5 5H9M5 8H9\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/></svg>" +
+        "Reconciliation</button>";
+
+    string[] avatarGradients = new[]
+    {
+        "linear-gradient(135deg,#b8941f,#7e6213)",
+        "linear-gradient(135deg,#2a5d8c,#1c3e5d)",
+        "linear-gradient(135deg,#a83232,#7a2424)",
+        "linear-gradient(135deg,#2a7d4f,#1c5d3a)",
+        "linear-gradient(135deg,#c47419,#8b520f)",
+        "linear-gradient(135deg,#75716a,#4a4845)"
+    };
+
+    string StatusPillClass(string? status, bool isReversed)
+    {
+        if (isReversed) return "s-disabled";
+        return (status ?? "").ToLowerInvariant() switch
+        {
+            "paid"     or "success"  or "settled" => "s-active",
+            "started"  or "pending"               => "s-pending",
+            "declined" or "failed"   or "failure" => "s-disabled",
+            "aborted"                              => "s-disabled",
+            _                                      => "s-pending"
+        };
+    }
+    string StatusLabel(string? s) => string.IsNullOrWhiteSpace(s)
+        ? "—"
+        : char.ToUpperInvariant(s[0]) + s.Substring(1).ToLowerInvariant();
+}
+
+@* KPI strip *@
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Total<span class="dot"></span></div>
+        <div class="kpi-value mono">@Model.Total.ToString("N0", CultureInfo.InvariantCulture)</div>
+        <div class="kpi-foot"><span class="label-suffix">in current view</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Settled<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value mono">@Model.Success.ToString("N0", CultureInfo.InvariantCulture)</div>
+        <div class="kpi-foot">
+            @if (Model.Total > 0)
+            {
+                var pct = (decimal)Model.Success / Model.Total * 100m;
+                <span class="label-suffix">@pct.ToString("F1", CultureInfo.InvariantCulture)% success</span>
+            }
+            else
+            {
+                <span class="label-suffix">No data</span>
+            }
+        </div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Reversed<span class="dot" style="background:var(--warning);"></span></div>
+        <div class="kpi-value mono">@Model.Reversed.ToString("N0", CultureInfo.InvariantCulture)</div>
+        <div class="kpi-foot"><span class="label-suffix">audited</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Failed<span class="dot" style="background:var(--danger);"></span></div>
+        <div class="kpi-value mono">@Model.Failure.ToString("N0", CultureInfo.InvariantCulture)</div>
+        <div class="kpi-foot"><span class="label-suffix">declined · aborted</span></div>
+    </div>
+</div>
+
+@* Filter toolbar *@
+<section class="card" style="margin-bottom:18px;">
+    <form method="get" asp-action="TransactionHistory" class="tx-filter-bar">
+        <div class="tx-filter-group">
+            <label>Customer code</label>
+            <input type="text"
+                   name="customerCode"
+                   value="@customerCode"
+                   placeholder="C-XXXX"
+                   class="mono tx-input"
+                   required />
+        </div>
+        <div class="tx-filter-group">
+            <label>Status</label>
+            <select name="stat" class="tx-filter-select" onchange="this.form.submit();">
+                <option value=""         selected="@(string.IsNullOrEmpty(stat))">All statuses</option>
+                <option value="paid"     selected="@(stat == "paid")">Paid · settled</option>
+                <option value="started"  selected="@(stat == "started")">Started</option>
+                <option value="declined" selected="@(stat == "declined")">Declined</option>
+                <option value="aborted"  selected="@(stat == "aborted")">Aborted</option>
+            </select>
+        </div>
+        <div class="tx-filter-divider"></div>
+        <div class="tx-filter-group" style="flex:1; min-width:220px;">
+            <label>Search</label>
+            <div class="search inline-search">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                    <circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5" />
+                    <path d="M11 11L14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                </svg>
+                <input type="text" name="search" value="@searchTerm" placeholder="TX-NNNN…" />
+            </div>
+        </div>
+        <div class="tx-filter-group">
+            <label class="visually-hidden">Apply</label>
+            <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+        </div>
+    </form>
+</section>
+
+@* Transaction table *@
+<section class="card">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">
+                Transactions
+                @if (!string.IsNullOrWhiteSpace(customerCode))
+                {
+                    <span style="color:var(--ink-faint); font-weight:400;"> · <span class="mono">@customerCode</span></span>
+                }
+                · <span class="mono">@Model.Total.ToString("N0", CultureInfo.InvariantCulture)</span>
+            </h2>
+            <div class="card-meta" style="margin-top:6px;">
+                <span><span class="dot-pulse"></span> Streaming · sorted by occurred-at desc</span>
+            </div>
+        </div>
+        <div style="display:flex; gap:6px;">
+            <button type="button" class="btn btn-ghost btn-sm">Columns</button>
+            <button type="button" class="btn btn-ghost btn-sm">Density</button>
+        </div>
+    </header>
+
+    <div style="overflow-x:auto;">
+        <table class="user-table tx-table">
+            <thead>
+                <tr>
+                    <th style="width:5%;">SR</th>
+                    <th style="width:9%;">TX-ID</th>
+                    <th style="width:14%;">Customer</th>
+                    <th style="width:11%; text-align:right;">Amount</th>
+                    <th style="width:11%; text-align:right;">Commission</th>
+                    <th style="width:11%; text-align:right;">Service fee</th>
+                    <th style="width:10%;">Original</th>
+                    <th style="width:10%;">Final</th>
+                    <th style="width:9%;">Reversed</th>
+                    <th style="width:10%; text-align:right; padding-right:22px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.transactionList != null && Model.transactionList.Any())
+                {
+                    var idx = 0;
+                    foreach (var tx in Model.transactionList)
+                    {
+                        var gradient = avatarGradients[idx % avatarGradients.Length];
+                        var initials = string.IsNullOrEmpty(tx.MobileMasked) ? "C" :
+                                       (tx.MobileMasked.Length >= 2 ? tx.MobileMasked.Substring(tx.MobileMasked.Length - 2) : tx.MobileMasked);
+                        var curr = string.IsNullOrWhiteSpace(tx.CurrencyCode) ? "AED" : tx.CurrencyCode;
+                        idx++;
+                        <tr>
+                            <td class="mono">@tx.Sr</td>
+                            <td><span class="feed-code">@tx.TransactionCode</span></td>
+                            <td>
+                                <div class="user-cell">
+                                    <span class="avatar" style="background:@gradient; color:#fff; width:24px; height:24px; font-size:10px;">@initials</span>
+                                    <div class="meta">
+                                        <strong>@(string.IsNullOrWhiteSpace(customerCode) ? "Customer" : customerCode)</strong>
+                                        <span class="mono">@tx.MobileMasked</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="mono" style="text-align:right;">
+                                @tx.Amount.ToString("N2", CultureInfo.InvariantCulture)
+                                <span style="color:var(--ink-faint); font-size:11px; margin-left:4px;">@curr</span>
+                            </td>
+                            <td class="mono" style="text-align:right;">
+                                @tx.Commission.ToString("N2", CultureInfo.InvariantCulture)
+                            </td>
+                            <td class="mono" style="text-align:right;">
+                                @tx.ServiceFee.ToString("N2", CultureInfo.InvariantCulture)
+                            </td>
+                            <td><span class="status-pill @StatusPillClass(tx.OriginalStatus, false)">@StatusLabel(tx.OriginalStatus)</span></td>
+                            <td>
+                                @if (tx.IsReversed)
+                                {
+                                    <span class="status-pill s-disabled">Reversed</span>
+                                }
+                                else
+                                {
+                                    <span class="status-pill @StatusPillClass(tx.FinalStatus, false)">@StatusLabel(tx.FinalStatus)</span>
+                                }
+                            </td>
+                            <td>
+                                @if (tx.IsReversed)
+                                {
+                                    <span class="mono" style="color:var(--success); font-size:12px;">✓ yes</span>
+                                }
+                                else
+                                {
+                                    <span class="mono" style="color:var(--ink-faint); font-size:12px;">— no</span>
+                                }
+                            </td>
+                            <td style="text-align:right; padding-right:22px;">
+                                @if (!tx.IsReversed)
+                                {
+                                    <form method="post" asp-action="ReverseTransaction" style="display:inline;">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="transactionId" value="@tx.TransactionId" />
+                                        <input type="hidden" name="customerCode"  value="@customerCode" />
+                                        <button type="submit"
+                                                class="btn btn-ghost btn-sm"
+                                                style="color:var(--danger); border-color:rgba(168,50,50,0.3);"
+                                                onclick="return confirm('Raise reversal for transaction @tx.TransactionCode? This action is logged.');">
+                                            Raise reversal
+                                        </button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <span class="mono" style="color:var(--ink-faint); font-size:11px;">already reversed</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="10" style="text-align:center; padding:36px 0; color:var(--ink-faint);">
+                            No transactions in this window.
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <div class="table-foot">
+        <span>Showing <strong class="mono">@(Model.transactionList?.Count ?? 0)</strong> of <strong class="mono">@Model.Total.ToString("N0", CultureInfo.InvariantCulture)</strong> · page @pageNo</span>
+        <div class="pager">
+            <a class="btn btn-ghost btn-sm @(pageNo <= 1 ? "disabled" : null)"
+               asp-action="TransactionHistory"
+               asp-route-customerCode="@customerCode"
+               asp-route-search="@searchTerm"
+               asp-route-stat="@stat"
+               asp-route-pageNo="@(pageNo - 1)"
+               asp-route-pageSize="@pageSize">◀</a>
+            <button type="button" class="btn btn-ghost btn-sm active">@pageNo</button>
+            <a class="btn btn-ghost btn-sm"
+               asp-action="TransactionHistory"
+               asp-route-customerCode="@customerCode"
+               asp-route-search="@searchTerm"
+               asp-route-stat="@stat"
+               asp-route-pageNo="@(pageNo + 1)"
+               asp-route-pageSize="@pageSize">▶</a>
+        </div>
+    </div>
+</section>
+
+@* TODO promote: tx-filter / table-foot / pager / status helpers into main.css *@
+<style>
+    .tx-filter-bar { display:flex; align-items:flex-end; gap:18px; padding:18px 22px; flex-wrap:wrap; }
+    .tx-filter-group { display:flex; flex-direction:column; gap:6px; }
+    .tx-filter-group label { font-size:11px; letter-spacing:var(--tracking-wider); text-transform:uppercase; color:var(--ink-faint); }
+    .tx-filter-divider { width:1px; align-self:stretch; background: var(--line); margin: 6px 0; }
+    .tx-input,
+    .tx-filter-select {
+        appearance:none; -webkit-appearance:none;
+        background: var(--canvas-sunken);
+        border: 1px solid var(--line-strong);
+        color: var(--ink);
+        padding: 8px 28px 8px 12px;
+        font-family: var(--font-sans);
+        font-size: var(--fs-13);
+        border-radius: var(--radius-md);
+        min-width: 180px;
+    }
+    .tx-input.mono { font-family: var(--font-mono); }
+    .tx-filter-select {
+        background-image: linear-gradient(45deg, transparent 50%, var(--ink-faint) 50%), linear-gradient(135deg, var(--ink-faint) 50%, transparent 50%);
+        background-position: calc(100% - 14px) 50%, calc(100% - 9px) 50%;
+        background-size: 5px 5px, 5px 5px;
+        background-repeat: no-repeat;
+    }
+    .tx-input:focus,
+    .tx-filter-select:focus { outline:none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+
+    .search.inline-search {
+        background: var(--canvas-sunken);
+        border: 1px solid var(--line-strong);
+        padding: 6px 10px;
+        border-radius: var(--radius-md);
+        width: 100%;
+        min-width: 220px;
+    }
+    .search.inline-search input { background: transparent; }
+
+    .tx-table .feed-code { font-family: var(--font-mono); color: var(--accent); font-weight: 500; }
+    .tx-table td { white-space: nowrap; }
+
+    .table-foot {
+        display:flex; justify-content:space-between; align-items:center;
+        padding: 14px 22px;
+        border-top: 1px solid var(--line);
+        font-size: var(--fs-13); color: var(--ink-faint);
+    }
+    .table-foot strong { color: var(--ink); font-weight:500; }
+    .pager { display:flex; gap:4px; align-items:center; }
+    .pager .btn-sm { padding: 4px 10px; min-width: 30px; }
+    .pager .btn-sm.active { border-color: var(--accent); color: var(--accent); }
+    .pager .disabled { pointer-events: none; opacity: 0.4; }
+
+    .visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+</style>

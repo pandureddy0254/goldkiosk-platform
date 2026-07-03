@@ -1,0 +1,206 @@
+@{
+    ViewBag.PageTitle = "Cash <em>collections.</em>";
+    ViewBag.Eyebrow   = "Operations · Field logistics";
+    ViewBag.Subtitle  = "Routes, cassette levels, and scheduled pickups across the fleet. Generate optimised routes when kiosks approach 70% capacity.";
+    ViewBag.ActiveNav = "operations";
+}
+
+@* ── Operations sub-nav + primary action ───────────────────────────── *@
+<div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin: -16px 0 22px;">
+    <div class="seg seg-tabs">
+        <a class="active" asp-controller="Operations" asp-action="CollectionTickets">Collections</a>
+        <a asp-controller="Operations" asp-action="MaintenanceTickets">Maintenance</a>
+        <a asp-controller="Operations" asp-action="TechnicianManagement">Technicians</a>
+        <a asp-controller="Operations" asp-action="SystemHealthCheck">System health</a>
+        <a asp-controller="Operations" asp-action="DeploymentTickets">Deployment</a>
+        <a asp-controller="Operations" asp-action="LocationConfiguration">Locations</a>
+    </div>
+    <span style="flex:1;"></span>
+    <button type="button" class="btn btn-primary btn-sm" data-action="open-modal" data-target="addRunModal">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 3V11M3 7H11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Generate route
+    </button>
+</div>
+
+@* ── KPI strip ───────────────────────────────────────────────────────── *@
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Need collection<span class="dot" style="background:var(--warning);"></span></div>
+        <div class="kpi-value mono">16</div>
+        <div class="kpi-foot"><span class="label-suffix">&ge; 70% capacity</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Total cash · fleet<span class="dot"></span></div>
+        <div class="kpi-value mono">2,148,420<span class="unit">AED</span></div>
+        <div class="kpi-foot"><span class="delta delta-up">&#9650; 8.2%</span><span class="label-suffix">vs 7d avg</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Routes today<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value mono">4</div>
+        <div class="kpi-foot"><span class="label-suffix">2 active · 1 scheduled</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Collected today<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value mono">842,180<span class="unit">AED</span></div>
+        <div class="kpi-foot"><span class="delta delta-up">&#9650; 14%</span><span class="label-suffix">target · AED 900k</span></div>
+    </div>
+</div>
+
+@* ── Map + active routes ────────────────────────────────────────────── *@
+<div class="split-2-1">
+    <section class="card">
+        <header class="card-head">
+            <div>
+                <h2 class="card-title">Fleet map · cash levels</h2>
+                <div class="card-meta" style="margin-top:6px;">
+                    <span><span class="sw" style="background:var(--success);"></span>Low</span>
+                    <span><span class="sw" style="background:var(--warning);"></span>&ge; 70%</span>
+                    <span><span class="sw" style="background:var(--danger);"></span>&ge; 90%</span>
+                </div>
+            </div>
+            <div class="seg"><button class="active" type="button">Map</button><button type="button">List</button></div>
+        </header>
+        <div class="card-body">
+            <div class="map-card">
+                <svg viewBox="0 0 600 360" preserveAspectRatio="xMidYMid meet" width="100%" style="display:block;">
+                    <defs>
+                        <radialGradient id="redglow" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="var(--danger)" stop-opacity="0.45"/><stop offset="100%" stop-color="var(--danger)" stop-opacity="0"/></radialGradient>
+                        <radialGradient id="ambglow" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="var(--warning)" stop-opacity="0.4"/><stop offset="100%" stop-color="var(--warning)" stop-opacity="0"/></radialGradient>
+                        <radialGradient id="grnglow" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="var(--success)" stop-opacity="0.35"/><stop offset="100%" stop-color="var(--success)" stop-opacity="0"/></radialGradient>
+                    </defs>
+                    <path d="M40,120 Q120,90 220,80 Q340,70 440,110 Q540,140 560,220 Q540,300 440,320 Q320,330 220,320 Q120,310 70,260 Q30,200 40,120 Z" fill="var(--canvas-sunken)" stroke="var(--line-strong)" stroke-width="1"/>
+                    <path d="M380,140 Q420,160 430,210 Q420,260 380,270 Q340,260 340,210 Q340,160 380,140 Z" fill="var(--canvas-elevated)" stroke="var(--accent)" stroke-width="1" stroke-dasharray="3 4" opacity="0.5"/>
+                    <path d="M395,205 Q360,170 320,175 Q260,180 230,210 Q200,250 240,270" fill="none" stroke="var(--accent)" stroke-width="1.4" stroke-dasharray="4 4" opacity="0.7"/>
+                    <g><circle cx="395" cy="205" r="18" fill="url(#redglow)"/><circle cx="395" cy="205" r="6" fill="var(--danger)"/><text x="408" y="208" font-size="10" font-family="var(--font-mono)" fill="var(--ink)">K-DXB-01 · 92%</text></g>
+                    <g><circle cx="385" cy="220" r="14" fill="url(#ambglow)"/><circle cx="385" cy="220" r="5" fill="var(--warning)"/><text x="398" y="234" font-size="10" font-family="var(--font-mono)" fill="var(--ink-soft)">K-DXB-02 · 78%</text></g>
+                    <g><circle cx="410" cy="195" r="14" fill="url(#ambglow)"/><circle cx="410" cy="195" r="5" fill="var(--warning)"/><text x="422" y="190" font-size="10" font-family="var(--font-mono)" fill="var(--ink-soft)">K-DXB-03 · 74%</text></g>
+                    <g><circle cx="370" cy="240" r="10" fill="url(#grnglow)"/><circle cx="370" cy="240" r="4" fill="var(--success)"/></g>
+                    <g><circle cx="280" cy="240" r="16" fill="url(#redglow)"/><circle cx="280" cy="240" r="6" fill="var(--danger)"/><text x="220" y="262" font-size="10" font-family="var(--font-mono)" fill="var(--ink)">K-AUH-01 · 88%</text></g>
+                    <g><circle cx="260" cy="225" r="12" fill="url(#ambglow)"/><circle cx="260" cy="225" r="5" fill="var(--warning)"/></g>
+                    <g><circle cx="420" cy="175" r="14" fill="url(#ambglow)"/><circle cx="420" cy="175" r="5" fill="var(--warning)"/><text x="432" y="172" font-size="10" font-family="var(--font-mono)" fill="var(--ink-soft)">K-SHJ-01 · 81%</text></g>
+                    <g><circle cx="440" cy="140" r="10" fill="url(#grnglow)"/><circle cx="440" cy="140" r="4" fill="var(--success)"/></g>
+                    <g><circle cx="455" cy="148" r="10" fill="url(#grnglow)"/><circle cx="455" cy="148" r="4" fill="var(--success)"/></g>
+                    <g><circle cx="425" cy="160" r="10" fill="url(#grnglow)"/><circle cx="425" cy="160" r="4" fill="var(--success)"/></g>
+                    <g><circle cx="490" cy="180" r="12" fill="url(#ambglow)"/><circle cx="490" cy="180" r="5" fill="var(--warning)"/></g>
+                    <text x="300" y="35" font-size="10" font-family="var(--font-sans)" fill="var(--ink-faint)" text-anchor="middle" letter-spacing="0.14em">UAE FLEET · CASH LEVELS · LIVE</text>
+                    <text x="450" y="345" font-size="9" font-family="var(--font-mono)" fill="var(--ink-faint)" text-anchor="end">Route R-DXB-01 · 6 stops · ETA 14:30</text>
+                </svg>
+            </div>
+        </div>
+    </section>
+
+    <section class="card">
+        <header class="card-head">
+            <div>
+                <h2 class="card-title">Active routes</h2>
+                <div class="card-meta" style="margin-top:6px;"><span class="dot-pulse" style="background:var(--success);"></span><span>2 in progress</span></div>
+            </div>
+        </header>
+        <div class="card-body" style="padding:18px 22px;">
+            <div class="route-item">
+                <div class="route-head"><span class="mono" style="color:var(--accent);">R-DXB-01</span><span class="status-pill s-active">In progress</span></div>
+                <div class="route-meta">Hassan Al Naqbi · 6 stops · DXB Mall &rarr; JBR &rarr; Marina</div>
+                <div class="route-prog"><div class="route-fill" style="width:60%;"></div></div>
+                <div class="route-foot"><span class="mono">3 / 6 stops</span><span class="mono">ETA 14:30</span></div>
+            </div>
+            <div class="route-item">
+                <div class="route-head"><span class="mono" style="color:var(--accent);">R-AUH-02</span><span class="status-pill s-active">In progress</span></div>
+                <div class="route-meta">Khalid Mohammed · 4 stops · Marina Mall &rarr; Yas &rarr; Corniche</div>
+                <div class="route-prog"><div class="route-fill" style="width:25%;"></div></div>
+                <div class="route-foot"><span class="mono">1 / 4 stops</span><span class="mono">ETA 16:10</span></div>
+            </div>
+            <div class="route-item">
+                <div class="route-head"><span class="mono" style="color:var(--accent);">R-SHJ-01</span><span class="status-pill s-pending">Scheduled</span></div>
+                <div class="route-meta">Raj Kumar · 3 stops · Al Wahda &rarr; Souk &rarr; Al Majaz</div>
+                <div class="route-prog"><div class="route-fill" style="width:0%;"></div></div>
+                <div class="route-foot"><span class="mono">0 / 3 stops</span><span class="mono">Starts 15:00</span></div>
+            </div>
+            <div class="route-item">
+                <div class="route-head"><span class="mono" style="color:var(--accent);">R-NTH-01</span><span class="status-pill s-pending">Scheduled · tomorrow</span></div>
+                <div class="route-meta">Salim Al Mazroui · 5 stops · RAK &rarr; UAQ &rarr; AJM &rarr; FUJ</div>
+                <div class="route-prog"><div class="route-fill" style="width:0%;"></div></div>
+                <div class="route-foot"><span class="mono">0 / 5 stops</span><span class="mono">May 24 · 09:00</span></div>
+            </div>
+        </div>
+    </section>
+</div>
+
+@* ── Kiosks needing collection ───────────────────────────────────────── *@
+<section class="card" style="margin-bottom:32px;">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Kiosks needing collection · &ge; 70% capacity</h2>
+            <div class="card-meta" style="margin-top:6px;"><span>16 kiosks · sorted by capacity descending</span></div>
+        </div>
+        <div style="display:flex; gap:6px;">
+            <button type="button" class="btn btn-ghost btn-sm">Bulk assign</button>
+            <button type="button" class="btn btn-ghost btn-sm">Export</button>
+        </div>
+    </header>
+    <div style="overflow-x:auto;">
+        <table class="user-table">
+            <thead>
+                <tr>
+                    <th>Kiosk</th><th>Location</th><th style="text-align:right;">Current cash</th>
+                    <th>Capacity</th><th>Last collection</th><th>Scheduled</th><th>Route</th><th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td class="mono">K-DXB-01</td><td>Dubai Mall · North</td><td class="mono" style="text-align:right;">184,200 AED</td><td><div class="bar"><div class="bar-fill" style="width:92%; background:var(--danger);"></div></div><span class="mono" style="font-size:11px; color:var(--danger);">92%</span></td><td class="mono" style="font-size:12px;">May 18 · 10:24</td><td class="mono" style="font-size:12px;">Today · 14:30</td><td class="mono" style="color:var(--accent);">R-DXB-01</td><td><span class="status-pill" style="background:var(--danger-soft); color:var(--danger);">Urgent</span></td></tr>
+                <tr><td class="mono">K-AUH-01</td><td>Marina Mall</td><td class="mono" style="text-align:right;">158,840 AED</td><td><div class="bar"><div class="bar-fill" style="width:88%; background:var(--danger);"></div></div><span class="mono" style="font-size:11px; color:var(--danger);">88%</span></td><td class="mono" style="font-size:12px;">May 19 · 11:08</td><td class="mono" style="font-size:12px;">Today · 16:10</td><td class="mono" style="color:var(--accent);">R-AUH-02</td><td><span class="status-pill" style="background:var(--danger-soft); color:var(--danger);">Urgent</span></td></tr>
+                <tr><td class="mono">K-DXB-02</td><td>Dubai Mall · South</td><td class="mono" style="text-align:right;">142,180 AED</td><td><div class="bar"><div class="bar-fill" style="width:78%; background:var(--warning);"></div></div><span class="mono" style="font-size:11px; color:var(--warning);">78%</span></td><td class="mono" style="font-size:12px;">May 20 · 09:48</td><td class="mono" style="font-size:12px;">Today · 14:30</td><td class="mono" style="color:var(--accent);">R-DXB-01</td><td><span class="status-pill s-pending">Scheduled</span></td></tr>
+                <tr><td class="mono">K-DXB-03</td><td>JBR Walk</td><td class="mono" style="text-align:right;">128,400 AED</td><td><div class="bar"><div class="bar-fill" style="width:74%; background:var(--warning);"></div></div><span class="mono" style="font-size:11px; color:var(--warning);">74%</span></td><td class="mono" style="font-size:12px;">May 20 · 11:18</td><td class="mono" style="font-size:12px;">Today · 14:30</td><td class="mono" style="color:var(--accent);">R-DXB-01</td><td><span class="status-pill s-pending">Scheduled</span></td></tr>
+                <tr><td class="mono">K-SHJ-01</td><td>Souk Saqr</td><td class="mono" style="text-align:right;">122,840 AED</td><td><div class="bar"><div class="bar-fill" style="width:81%; background:var(--warning);"></div></div><span class="mono" style="font-size:11px; color:var(--warning);">81%</span></td><td class="mono" style="font-size:12px;">May 19 · 14:42</td><td class="mono" style="font-size:12px;">Today · 15:00</td><td class="mono" style="color:var(--accent);">R-SHJ-01</td><td><span class="status-pill s-pending">Scheduled</span></td></tr>
+                <tr><td class="mono">K-DXB-04</td><td>JBR · West</td><td class="mono" style="text-align:right;">118,200 AED</td><td><div class="bar"><div class="bar-fill" style="width:72%; background:var(--warning);"></div></div><span class="mono" style="font-size:11px; color:var(--warning);">72%</span></td><td class="mono" style="font-size:12px;">May 21 · 08:42</td><td class="mono" style="font-size:12px;">Today · 14:30</td><td class="mono" style="color:var(--accent);">R-DXB-01</td><td><span class="status-pill s-pending">Scheduled</span></td></tr>
+                <tr><td class="mono">K-AUH-02</td><td>Yas Mall</td><td class="mono" style="text-align:right;">112,840 AED</td><td><div class="bar"><div class="bar-fill" style="width:71%; background:var(--warning);"></div></div><span class="mono" style="font-size:11px; color:var(--warning);">71%</span></td><td class="mono" style="font-size:12px;">May 21 · 12:14</td><td class="mono" style="font-size:12px;">Today · 16:10</td><td class="mono" style="color:var(--accent);">R-AUH-02</td><td><span class="status-pill s-pending">Scheduled</span></td></tr>
+                <tr><td class="mono">K-DXB-05</td><td>City Walk</td><td class="mono" style="text-align:right;">98,180 AED</td><td><div class="bar"><div class="bar-fill" style="width:70%; background:var(--warning);"></div></div><span class="mono" style="font-size:11px; color:var(--warning);">70%</span></td><td class="mono" style="font-size:12px;">May 21 · 16:08</td><td class="mono" style="font-size:12px;">&mdash;</td><td class="mono" style="color:var(--ink-faint);">unassigned</td><td><span class="status-pill s-disabled">Pending</span></td></tr>
+                <tr><td class="mono">K-AUH-03</td><td>Corniche</td><td class="mono" style="text-align:right;">94,400 AED</td><td><div class="bar"><div class="bar-fill" style="width:74%; background:var(--warning);"></div></div><span class="mono" style="font-size:11px; color:var(--warning);">74%</span></td><td class="mono" style="font-size:12px;">May 20 · 13:48</td><td class="mono" style="font-size:12px;">Today · 16:10</td><td class="mono" style="color:var(--accent);">R-AUH-02</td><td><span class="status-pill s-pending">Scheduled</span></td></tr>
+                <tr><td class="mono">K-RAK-01</td><td>RAK · City Centre</td><td class="mono" style="text-align:right;">82,840 AED</td><td><div class="bar"><div class="bar-fill" style="width:76%; background:var(--warning);"></div></div><span class="mono" style="font-size:11px; color:var(--warning);">76%</span></td><td class="mono" style="font-size:12px;">May 18 · 09:14</td><td class="mono" style="font-size:12px;">May 24 · 09:00</td><td class="mono" style="color:var(--accent);">R-NTH-01</td><td><span class="status-pill s-pending">Tomorrow</span></td></tr>
+                <tr><td class="mono">K-FUJ-01</td><td>Fujairah</td><td class="mono" style="text-align:right;">78,180 AED</td><td><div class="bar"><div class="bar-fill" style="width:73%; background:var(--warning);"></div></div><span class="mono" style="font-size:11px; color:var(--warning);">73%</span></td><td class="mono" style="font-size:12px;">May 18 · 12:42</td><td class="mono" style="font-size:12px;">May 24 · 09:00</td><td class="mono" style="color:var(--accent);">R-NTH-01</td><td><span class="status-pill s-pending">Tomorrow</span></td></tr>
+                <tr><td class="mono">K-AJM-01</td><td>Ajman City</td><td class="mono" style="text-align:right;">74,200 AED</td><td><div class="bar"><div class="bar-fill" style="width:75%; background:var(--warning);"></div></div><span class="mono" style="font-size:11px; color:var(--warning);">75%</span></td><td class="mono" style="font-size:12px;">May 19 · 10:18</td><td class="mono" style="font-size:12px;">May 24 · 09:00</td><td class="mono" style="color:var(--accent);">R-NTH-01</td><td><span class="status-pill s-pending">Tomorrow</span></td></tr>
+                <tr><td class="mono">K-UAQ-01</td><td>Umm Al-Quwain</td><td class="mono" style="text-align:right;">68,840 AED</td><td><div class="bar"><div class="bar-fill" style="width:72%; background:var(--warning);"></div></div><span class="mono" style="font-size:11px; color:var(--warning);">72%</span></td><td class="mono" style="font-size:12px;">May 18 · 15:24</td><td class="mono" style="font-size:12px;">May 24 · 09:00</td><td class="mono" style="color:var(--accent);">R-NTH-01</td><td><span class="status-pill s-pending">Tomorrow</span></td></tr>
+                <tr><td class="mono">K-SHJ-03</td><td>Al Wahda</td><td class="mono" style="text-align:right;">62,180 AED</td><td><div class="bar"><div class="bar-fill" style="width:70%; background:var(--warning);"></div></div><span class="mono" style="font-size:11px; color:var(--warning);">70%</span></td><td class="mono" style="font-size:12px;">May 20 · 17:08</td><td class="mono" style="font-size:12px;">Today · 15:00</td><td class="mono" style="color:var(--accent);">R-SHJ-01</td><td><span class="status-pill s-pending">Scheduled</span></td></tr>
+                <tr><td class="mono">K-DXB-06</td><td>Ibn Battuta</td><td class="mono" style="text-align:right;">58,420 AED</td><td><div class="bar"><div class="bar-fill" style="width:71%; background:var(--warning);"></div></div><span class="mono" style="font-size:11px; color:var(--warning);">71%</span></td><td class="mono" style="font-size:12px;">May 21 · 11:32</td><td class="mono" style="font-size:12px;">&mdash;</td><td class="mono" style="color:var(--ink-faint);">unassigned</td><td><span class="status-pill s-disabled">Pending</span></td></tr>
+                <tr><td class="mono">K-SHJ-02</td><td>Al Majaz</td><td class="mono" style="text-align:right;">52,240 AED</td><td><div class="bar"><div class="bar-fill" style="width:70%; background:var(--warning);"></div></div><span class="mono" style="font-size:11px; color:var(--warning);">70%</span></td><td class="mono" style="font-size:12px;">May 20 · 13:42</td><td class="mono" style="font-size:12px;">Today · 15:00</td><td class="mono" style="color:var(--accent);">R-SHJ-01</td><td><span class="status-pill s-pending">Scheduled</span></td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@* ── Hidden form for generating a route (visual stub; wire to AddCollectionRun) ─── *@
+<form asp-controller="Operations" asp-action="AddCollectionRun" method="post" style="display:none;" id="addRunForm">
+    @Html.AntiForgeryToken()
+</form>
+
+@section Scripts {
+    <script>
+        // No-op placeholder for the Generate route button until the modal is built.
+        document.querySelectorAll('[data-action="open-modal"]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                console.info('Open modal:', btn.getAttribute('data-target'));
+            });
+        });
+    </script>
+}
+
+@* TODO promote: page-scoped styles (seg-tabs, map-card, bar, route-*) — once
+    used by 2+ views, lift to main.css.  Most are already proven elsewhere in
+    the prototype; we only keep what's missing locally. *@
+<style>
+    .seg.seg-tabs { display:inline-flex; border:1px solid var(--line-strong); border-radius:var(--radius-md); overflow:hidden; background:var(--canvas-elevated); flex-wrap:wrap; }
+    .seg.seg-tabs a { padding:8px 14px; font-size:13px; color:var(--ink-soft); border-right:1px solid var(--line); text-decoration:none; }
+    .seg.seg-tabs a:last-child { border-right:none; }
+    .seg.seg-tabs a.active { background: var(--ink); color: var(--canvas); }
+    .seg.seg-tabs a:hover:not(.active) { background: var(--canvas-sunken); color: var(--ink); }
+    .map-card { background: var(--canvas-sunken); border:1px solid var(--line); border-radius: var(--radius-md); padding: 6px; }
+    .sw { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:4px; vertical-align:middle; }
+    .bar { display:inline-block; width:78px; height: 5px; background: var(--canvas-sunken); border-radius:2px; overflow:hidden; vertical-align:middle; margin-right:8px; }
+    .bar-fill { height: 100%; border-radius:2px; }
+    .route-item { padding: 14px 0; border-bottom: 1px solid var(--line); }
+    .route-item:last-child { border-bottom: none; }
+    .route-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; font-weight:500; }
+    .route-meta { font-size: 13px; color: var(--ink-soft); margin-bottom: 10px; }
+    .route-prog { height: 4px; background: var(--canvas-sunken); border-radius:2px; margin-bottom: 6px; overflow:hidden; }
+    .route-fill { height:100%; background: var(--accent); border-radius:2px; transition: width var(--dur-med); }
+    .route-foot { display:flex; justify-content:space-between; font-size:12px; color: var(--ink-faint); }
+</style>

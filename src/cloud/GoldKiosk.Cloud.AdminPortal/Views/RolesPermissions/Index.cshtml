@@ -1,0 +1,405 @@
+@model GoldKiosk.Cloud.AdminPortal.Models.Identity.RolesIndexViewModel
+@using GoldKiosk.Cloud.AdminPortal.Models.Identity
+@{
+    ViewBag.PageTitle = "Roles &amp; <em>permissions.</em>";
+    ViewBag.Eyebrow   = "Administration · Access control";
+    ViewBag.Subtitle  = "Six predefined system roles + your own custom roles. Permission grants are inspected on every API call and every UI action. The Owner role is special — it cannot be deleted or stripped of permissions.";
+    ViewBag.ActiveNav = "roles";
+
+    ViewBag.PageHeadActions =
+        "<button class=\"btn btn-ghost btn-sm\" type=\"button\" data-action=\"open-modal\" data-target=\"importRoleModal\">" +
+            "<svg width=\"14\" height=\"14\" viewBox=\"0 0 14 14\" fill=\"none\"><path d=\"M2 7H12M7 2V12\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/></svg>" +
+            " Import role" +
+        "</button>" +
+        "<button class=\"btn btn-primary btn-sm\" type=\"button\" data-action=\"open-modal\" data-target=\"createRoleModal\" id=\"openCreateRole\">" +
+            "<svg width=\"14\" height=\"14\" viewBox=\"0 0 14 14\" fill=\"none\"><path d=\"M7 3V11M3 7H11\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/></svg>" +
+            " Create custom role" +
+        "</button>";
+
+    var selected      = Model.SelectedRole;
+    var selectedId    = selected?.Id;
+    var isEditable    = selected is not null && !selected.IsSystem;
+    var granted       = Model.GrantedPermissionCodes;
+    var kpis          = Model.Kpis;
+    var systemSummary = $"{kpis.SystemRoles} system · {kpis.CustomRoles} custom";
+}
+
+@* ── KPI strip ──────────────────────────────────────────────────────── *@
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Total roles<span class="dot"></span></div>
+        <div class="kpi-value mono">@kpis.TotalRoles</div>
+        <div class="kpi-foot"><span class="label-suffix">@systemSummary</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Total permissions<span class="dot"></span></div>
+        <div class="kpi-value mono">@kpis.TotalPermissions</div>
+        <div class="kpi-foot"><span class="label-suffix">across 14 modules</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Users assigned<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value mono">@kpis.UsersAssigned</div>
+        <div class="kpi-foot"><span class="label-suffix">role grants in use</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Permission changes · 7d<span class="dot" style="background:var(--warning);"></span></div>
+        <div class="kpi-value mono">@kpis.ChangesLast7d</div>
+        <div class="kpi-foot"><span class="label-suffix">audit-logged</span></div>
+    </div>
+</div>
+
+@* ── Role cards ─────────────────────────────────────────────────────── *@
+<div class="eyebrow" style="margin-bottom:14px;">Roles · select to edit permissions</div>
+<div class="role-grid">
+    @foreach (var r in Model.Roles)
+    {
+        var isActive   = selectedId == r.Id;
+        var classes    = "role-card role-tile" + (isActive ? " active" : "") + (r.IsSystem ? "" : " role-custom");
+        var pillStyle  = r.IsSystem ? "" : "background:rgba(42,93,140,0.10); color:var(--info); border-color:rgba(42,93,140,0.22);";
+        var displayDesc = string.IsNullOrWhiteSpace(r.Description) ? "—" : r.Description;
+        <a class="@classes" href="@Url.Action("Index", "RolesPermissions", new { roleId = r.Id })" data-role-id="@r.Id">
+            <span class="role-pill @r.PillClass" style="@pillStyle">@r.PillLabel</span>
+            <h4>@r.Name</h4>
+            <p class="role-desc">@displayDesc</p>
+            <div class="role-stats">
+                <span>@r.UserCount @(r.UserCount == 1 ? "user" : "users")</span>
+                <span><strong>@r.PermissionCount</strong> / @kpis.TotalPermissions perms</span>
+            </div>
+        </a>
+    }
+</div>
+
+@* ── Permission editor ──────────────────────────────────────────────── *@
+<section class="card" style="margin-bottom:32px;">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">
+                Permissions ·
+                <span style="font-family:var(--font-display); color:var(--accent); font-style:italic;">
+                    @(selected?.Name ?? "—")
+                </span>
+            </h2>
+            <div class="card-meta" style="margin-top:6px;">
+                @if (selected is null)
+                {
+                    <span>Select a role to inspect its permission grants.</span>
+                }
+                else if (selected.IsSystem)
+                {
+                    <span>@selected.PillLabel · @selected.UserCount @(selected.UserCount == 1 ? "user" : "users") · cannot be edited (system role)</span>
+                }
+                else
+                {
+                    <span>Custom · @selected.UserCount @(selected.UserCount == 1 ? "user" : "users") · created @selected.CreatedAt.UtcDateTime.ToString("dd MMM yyyy") · editable</span>
+                }
+            </div>
+        </div>
+
+        <div style="display:flex; gap:6px; align-items:center;">
+            @if (selected is not null)
+            {
+                <button class="btn btn-ghost btn-sm" type="button"
+                        data-action="duplicate-role" data-role-id="@selected.Id" data-role-name="@selected.Name">
+                    Duplicate as custom
+                </button>
+                <a class="btn btn-ghost btn-sm" href="@Url.Action("Index", "RolesPermissions", new { roleId = selected.Id, export = "json" })"
+                   onclick="return rpExportJson(event);">Export JSON</a>
+
+                @if (!selected.IsSystem)
+                {
+                    <form method="post" asp-action="DeleteCustomRole" asp-controller="RolesPermissions"
+                          style="display:inline;"
+                          onsubmit="return confirm('Delete this custom role? Users assigned to it must be reassigned first.');">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="roleId" value="@selected.Id" />
+                        <button class="btn btn-ghost btn-sm" type="submit"
+                                style="color:var(--danger); border-color:var(--danger-soft);">Delete</button>
+                    </form>
+                }
+            }
+            <button class="btn btn-primary btn-sm" type="submit" form="rpSaveForm" id="rpSaveBtn" @(isEditable ? "" : "disabled")>
+                Save changes
+            </button>
+        </div>
+    </header>
+
+    <form id="rpSaveForm" method="post" asp-action="UpdatePermissions" asp-controller="RolesPermissions">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="roleId" value="@(selectedId?.ToString() ?? string.Empty)" />
+
+        <div class="perm-editor">
+            @foreach (var group in Model.ModuleGroups)
+            {
+                var anyGranted = group.Permissions.Any(p => granted.Contains(p.Code));
+                <div class="perm-group">
+                    <div class="perm-group-head">
+                        <div>
+                            <div class="perm-group-name">@group.Name</div>
+                            <div class="perm-group-meta">@group.Meta</div>
+                        </div>
+                        <label class="perm-toggle">
+                            <input type="checkbox" data-rp-group="@group.Name"
+                                   @(anyGranted ? "checked" : "")
+                                   @(isEditable ? "" : "disabled")
+                                   onchange="rpToggleGroup(this);" />
+                            <span>Module access</span>
+                        </label>
+                    </div>
+
+                    @foreach (var p in group.Permissions)
+                    {
+                        var isOn = granted.Contains(p.Code);
+                        <label class="perm-row rp-perm">
+                            <span class="perm-code">@p.Code</span>
+                            <span class="perm-name">
+                                @p.DisplayName
+                                @if (p.IsAudited)
+                                {
+                                    <span class="perm-tag">audited</span>
+                                }
+                                @if (p.IsSensitive)
+                                {
+                                    <span class="perm-tag warn">sensitive</span>
+                                }
+                            </span>
+                            <span class="perm-state">
+                                <input class="rp-perm-input" type="checkbox"
+                                       name="permissionCodes" value="@p.Code"
+                                       data-rp-group="@group.Name"
+                                       @(isOn ? "checked" : "")
+                                       @(isEditable ? "" : "disabled") />
+                            </span>
+                        </label>
+                    }
+                </div>
+            }
+        </div>
+    </form>
+</section>
+
+@* ── Create-custom-role modal ───────────────────────────────────────── *@
+<div class="modal" id="createRoleModal" hidden>
+    <div class="modal-backdrop" data-action="close-modal" data-target="createRoleModal"></div>
+    <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="createRoleTitle">
+        <header class="modal-head">
+            <h3 id="createRoleTitle" class="card-title">Create <em>custom</em> role</h3>
+            <button type="button" class="icon-btn" data-action="close-modal" data-target="createRoleModal" aria-label="Close">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 3L11 11M11 3L3 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </button>
+        </header>
+
+        <form method="post" asp-action="CreateCustomRole" asp-controller="RolesPermissions" class="modal-body">
+            @Html.AntiForgeryToken()
+            <div class="form-row">
+                <label for="newRoleCode">Code</label>
+                <input id="newRoleCode" name="code" type="text" required pattern="[a-z][a-z0-9_-]{2,}"
+                       placeholder="e.g. treasury-ops" autocomplete="off" />
+                <span class="hint mono">lower-case, hyphens or underscores · cannot match a system code</span>
+            </div>
+            <div class="form-row">
+                <label for="newRoleName">Name</label>
+                <input id="newRoleName" name="name" type="text" required maxlength="80" placeholder="e.g. Treasury · daily ops" />
+            </div>
+            <div class="form-row">
+                <label for="newRoleDesc">Description</label>
+                <textarea id="newRoleDesc" name="description" rows="2" maxlength="240"
+                          placeholder="One-line summary of what this role can do."></textarea>
+            </div>
+
+            <div class="form-row">
+                <label>Starter permissions</label>
+                <div class="hint">Pick a baseline now — you can refine grants after the role is created.</div>
+                <div class="rp-perm-starter">
+                    @foreach (var group in Model.ModuleGroups)
+                    {
+                        <div class="rp-starter-group">
+                            <div class="rp-starter-name">@group.Name</div>
+                            @foreach (var p in group.Permissions)
+                            {
+                                <label class="rp-starter-row">
+                                    <input type="checkbox" name="permissionCodes" value="@p.Code" />
+                                    <span class="perm-code">@p.Code</span>
+                                </label>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <footer class="modal-foot">
+                <button type="button" class="btn btn-ghost btn-sm" data-action="close-modal" data-target="createRoleModal">Cancel</button>
+                <button type="submit" class="btn btn-primary btn-sm">Create role</button>
+            </footer>
+        </form>
+    </div>
+</div>
+
+@* ── Import-role placeholder modal ──────────────────────────────────── *@
+<div class="modal" id="importRoleModal" hidden>
+    <div class="modal-backdrop" data-action="close-modal" data-target="importRoleModal"></div>
+    <div class="modal-panel" role="dialog" aria-modal="true">
+        <header class="modal-head">
+            <h3 class="card-title">Import role <span style="color:var(--ink-faint); font-style:italic;">— coming soon</span></h3>
+            <button type="button" class="icon-btn" data-action="close-modal" data-target="importRoleModal" aria-label="Close">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 3L11 11M11 3L3 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </button>
+        </header>
+        <div class="modal-body">
+            <p style="color:var(--ink-soft); font-size:13px;">
+                Paste a previously-exported role JSON to recreate it on this tenant.
+                Wired up in the next iteration — the API endpoint exists but the parser is still under review.
+            </p>
+        </div>
+        <footer class="modal-foot">
+            <button type="button" class="btn btn-ghost btn-sm" data-action="close-modal" data-target="importRoleModal">Close</button>
+        </footer>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+  (function () {
+    // ── modal open/close (data-action driven) ───────────────────────────
+    document.querySelectorAll('[data-action="open-modal"]').forEach(b => {
+      b.addEventListener('click', () => {
+        const m = document.getElementById(b.dataset.target);
+        if (m) m.hidden = false;
+      });
+    });
+    document.querySelectorAll('[data-action="close-modal"]').forEach(b => {
+      b.addEventListener('click', () => {
+        const m = document.getElementById(b.dataset.target);
+        if (m) m.hidden = true;
+      });
+    });
+
+    // ── duplicate-as-custom: open the create modal pre-populated ────────
+    document.querySelectorAll('[data-action="duplicate-role"]').forEach(b => {
+      b.addEventListener('click', () => {
+        const checked = Array.from(document.querySelectorAll('#rpSaveForm input.rp-perm-input:checked'))
+                              .map(i => i.value);
+        const m = document.getElementById('createRoleModal');
+        if (!m) return;
+        m.hidden = false;
+        const codeEl = document.getElementById('newRoleCode');
+        const nameEl = document.getElementById('newRoleName');
+        if (codeEl && !codeEl.value) codeEl.value = (b.dataset.roleName || '').toLowerCase().replace(/[^a-z0-9]+/g,'-') + '-copy';
+        if (nameEl && !nameEl.value) nameEl.value = (b.dataset.roleName || '') + ' (copy)';
+        m.querySelectorAll('.rp-perm-starter input[type=checkbox]').forEach(cb => {
+          cb.checked = checked.includes(cb.value);
+        });
+      });
+    });
+
+    // ── group-toggle: flip every perm in the group on/off ───────────────
+    window.rpToggleGroup = function (toggle) {
+      const grp = toggle.getAttribute('data-rp-group');
+      document.querySelectorAll(`#rpSaveForm input.rp-perm-input[data-rp-group="${grp}"]`).forEach(cb => {
+        if (!cb.disabled) cb.checked = toggle.checked;
+      });
+    };
+
+    // ── export JSON: serialise the current grants to a download ─────────
+    window.rpExportJson = function (evt) {
+      evt.preventDefault();
+      const codes = Array.from(document.querySelectorAll('#rpSaveForm input.rp-perm-input:checked')).map(i => i.value);
+      const name  = document.querySelector('.card-title em')?.textContent?.trim() || 'role';
+      const blob  = new Blob([JSON.stringify({ name, permissions: codes }, null, 2)], { type:'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `role-${name.toLowerCase().replace(/\s+/g,'-')}.json`;
+      document.body.appendChild(a); a.click(); a.remove();
+      return false;
+    };
+  })();
+</script>
+}
+
+@* ── New CSS scoped to this view; promote to main.css once design is signed off ── *@
+<style>
+    /* TODO promote */
+    .role-tile { cursor:pointer; text-decoration:none; color:inherit; display:block; }
+    .role-tile.active { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-ring); }
+    .role-tile.role-custom h4::after {
+        content:"✎"; margin-left:6px; font-size:13px; color:var(--ink-faint); font-style:normal;
+    }
+
+    .perm-editor { display:grid; grid-template-columns: repeat(2, 1fr); gap:1px; background:var(--line); }
+    .perm-group { background:var(--canvas); padding:20px 22px; }
+    .perm-group-head {
+        display:flex; align-items:center; justify-content:space-between;
+        padding-bottom:14px; margin-bottom:10px;
+        border-bottom:1px solid var(--line);
+    }
+    .perm-group-name { font-family:var(--font-display); font-size:18px; letter-spacing:var(--tracking-snug); font-weight:400; }
+    .perm-group-meta { font-size:12px; color:var(--ink-faint); margin-top:2px; }
+
+    .perm-toggle { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--ink-faint); cursor:pointer; }
+    .perm-toggle input { width:30px; height:18px; appearance:none; background:var(--canvas-sunken); border:1px solid var(--line-strong); border-radius:9px; position:relative; cursor:pointer; transition:background var(--dur-fast); }
+    .perm-toggle input::after { content:""; position:absolute; top:1px; left:1px; width:14px; height:14px; border-radius:50%; background:var(--canvas); box-shadow:0 1px 2px rgba(0,0,0,0.15); transition:left var(--dur-fast); }
+    .perm-toggle input:checked { background:var(--accent); border-color:var(--accent); }
+    .perm-toggle input:checked::after { left:13px; background:#fff; }
+    .perm-toggle input:disabled { opacity:0.5; cursor:not-allowed; }
+
+    .perm-row {
+        display:grid; grid-template-columns: 180px 1fr 28px; align-items:center;
+        gap:12px; padding:8px 0; font-size:13px; cursor:pointer;
+    }
+    .perm-row.rp-perm:hover { background:var(--canvas-sunken); }
+    .perm-row .perm-code { font-family:var(--font-mono); font-size:11px; color:var(--accent); letter-spacing:0.02em; }
+    .perm-row .perm-name { color:var(--ink-soft); }
+    .perm-row .perm-state input { appearance:none; width:18px; height:18px; border-radius:4px; border:1px solid var(--line-strong); background:var(--canvas); cursor:pointer; position:relative; }
+    .perm-row .perm-state input:checked { background:var(--accent); border-color:var(--accent); }
+    .perm-row .perm-state input:checked::after {
+        content:""; position:absolute; left:4px; top:1px; width:5px; height:10px;
+        border-right:2px solid #fff; border-bottom:2px solid #fff; transform:rotate(45deg);
+    }
+    .perm-row .perm-state input:disabled { opacity:0.55; cursor:not-allowed; }
+
+    .perm-tag { font-family:var(--font-mono); font-size:10px; letter-spacing:0.04em; padding:1px 6px; border-radius:var(--radius-xs); background:var(--canvas-sunken); color:var(--ink-faint); margin-left:6px; }
+    .perm-tag.warn { background:var(--warning-soft); color:var(--warning); }
+
+    @@media (max-width:1180px) { .perm-editor { grid-template-columns: 1fr; } }
+
+    /* ── modal shell ───────────────────────────────────────────────── */
+    .modal { position:fixed; inset:0; z-index:1000; display:flex; align-items:center; justify-content:center; }
+    .modal[hidden] { display:none; }
+    .modal-backdrop { position:absolute; inset:0; background:rgba(10,10,10,0.45); backdrop-filter:blur(2px); }
+    .modal-panel {
+        position:relative; width:min(720px, calc(100vw - 32px));
+        max-height:calc(100vh - 64px); overflow:auto;
+        background:var(--canvas); border:1px solid var(--line); border-radius:var(--radius-lg);
+        box-shadow:0 30px 60px rgba(0,0,0,0.25);
+    }
+    .modal-head { display:flex; align-items:center; justify-content:space-between; padding:18px 22px; border-bottom:1px solid var(--line); }
+    .modal-body { padding:18px 22px; }
+    .modal-foot { display:flex; gap:8px; justify-content:flex-end; padding:14px 22px; border-top:1px solid var(--line); }
+
+    .form-row { display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
+    .form-row label { font-size:12px; color:var(--ink-faint); letter-spacing:0.04em; text-transform:uppercase; }
+    .form-row input[type=text], .form-row textarea {
+        background:var(--canvas-sunken); border:1px solid var(--line); border-radius:var(--radius-sm);
+        padding:9px 11px; color:var(--ink); font-family:var(--font-body); font-size:13px;
+    }
+    .form-row input[type=text]:focus, .form-row textarea:focus {
+        outline:none; border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-ring);
+    }
+    .form-row .hint { font-size:11px; color:var(--ink-faint); }
+
+    .rp-perm-starter {
+        display:grid; grid-template-columns:repeat(2, minmax(0,1fr));
+        gap:10px 22px;
+        max-height:280px; overflow:auto;
+        padding:10px 12px;
+        border:1px solid var(--line); border-radius:var(--radius-sm);
+        background:var(--canvas-sunken);
+    }
+    .rp-starter-group { display:flex; flex-direction:column; gap:4px; }
+    .rp-starter-name {
+        font-family:var(--font-display); font-size:13px; letter-spacing:var(--tracking-snug);
+        color:var(--ink); padding-bottom:4px; border-bottom:1px solid var(--line);
+    }
+    .rp-starter-row { display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer; }
+    .rp-starter-row .perm-code { font-family:var(--font-mono); color:var(--accent); font-size:11px; }
+    .rp-starter-row input[type=checkbox] { width:14px; height:14px; }
+</style>

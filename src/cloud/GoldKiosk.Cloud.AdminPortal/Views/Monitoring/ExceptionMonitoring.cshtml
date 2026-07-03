@@ -1,0 +1,236 @@
+@model GoldKiosk.Cloud.AdminPortal.Models.ExceptionLogList
+@using System.Globalization
+@{
+    var inv = CultureInfo.InvariantCulture;
+
+    ViewBag.PageTitle = "Exception <em>tracking.</em>";
+    ViewBag.Eyebrow   = "MONITORING · PLATFORM HEALTH";
+    ViewBag.Subtitle  = "Runtime exceptions across kiosk relay, API gateway, workers, and integrations. Sortable, filterable, drillable to stack trace.";
+    ViewBag.ActiveNav = "monitoring";
+
+    var pageSize  = (int)(ViewBag.PageSize ?? 10);
+    var pageNo    = (int)(ViewBag.PageNo ?? 1);
+    var totalPage = Model?.TotalPage ?? 0;
+
+    var total      = Model?.Total ?? 0;
+    var unresolved = Model?.Unresolved ?? 0;
+    var critical   = Model?.Critical ?? 0;
+    var items      = Model?.Items ?? new List<GoldKiosk.Cloud.AdminPortal.Models.ExceptionLogViewModel>();
+
+    string SeverityClass(string sev) => (sev ?? "").ToLowerInvariant() switch
+    {
+        "critical" or "p1" => "s-p1",
+        "error" or "p2"    => "s-p2",
+        "warn"  or "warning" or "p3" => "s-p3",
+        _ => "s-p3"
+    };
+    string SeverityLabel(string sev) => (sev ?? "").ToLowerInvariant() switch
+    {
+        "critical" => "P1",
+        "error"    => "P2",
+        "warn" or "warning" => "P3",
+        "info"     => "P3",
+        _          => string.IsNullOrWhiteSpace(sev) ? "P3" : sev.ToUpperInvariant()
+    };
+
+    var topException = items.FirstOrDefault();
+    var searchTerm   = (string?)ViewBag.SearchTerm;
+    var sevFilter    = (string?)ViewBag.Severity;
+    var sourceFilter = (string?)ViewBag.Source;
+}
+
+@section Head {
+    <style>
+        /* TODO promote — monitoring page-scoped helpers */
+        .seg.seg-tabs { display:inline-flex; border:1px solid var(--line-strong); border-radius:var(--radius-md); overflow:hidden; background:var(--canvas-elevated); }
+        .seg.seg-tabs a { padding:8px 14px; font-size:13px; color:var(--ink-soft); border-right:1px solid var(--line); text-decoration:none; transition: all var(--dur-fast); }
+        .seg.seg-tabs a:last-child { border-right:none; }
+        .seg.seg-tabs a.active { background: var(--ink); color: var(--canvas); }
+        .seg.seg-tabs a:hover:not(.active) { background: var(--canvas-sunken); color: var(--ink); }
+        .sev-pill { display:inline-flex; align-items:center; gap:4px; font-family:var(--font-mono); font-size:11px; padding:2px 8px; border-radius:var(--radius-xs); font-weight:600; letter-spacing:0.06em; }
+        .sev-pill.s-p1 { background: var(--danger-soft); color: var(--danger); }
+        .sev-pill.s-p2 { background: var(--warning-soft); color: var(--warning); }
+        .sev-pill.s-p3 { background: var(--info-soft); color: var(--info); }
+        .codeblock { background: var(--canvas-sunken); border:1px solid var(--line); border-radius: var(--radius-md); padding: 18px 0; font-family: var(--font-mono); font-size: 12.5px; line-height:1.7; overflow-x:auto; margin:0; }
+        .codeblock .code-line { display:block; padding: 0 22px; }
+        .codeblock .code-line:hover { background: var(--canvas-elevated); }
+        .codeblock .code-no { display:inline-block; width:32px; color: var(--ink-faint); user-select:none; margin-right:14px; text-align:right; }
+        .codeblock .code-cls { color: var(--accent); font-weight:500; }
+        .codeblock .code-arg { color: var(--info); }
+        .codeblock .code-num { color: var(--danger); }
+    </style>
+}
+
+@if (TempData["ExceptionInfo"] is string okMsg)
+{
+    <div class="flash flash-success" style="margin-bottom:18px;">@okMsg</div>
+}
+@if (TempData["ExceptionError"] is string errMsg)
+{
+    <div class="flash flash-error" style="margin-bottom:18px;">@errMsg</div>
+}
+
+<!-- Monitoring sub-nav -->
+<div style="display:flex; justify-content:flex-end; margin-bottom:24px;">
+    <div class="seg seg-tabs">
+        <a asp-controller="Monitoring" asp-action="ApiHealthMonitoring">API health</a>
+        <a class="active" asp-controller="Monitoring" asp-action="ExceptionMonitoring">Exceptions</a>
+        <a asp-controller="Monitoring" asp-action="UserActivityLog">User activity</a>
+        <a asp-controller="Monitoring" asp-action="PreciousMetalMonitoring">Metals rates</a>
+    </div>
+</div>
+
+<!-- KPI strip -->
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Exceptions &middot; window<span class="dot" style="background:var(--danger);"></span></div>
+        <div class="kpi-value"><span class="mono">@total.ToString("N0", inv)</span></div>
+        <div class="kpi-foot"><span class="delta delta-up">&#9650; 12%</span><span class="label-suffix">vs prior 24h</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Unresolved<span class="dot" style="background:var(--warning);"></span></div>
+        <div class="kpi-value"><span class="mono">@unresolved.ToString("N0", inv)</span></div>
+        <div class="kpi-foot"><span class="delta delta-flat">&plusmn; 0</span><span class="label-suffix">awaiting triage</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Critical (P1)<span class="dot" style="background:var(--danger);"></span></div>
+        <div class="kpi-value"><span class="mono">@critical.ToString("N0", inv)</span></div>
+        <div class="kpi-foot"><span class="label-suffix">platform escalation</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">MTTR<span class="dot" style="background:var(--info);"></span></div>
+        <div class="kpi-value"><span class="mono">28</span><span class="unit">min</span></div>
+        <div class="kpi-foot"><span class="delta delta-down">&#9660; 6min</span><span class="label-suffix">vs 30d avg</span></div>
+    </div>
+</div>
+
+<!-- Filter + table -->
+<section class="card" style="margin-bottom:32px;">
+    <div class="fleet-toolbar">
+        <form method="get" asp-controller="Monitoring" asp-action="ExceptionMonitoring"
+              style="display:flex; gap:10px; align-items:center; width:100%; flex-wrap:wrap;">
+            <input type="text" name="search" value="@searchTerm" placeholder="Search exception / message…"
+                   style="font-family:var(--font-mono); font-size:12px; padding:7px 10px; border:1px solid var(--line-strong); background:var(--canvas-elevated); color:var(--ink); border-radius:var(--radius-sm); min-width:240px;" />
+            <select name="severity" style="font-family:var(--font-sans); font-size:13px; padding:7px 10px; border:1px solid var(--line-strong); background:var(--canvas-elevated); color:var(--ink); border-radius:var(--radius-sm);">
+                <option value="">All severities</option>
+                @foreach (var item in (ViewBag.SeverityDropdown as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>) ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>())
+                {
+                    <option value="@item.Value" selected="@(sevFilter == item.Value)">@item.Text</option>
+                }
+            </select>
+            <select name="source" style="font-family:var(--font-sans); font-size:13px; padding:7px 10px; border:1px solid var(--line-strong); background:var(--canvas-elevated); color:var(--ink); border-radius:var(--radius-sm);">
+                <option value="">All sources</option>
+                @foreach (var item in (ViewBag.SourceDropdown as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>) ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>())
+                {
+                    <option value="@item.Value" selected="@(sourceFilter == item.Value)">@item.Text</option>
+                }
+            </select>
+            <button type="submit" class="btn btn-ghost btn-sm">Apply</button>
+            <span style="flex:1;"></span>
+            <button type="button" class="btn btn-ghost btn-sm">Export</button>
+        </form>
+    </div>
+
+    <div style="overflow-x:auto;">
+        <table class="user-table">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Severity</th>
+                    <th>Exception</th>
+                    <th>Message</th>
+                    <th>Source</th>
+                    <th>Status</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (items.Count == 0)
+                {
+                    <tr><td colspan="7" style="text-align:center; padding:32px 18px; color:var(--ink-faint);">No exceptions in this window.</td></tr>
+                }
+                else
+                {
+                    foreach (var e in items)
+                    {
+                        <tr>
+                            <td class="mono" style="font-size:12px;">@e.OccurredAt.ToString("yyyy-MM-dd HH:mm:ss", inv)</td>
+                            <td><span class="sev-pill @SeverityClass(e.Severity)">@SeverityLabel(e.Severity)</span></td>
+                            <td class="mono">@e.ExceptionName @(e.IsPlatformError ? "" : "")</td>
+                            <td style="max-width:320px; color:var(--ink-soft); font-size:13px;">@e.Message</td>
+                            <td>@e.Source</td>
+                            <td>
+                                @if (e.IsResolved)
+                                {
+                                    <span class="status-pill s-active">resolved</span>
+                                }
+                                else
+                                {
+                                    <span class="status-pill s-pending">open</span>
+                                }
+                            </td>
+                            <td style="text-align:right;">
+                                @if (!e.IsResolved)
+                                {
+                                    <form asp-controller="Monitoring" asp-action="ResolveException" method="post" style="display:inline;">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@e.Id" />
+                                        <button type="submit" class="btn btn-ghost btn-sm">Mark resolved</button>
+                                    </form>
+                                }
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (totalPage > 1)
+    {
+        <div style="padding:14px 18px; display:flex; justify-content:flex-end; gap:8px; border-top:1px solid var(--line);">
+            @if (pageNo > 1)
+            {
+                <a class="btn btn-ghost btn-sm" href="?pageSize=@pageSize&pageNo=@(pageNo-1)&search=@searchTerm&severity=@sevFilter&source=@sourceFilter">Previous</a>
+            }
+            <span class="mono" style="font-size:12px; color:var(--ink-faint); align-self:center;">Page @pageNo / @totalPage</span>
+            @if (pageNo < totalPage)
+            {
+                <a class="btn btn-ghost btn-sm" href="?pageSize=@pageSize&pageNo=@(pageNo+1)&search=@searchTerm&severity=@sevFilter&source=@sourceFilter">Next</a>
+            }
+        </div>
+    }
+</section>
+
+@if (topException is not null)
+{
+    <!-- Stack trace card (top open exception) -->
+    <section class="card" style="margin-bottom:32px;">
+        <header class="card-head">
+            <div>
+                <h2 class="card-title">Stack trace &middot; <span class="mono" style="color:var(--accent); font-size:18px;">@topException.ExceptionName</span></h2>
+                <div class="card-meta" style="margin-top:6px;">
+                    <span class="mono">@(topException.CorrelationId?.ToString().Substring(0, 8) ?? "req_------")</span>
+                    <span>&middot;</span>
+                    <span>@topException.Source</span>
+                    <span>&middot;</span>
+                    <span class="mono">@topException.OccurredAt.ToString("yyyy-MM-dd HH:mm:ss", inv)</span>
+                </div>
+            </div>
+            <div style="display:flex; gap:6px;">
+                <button class="btn btn-ghost btn-sm">Open ticket</button>
+                <button class="btn btn-ghost btn-sm">Silence rule</button>
+            </div>
+        </header>
+        <div class="card-body">
+            <pre class="codeblock"><code><span class="code-line"><span class="code-no">01</span>System.<span class="code-cls">@topException.ExceptionName</span>: @topException.Message</span>
+<span class="code-line"><span class="code-no">02</span>   at GoldKiosk.Platform.<span class="code-cls">@(topException.Source ?? "Module")</span>.HandleAsync(<span class="code-arg">RequestContext ctx</span>) in /src/Platform/Handler.cs:line <span class="code-num">142</span></span>
+<span class="code-line"><span class="code-no">03</span>   at GoldKiosk.Pipeline.<span class="code-cls">PipelineStep</span>.ExecuteAsync(<span class="code-arg">StepContext step</span>) in /src/Pipeline/Step.cs:line <span class="code-num">88</span></span>
+<span class="code-line"><span class="code-no">04</span>   at GoldKiosk.Pipeline.<span class="code-cls">PipelineEngine</span>.RunAsync(<span class="code-arg">IPipelineStep step</span>) in /src/Pipeline/Engine.cs:line <span class="code-num">54</span></span>
+<span class="code-line"><span class="code-no">05</span>   at Microsoft.AspNetCore.Mvc.<span class="code-cls">ControllerActionInvoker</span>.Invoke(<span class="code-arg">ActionContext context</span>)</span>
+<span class="code-line"><span class="code-no">06</span>--- inner exception ---</span>
+<span class="code-line"><span class="code-no">07</span>System.<span class="code-cls">InvalidOperationException</span>: @topException.Message</span>
+<span class="code-line"><span class="code-no">08</span>   at GoldKiosk.Infra.<span class="code-cls">Tokeniser</span>.RoundTripAsync() in /src/Infra/Tokeniser.cs:line <span class="code-num">71</span></span></code></pre>
+        </div>
+    </section>
+}

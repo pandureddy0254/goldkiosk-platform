@@ -1,0 +1,210 @@
+@model GoldKiosk.Cloud.CRMPortal.Models.ViewModels.OnboardWizardViewModel
+@{
+    var step = Model.CurrentStep;
+    string StepClass(int n) =>
+        n <  step ? "done" :
+        n == step ? "active" : "";
+    string StepNum(int n) => n < step ? "✓" : n.ToString();
+    var onboardError = TempData["OnboardError"] as string;
+    var emailFlash   = TempData["EmailFlash"]   as string;
+    var emailError   = TempData["EmailError"]   as string;
+}
+
+<div class="page-head">
+    <div class="page-title-block">
+        <div class="eyebrow">
+            @if (Model.LeadId.HasValue)
+            { <a asp-controller="Leads" asp-action="Details" asp-route-id="@Model.LeadId" style="color:var(--ink-faint);">← Lead</a><text> · onboarding</text> }
+            else
+            { <text>Pipeline · onboarding</text> }
+        </div>
+        <h1 class="page-title">Onboard <em>partner.</em></h1>
+        <p class="page-subtitle">Provision the tenant, generate the activation key, and hand off to the primary admin.</p>
+    </div>
+    <div style="display:flex; gap:10px;">
+        <form asp-action="Reset" method="post" style="display:inline;">@Html.AntiForgeryToken()<button class="btn btn-ghost btn-sm" type="submit" style="color:var(--danger); border-color:rgba(168,50,50,0.22);">Cancel wizard</button></form>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(onboardError))
+{
+    <div class="warn-callout" style="margin-bottom:16px;"><div class="ico">!</div><div class="body">@onboardError</div></div>
+}
+@if (!string.IsNullOrEmpty(emailFlash))
+{
+    <div class="card" style="border-color:rgba(57,135,86,0.35); background:rgba(57,135,86,0.06); margin-bottom:16px;">
+        <div class="card-body" style="display:flex; align-items:center; gap:10px;">
+            <span style="color:var(--success);">✓</span><span>@emailFlash</span>
+        </div>
+    </div>
+}
+@if (!string.IsNullOrEmpty(emailError))
+{
+    <div class="warn-callout" style="margin-bottom:16px;"><div class="ico">!</div><div class="body">@emailError</div></div>
+}
+
+<div class="wizard">
+    <div class="wizard-step @StepClass(1)"><div class="ws-num">@StepNum(1)</div><div class="ws-meta"><span class="ws-label">Step 01</span><span class="ws-title">Legal entity &amp; billing</span></div></div>
+    <div class="wizard-step @StepClass(2)"><div class="ws-num">@StepNum(2)</div><div class="ws-meta"><span class="ws-label">Step 02</span><span class="ws-title">Primary admin</span></div></div>
+    <div class="wizard-step @StepClass(3)"><div class="ws-num">@StepNum(3)</div><div class="ws-meta"><span class="ws-label">Step 03</span><span class="ws-title">Initial kiosk order</span></div></div>
+    <div class="wizard-step @StepClass(4)"><div class="ws-num">@StepNum(4)</div><div class="ws-meta"><span class="ws-label">Step 04</span><span class="ws-title">Activation key reveal</span></div></div>
+</div>
+
+@if (step == 1)
+{
+    <section class="card">
+        <header class="card-head"><div><h2 class="card-title">Step 01 · Legal entity &amp; billing</h2><div class="card-meta" style="margin-top:6px;"><span>Captured into <span class="mono">partners.billing_address</span> as JSON.</span></div></div></header>
+        <form asp-action="Step1" method="post" class="card-body">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="LeadId" />
+            <div class="field"><label>Legal name</label><input asp-for="LegalName" required placeholder="Emirates Gold Bank PJSC" /></div>
+            <div class="field"><label>Display name</label><input asp-for="DisplayName" placeholder="Emirates Gold Bank" /></div>
+            <div class="field"><label>VAT / TRN</label><input asp-for="VatTrn" class="mono" placeholder="100-2847-0192" /></div>
+            <div class="field"><label>Billing address</label><textarea asp-for="BillingAddress" placeholder="DIFC Gate Building 4 · Level 12 · Dubai"></textarea></div>
+            <div class="field"><label>Region</label><input asp-for="Region" placeholder="UAE · DXB" /></div>
+            <div class="field"><label>Currency</label>
+                <select asp-for="CurrencyCode">
+                    @foreach (var c in GoldKiosk.Cloud.CRMPortal.Models.Domain.SupportedCurrencies.All)
+                    { <option value="@c" selected="@(Model.CurrencyCode == c)">@c</option> }
+                </select>
+            </div>
+            <div style="display:flex; justify-content:flex-end; margin-top:16px;">
+                <button class="btn btn-gold" type="submit">Continue to admin →</button>
+            </div>
+        </form>
+    </section>
+}
+else if (step == 2)
+{
+    <section class="card">
+        <header class="card-head"><div><h2 class="card-title">Step 02 · Primary admin</h2><div class="card-meta" style="margin-top:6px;"><span>Receives the activation key by email.</span></div></div></header>
+        <form asp-action="Step2" method="post" class="card-body">
+            @Html.AntiForgeryToken()
+            <div class="field"><label>Full name</label><input asp-for="AdminFullName" placeholder="Sara Al Mansoori" /></div>
+            <div class="field"><label>Email</label><input asp-for="AdminEmail" type="email" required class="mono" placeholder="cio@@emiratesgold.ae" /></div>
+            <div class="field"><label>Role title</label><input asp-for="AdminRoleTitle" placeholder="Chief Information Officer" /></div>
+            <div class="field"><label>Mobile</label><input asp-for="AdminMobile" class="mono" placeholder="+971 50 555 0148" /></div>
+            <div style="display:flex; justify-content:space-between; margin-top:16px;">
+                <a class="btn btn-ghost btn-sm" asp-action="Index" asp-route-step="1">← Back</a>
+                <button class="btn btn-gold" type="submit">Continue to kiosk order →</button>
+            </div>
+        </form>
+    </section>
+}
+else if (step == 3)
+{
+    <section class="card">
+        <header class="card-head"><div><h2 class="card-title">Step 03 · Initial kiosk order</h2><div class="card-meta" style="margin-top:6px;"><span>Drives the first contract + sub plan sizing.</span></div></div></header>
+        <form asp-action="Step3" method="post" class="card-body">
+            @Html.AntiForgeryToken()
+            <div class="field"><label>Initial kiosk count</label><input asp-for="InitialKioskCount" type="number" min="0" class="mono" placeholder="9" /></div>
+            <div class="field"><label>Sites</label><input asp-for="Sites" placeholder="9 sites · DXB ×5 · AUH ×2 · SHJ ×2" /></div>
+            <div class="field"><label>Phasing</label><input asp-for="Phasing" placeholder="3 waves of 4 · Q3 2026 → Q1 2027" /></div>
+            <div class="field"><label>Term</label><input asp-for="Term" placeholder="36 months · auto-renew 12-month" /></div>
+            <div style="display:flex; justify-content:space-between; margin-top:16px;">
+                <a class="btn btn-ghost btn-sm" asp-action="Index" asp-route-step="2">← Back</a>
+                <button class="btn btn-ghost" type="submit">Save step 3</button>
+            </div>
+        </form>
+        <div class="card-body" style="border-top:1px solid var(--line);">
+            <p style="color:var(--ink-faint); font-size:13px;">When the kiosk-order summary above is saved and correct, click below to provision the tenant and reveal the activation key. <strong>This is irreversible.</strong></p>
+            <form asp-action="Provision" method="post" style="display:flex; justify-content:flex-end;">
+                @Html.AntiForgeryToken()
+                <button class="btn btn-gold" type="submit">Provision tenant &amp; reveal key →</button>
+            </form>
+        </div>
+    </section>
+}
+else // step 4 — reveal
+{
+    <div class="detail-rail">
+        <section class="card">
+            <header class="card-head">
+                <div><h2 class="card-title">Activation key · <em>one-time reveal</em></h2>
+                    <div class="card-meta" style="margin-top:6px;">
+                        @if (Model.Reveal is not null)
+                        { <text>Tenant <span class="mono" style="color:var(--accent);">@Model.Reveal.TenantId.ToString().Substring(0,8)</span> provisioned · key hashed · cleartext shown once below</text> }
+                        else
+                        { <text>No reveal data — provision again from step 3.</text> }
+                    </div>
+                </div>
+            </header>
+            <div class="card-body">
+                <div class="warn-callout">
+                    <div class="ico">!</div>
+                    <div class="body"><strong>This is the only time the activation key is displayed.</strong> The CRM stores only a SHA-256 hash. If @(Model.AdminFullName ?? "the admin") loses the key before consuming it, you must <em>re-issue</em> a new one. Copy it to a password manager or rely on the email below.</div>
+                </div>
+
+                @if (Model.Reveal is not null)
+                {
+                    <div class="activation-reveal">
+                        <div class="ar-label">Activation key · expires @Model.Reveal.ExpiresAt.ToString("dd MMM yyyy")</div>
+                        <div class="ar-key">@Model.Reveal.ActivationKey</div>
+                        <div class="ar-meta">
+                            <span>Issued to · <strong>@Model.Reveal.AdminEmail</strong></span>
+                            <span>Expires · <strong>@Model.Reveal.ExpiresAt.ToString("dd MMM yyyy")</strong></span>
+                            <span>SHA-256 · <strong>@Model.Reveal.Sha256Prefix</strong></span>
+                        </div>
+                        <div class="ar-actions">
+                            <button class="btn btn-gold btn-sm" type="button" data-copy-key data-key="@Model.Reveal.ActivationKey">Copy to clipboard</button>
+                            <button class="btn btn-ghost btn-sm" type="button" disabled>Resend by email</button>
+                            <button class="btn btn-ghost btn-sm" type="button" disabled>Download as .txt</button>
+                        </div>
+                    </div>
+
+                    <div class="info-list" style="border-top:1px solid var(--line); margin-top:8px;">
+                        <div class="info-row"><div class="info-label">Partner</div><div class="info-value">@Model.Reveal.PartnerName</div></div>
+                        <div class="info-row"><div class="info-label">Tenant ID</div><div class="info-value mono" style="color:var(--accent);">@Model.Reveal.TenantId · @Model.Reveal.RegionCode</div></div>
+                        <div class="info-row"><div class="info-label">Admin Dashboard URL</div><div class="info-value mono">https://admin.goldkiosk.ai/activate</div></div>
+                        <div class="info-row"><div class="info-label">Key state</div><div class="info-value"><span class="t-pill t-provisioning">Pending consumption</span></div></div>
+                        <div class="info-row"><div class="info-label">Key prefix</div><div class="info-value mono">@Model.Reveal.KeyPrefix</div></div>
+                    </div>
+                }
+
+                <div style="display:flex; justify-content:space-between; margin-top:28px;">
+                    <a class="btn btn-ghost btn-sm" asp-action="Index" asp-route-step="3">← Back</a>
+                    <a class="btn btn-gold" asp-controller="Partners" asp-action="Details" asp-route-id="@(Model.Reveal?.PartnerId)">
+                        Finish &amp; go to partner
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 7H11M11 7L7 3M11 7L7 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <section style="display:flex; flex-direction:column; gap:16px;">
+            <div class="card">
+                <header class="card-head"><div><h2 class="card-title">Step 01 · Legal entity</h2></div><span class="t-pill t-active">Done</span></header>
+                <div class="info-list">
+                    <div class="info-row"><div class="info-label">Legal name</div><div class="info-value">@Model.LegalName</div></div>
+                    <div class="info-row"><div class="info-label">Display name</div><div class="info-value">@(Model.DisplayName ?? Model.LegalName)</div></div>
+                    <div class="info-row"><div class="info-label">VAT / TRN</div><div class="info-value mono">@(Model.VatTrn ?? "—")</div></div>
+                    <div class="info-row"><div class="info-label">Billing address</div><div class="info-value">@(Model.BillingAddress ?? "—")</div></div>
+                    <div class="info-row"><div class="info-label">Currency</div><div class="info-value mono">@Model.CurrencyCode</div></div>
+                </div>
+            </div>
+            <div class="card">
+                <header class="card-head"><div><h2 class="card-title">Step 02 · Primary admin</h2></div><span class="t-pill t-active">Done</span></header>
+                <div class="info-list">
+                    <div class="info-row"><div class="info-label">Full name</div><div class="info-value">@Model.AdminFullName</div></div>
+                    <div class="info-row"><div class="info-label">Email</div><div class="info-value mono">@Model.AdminEmail</div></div>
+                    <div class="info-row"><div class="info-label">Role title</div><div class="info-value">@(Model.AdminRoleTitle ?? "—")</div></div>
+                    <div class="info-row"><div class="info-label">Mobile</div><div class="info-value mono">@(Model.AdminMobile ?? "—")</div></div>
+                </div>
+            </div>
+            <div class="card">
+                <header class="card-head"><div><h2 class="card-title">Step 03 · Initial kiosk order</h2></div><span class="t-pill t-active">Done</span></header>
+                <div class="info-list">
+                    <div class="info-row"><div class="info-label">Initial count</div><div class="info-value mono">@Model.InitialKioskCount kiosks</div></div>
+                    <div class="info-row"><div class="info-label">Sites</div><div class="info-value">@(Model.Sites ?? "—")</div></div>
+                    <div class="info-row"><div class="info-label">Phasing</div><div class="info-value">@(Model.Phasing ?? "—")</div></div>
+                    <div class="info-row"><div class="info-label">Term</div><div class="info-value">@(Model.Term ?? "—")</div></div>
+                </div>
+            </div>
+        </section>
+    </div>
+}
+
+<footer class="crm-foot">
+    <span>Gold Kiosk · CRM · © AI Kiosks International Inc. 2026</span>
+    <span class="mono">wizard: partner-onboarding · v1 · key_format: AIKI-NNNN-NNNN-NNNN</span>
+</footer>

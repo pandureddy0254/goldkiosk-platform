@@ -1,0 +1,206 @@
+@model GoldKiosk.Cloud.AdminPortal.Controllers.AuthPageViewModel
+@{
+    Layout = "~/Views/Shared/_LoginLayout.cshtml";
+    ViewBag.Title = "Sign in";
+    var returnUrl = ViewData["ReturnUrl"] as string;
+    var activeTab = (ViewData["ActiveTab"] as string) ?? "signin";
+}
+
+<div class="login-shell">
+
+    <!-- ============== LEFT: Kiosk hero (enterprise onboarding moment) ============== -->
+    <aside class="login-art">
+        <div class="filigree"></div>
+
+        <div class="corner-mark">
+            <span>v1.0 · SOC&nbsp;2 / ISO&nbsp;27001</span>
+        </div>
+
+        <div class="login-art-top">
+            <span class="brand-mark"></span>
+            <div class="wordmark">
+                Gold <em>Kiosk</em>
+                <span class="corp">Operator portal · the precious-metals platform</span>
+            </div>
+        </div>
+
+        <div class="kiosk-hero">
+            <img src="~/img/kiosk-hero.png" alt="Gold Kiosk · precious-metals self-service terminal" />
+            <span class="shimmer"></span>
+        </div>
+
+        <div class="hero-tag t1"><span class="dot"></span><span class="line"></span><span>XRF · 22K assay</span></div>
+        <div class="hero-tag t2"><span>ID · biometric</span><span class="line"></span><span class="dot"></span></div>
+        <div class="hero-tag t3"><span class="dot"></span><span class="line"></span><span>Cash · bank transfer</span></div>
+
+        <div class="login-art-stats">
+            <div class="login-art-stat">
+                <div class="num">52</div>
+                <div class="lbl">Active kiosks</div>
+            </div>
+            <div class="login-art-stat">
+                <div class="num">9</div>
+                <div class="lbl">Markets · GCC</div>
+            </div>
+            <div class="login-art-stat">
+                <div class="num">4.8M</div>
+                <div class="lbl">AED · last 14 days</div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ============== RIGHT: Auth panel ============== -->
+    <main class="login-form-shell">
+        <div class="login-form">
+
+            <div class="auth-tabs" role="tablist">
+                <button class="auth-tab @(activeTab == "signin"   ? "active" : "")" data-tab="signin"   type="button" role="tab">Sign in</button>
+                <button class="auth-tab @(activeTab == "activate" ? "active" : "")" data-tab="activate" type="button" role="tab">Activate with key</button>
+            </div>
+
+            @* ── SIGN IN ─────────────────────────────────────────── *@
+            <form class="auth-panel"
+                  data-panel="signin"
+                  style="@(activeTab == "signin" ? "" : "display:none;")"
+                  asp-controller="Account"
+                  asp-action="Login"
+                  asp-route-returnUrl="@returnUrl"
+                  method="post"
+                  autocomplete="off"
+                  novalidate>
+                @Html.AntiForgeryToken()
+
+                <div class="eyebrow">Operator portal</div>
+                <h1 style="font-family:var(--font-display); font-size:var(--fs-40); font-weight:400; letter-spacing:var(--tracking-tight); margin:12px 0 12px; line-height:1.04;">Welcome <em style="font-style:italic; color:var(--accent); font-weight:400;">back.</em></h1>
+                <p class="lede" style="color:var(--ink-faint); margin-bottom:36px; font-size:var(--fs-15);">Sign in with your tenant credentials. SSO is available for partner banks and enterprise customers.</p>
+
+                @if (activeTab == "signin" && ViewData.ModelState.ErrorCount > 0)
+                {
+                    <div class="validation-summary" role="alert">
+                        @Html.ValidationSummary(false)
+                    </div>
+                }
+
+                <div class="field">
+                    <label asp-for="SignIn.Email">Work email</label>
+                    <input asp-for="SignIn.Email" type="email" autocomplete="email"
+                           placeholder="you@yourcompany.com" />
+                    <span asp-validation-for="SignIn.Email" class="field-validation-error"></span>
+                </div>
+
+                <div class="field">
+                    <label asp-for="SignIn.Password">Password</label>
+                    <input asp-for="SignIn.Password" type="password" autocomplete="current-password"
+                           placeholder="••••••••••" />
+                    <span asp-validation-for="SignIn.Password" class="field-validation-error"></span>
+                </div>
+
+                <div class="login-row">
+                    <label class="checkbox">
+                        <input asp-for="SignIn.RememberMe" type="checkbox" />
+                        <span>Keep me signed in for 14 days</span>
+                    </label>
+                    <a href="#">Forgot?</a>
+                </div>
+
+                <button class="btn btn-gold btn-block" type="submit">
+                    Sign in
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8H13M13 8L9 4M13 8L9 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                </button>
+
+                <div class="login-foot">
+                    <span>Gold Kiosk · © AI Kiosks International Inc. 2026</span>
+                </div>
+            </form>
+
+            @* ── ACTIVATE WITH AIKI SHORT KEY (identity.activation_keys flow) ─── *@
+            <form class="auth-panel"
+                  data-panel="activate"
+                  style="@(activeTab == "activate" ? "" : "display:none;")"
+                  asp-controller="Account"
+                  asp-action="Activate"
+                  asp-route-returnUrl="@returnUrl"
+                  method="post"
+                  autocomplete="off"
+                  novalidate>
+                @Html.AntiForgeryToken()
+
+                <div class="eyebrow">First-time tenant activation</div>
+                <h1 style="font-family:var(--font-display); font-size:var(--fs-40); font-weight:400; letter-spacing:var(--tracking-tight); margin:12px 0 12px; line-height:1.04;">Activate your <em style="font-style:italic; color:var(--accent); font-weight:400;">account.</em></h1>
+                <p class="lede" style="color:var(--ink-faint); margin-bottom:24px; font-size:var(--fs-15);">
+                    Enter the <strong style="color:var(--ink); font-weight:500;">AIKI-</strong> activation key from your welcome email, together with your admin email and a new password.
+                </p>
+
+                @if (activeTab == "activate" && ViewData.ModelState.ErrorCount > 0)
+                {
+                    <div class="validation-summary" role="alert">
+                        @Html.ValidationSummary(false)
+                    </div>
+                }
+
+                <div class="field">
+                    <label asp-for="Activate.ActivationKey">Activation key</label>
+                    <input asp-for="Activate.ActivationKey"
+                           type="text"
+                           autocomplete="off"
+                           spellcheck="false"
+                           placeholder="AIKI-XXXX-XXXX-XXXX"
+                           style="font-family:var(--font-mono);" />
+                    <span asp-validation-for="Activate.ActivationKey" class="field-validation-error"></span>
+                </div>
+
+                <div class="field">
+                    <label asp-for="Activate.Email">Admin email</label>
+                    <input asp-for="Activate.Email" type="email" autocomplete="email" placeholder="you@yourcompany.com" />
+                    <span asp-validation-for="Activate.Email" class="field-validation-error"></span>
+                </div>
+
+                <div class="field">
+                    <label asp-for="Activate.FullName">Full name</label>
+                    <input asp-for="Activate.FullName" type="text" autocomplete="name" placeholder="Aisha Al Mansouri" />
+                    <span asp-validation-for="Activate.FullName" class="field-validation-error"></span>
+                </div>
+
+                <div class="field">
+                    <label asp-for="Activate.Password">Choose a password</label>
+                    <input asp-for="Activate.Password" type="password" autocomplete="new-password" placeholder="••••••••••••" />
+                    <span asp-validation-for="Activate.Password" class="field-validation-error"></span>
+                </div>
+
+                <div class="login-row" style="margin-bottom:20px;">
+                    <label class="checkbox">
+                        <input asp-for="Activate.AcceptsTerms" type="checkbox" />
+                        <span>I accept the Master Service Agreement</span>
+                    </label>
+                </div>
+
+                <button class="btn btn-gold btn-block" type="submit">
+                    Activate &amp; sign in
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8H13M13 8L9 4M13 8L9 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                </button>
+
+                <div class="login-foot" style="margin-top:16px;">
+                    <span>Have a CRM licence token instead? <a href="/License/Activate" style="color:var(--accent);">Activate via licence</a></span>
+                </div>
+            </form>
+
+        </div>
+    </main>
+
+</div>
+
+@section Scripts {
+    <script>
+        document.querySelectorAll('.auth-tab').forEach(function (tab) {
+            tab.addEventListener('click', function () {
+                var target = tab.dataset.tab;
+                document.querySelectorAll('.auth-tab').forEach(function (t) {
+                    t.classList.toggle('active', t.dataset.tab === target);
+                });
+                document.querySelectorAll('.auth-panel').forEach(function (p) {
+                    p.style.display = (p.dataset.panel === target) ? '' : 'none';
+                });
+            });
+        });
+    </script>
+}

@@ -1,0 +1,47 @@
+@model GoldKiosk.Cloud.AdminPortal.Models.Layout.ReportMetaCardModel
+@using System.Globalization
+@{
+    var inv = CultureInfo.InvariantCulture;
+    var now = DateTime.UtcNow;
+}
+<section class="card" style="margin-bottom:32px;">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Report metadata</h2>
+            <div class="card-meta" style="margin-top:6px;"><span>Backing matview &middot; refresh cadence &middot; freshness SLA</span></div>
+        </div>
+        <span class="dot-pulse" style="background:var(--success);" title="Pipeline healthy"></span>
+    </header>
+    <div class="meta-grid">
+        <div class="meta-cell">
+            <div class="meta-label">Matview source</div>
+            <div class="meta-value mono">@Model.Matview</div>
+            <div class="meta-sub">@Model.SchemaHint</div>
+        </div>
+        <div class="meta-cell">
+            <div class="meta-label">Refresh cadence</div>
+            <div class="meta-value">@Model.Cadence</div>
+            <div class="meta-sub">Service Bus trigger &middot; incremental</div>
+        </div>
+        <div class="meta-cell">
+            <div class="meta-label">Last built</div>
+            <div class="meta-value mono">@now.AddMinutes(-2).ToString("yyyy-MM-dd HH:mm:ss", inv)</div>
+            <div class="meta-sub">2 min ago &middot; 1.8s duration</div>
+        </div>
+        <div class="meta-cell">
+            <div class="meta-label">Next build</div>
+            <div class="meta-value mono">@now.AddMinutes(12).ToString("yyyy-MM-dd HH:mm:ss", inv)</div>
+            <div class="meta-sub">in ~12 min &middot; scheduled</div>
+        </div>
+        <div class="meta-cell">
+            <div class="meta-label">Row count</div>
+            <div class="meta-value mono">@Model.Rows.ToString("N0", inv)</div>
+            <div class="meta-sub">@Model.ReportCode &middot; window-bounded</div>
+        </div>
+        <div class="meta-cell">
+            <div class="meta-label">Freshness SLA</div>
+            <div class="meta-value"><span style="color:var(--success); font-family:var(--font-mono);">&#9679; Healthy</span></div>
+            <div class="meta-sub">@Model.SlaText</div>
+        </div>
+    </div>
+</section>

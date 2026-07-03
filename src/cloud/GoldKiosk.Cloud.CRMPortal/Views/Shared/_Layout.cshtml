@@ -1,0 +1,60 @@
+@{
+    var activeSection = (ViewData["ActiveSection"] as string) ?? "";
+    var pageTitle     = (ViewData["Title"]         as string) ?? "Gold Kiosk CRM";
+}
+<!doctype html>
+<html lang="en" data-theme="@(Context.Items["Theme"] as string ?? "light")">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#A07F3F" />
+    <title>@pageTitle — Gold Kiosk CRM</title>
+    <link rel="icon" type="image/x-icon" href="~/favicon.ico" asp-append-version="true" />
+    <link rel="icon" type="image/png" sizes="16x16"   href="~/favicon-16.png"  asp-append-version="true" />
+    <link rel="icon" type="image/png" sizes="32x32"   href="~/favicon-32.png"  asp-append-version="true" />
+    <link rel="icon" type="image/png" sizes="192x192" href="~/favicon-192.png" asp-append-version="true" />
+    <link rel="apple-touch-icon" sizes="180x180" href="~/apple-touch-icon.png" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/tokens.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/main.css"   asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/components/header.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/components/kanban-drawer.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/components/responsive.css" asp-append-version="true" />
+    <script src="~/js/theme.js" defer asp-append-version="true"></script>
+    @await RenderSectionAsync("Head", required: false)
+</head>
+<body>
+    <div class="app">
+        @await Html.PartialAsync("_Header")
+        @await Html.PartialAsync("_Sidebar", (object)activeSection)
+        <main class="main">
+            @RenderBody()
+        </main>
+        @* Backdrop is only visible when body.sidebar-open (CSS-gated). *@
+        <div class="sidebar-backdrop" onclick="gkToggleSidebar()"></div>
+    </div>
+
+    @* Global sidebar drawer toggle for mobile/tablet. Inline so it always runs. *@
+    <script>
+        window.gkToggleSidebar = function () {
+            document.body.classList.toggle('sidebar-open');
+        };
+        // Close drawer when a sidebar nav link is clicked (let the navigation happen)
+        document.addEventListener('click', function (e) {
+            var link = e.target.closest('.sidebar .nav-link');
+            if (link) document.body.classList.remove('sidebar-open');
+        });
+        // Close on Escape
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') document.body.classList.remove('sidebar-open');
+        });
+        // Close on resize past desktop breakpoint (don't leave the body class lingering)
+        window.addEventListener('resize', function () {
+            if (window.innerWidth >= 1024) document.body.classList.remove('sidebar-open');
+        });
+    </script>
+
+    <script src="~/js/site.js" defer asp-append-version="true"></script>
+
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

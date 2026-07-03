@@ -1,0 +1,533 @@
+@model PartnerApiCredentialIndexViewModel
+@using System.Globalization
+@{
+    var inv = CultureInfo.InvariantCulture;
+
+    ViewBag.PageTitle = "API <em>credentials.</em>";
+    ViewBag.Eyebrow   = "Administration · Integration";
+    ViewBag.Subtitle  = "Generate <code class=\"mono\">app_id</code> + <code class=\"mono\">app_key</code> pairs your backend uses to call the Gold Kiosk REST API. The secret half is shown <strong>once</strong> at generation — store it in your own vault.";
+    ViewBag.ActiveNav = "api-credentials";
+
+    ViewBag.PageHeadActions =
+        "<button type=\"button\" class=\"btn btn-ghost btn-sm\">" +
+            "<svg width=\"14\" height=\"14\" viewBox=\"0 0 14 14\" fill=\"none\"><path d=\"M2 7H12M7 2V12\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/></svg>" +
+            " Read the docs" +
+        "</button>" +
+        "<button type=\"button\" class=\"btn btn-primary btn-sm\" data-action=\"open-gen-drawer\">" +
+            "<svg width=\"14\" height=\"14\" viewBox=\"0 0 14 14\" fill=\"none\"><path d=\"M7 3V11M3 7H11\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\"/></svg>" +
+            " Generate credential" +
+        "</button>";
+
+    var scopes = (IReadOnlyList<string>)(ViewBag.ScopesCatalogue ?? PartnerApiCredentialScopes.All);
+
+    // Live + test counts for the toolbar seg buttons.
+    var liveCount = Model.Rows.Count(r => r.Environment == "live" && r.RevokedAt is null);
+    var testCount = Model.Rows.Count(r => r.Environment == "test" && r.RevokedAt is null);
+
+    string SegActiveEnv(string forValue) => Model.EnvironmentFilter == forValue ? "active" : "";
+    string SegActiveStatus(bool revoked) => Model.IncludeRevoked == revoked ? "active" : "";
+
+    // Map scope -> role-pill class (visual taxonomy from the prototype).
+    string PillForScope(string scope) => scope switch
+    {
+        "customers:unmask"   => "role-pill r-support",
+        "webhooks:write"     => "role-pill r-manager",
+        "kiosks:read"        => "role-pill r-operator",
+        "transactions:write" => "role-pill r-manager",
+        "customers:write"    => "role-pill r-manager",
+        var s when s.EndsWith(":read")   => "role-pill r-analyst",
+        var s when s.EndsWith(":export") => "role-pill r-analyst",
+        _                                => "role-pill r-operator",
+    };
+
+    string FormatRelativeUtc(DateTimeOffset? when)
+    {
+        if (when is null) return "—";
+        var delta = DateTimeOffset.UtcNow - when.Value;
+        if (delta.TotalSeconds < 60)  return $"{(int)Math.Max(0, delta.TotalSeconds)}s ago";
+        if (delta.TotalMinutes < 60)  return $"{(int)delta.TotalMinutes} min ago";
+        if (delta.TotalHours   < 24)  return $"{(int)delta.TotalHours} hours ago";
+        if (delta.TotalDays    < 30)  return $"{(int)delta.TotalDays} days ago";
+        return when.Value.UtcDateTime.ToString("dd MMM yyyy", inv);
+    }
+}
+
+@* ── KPI strip ───────────────────────────────────────────────────────── *@
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Live credentials<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value mono">@Model.Kpis.LiveCount</div>
+        <div class="kpi-foot"><span class="label-suffix">@Model.Kpis.RevokedCount revoked</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">API calls · 30d<span class="dot"></span></div>
+        <div class="kpi-value mono">@(Model.Kpis.ApiCalls30d == 0 ? "—" : Model.Kpis.ApiCalls30d.ToString("N0", inv))</div>
+        <div class="kpi-foot"><span class="label-suffix">metrics pipeline · pending</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Avg p95 latency<span class="dot"></span></div>
+        <div class="kpi-value"><span class="mono">@Model.Kpis.AvgP95Ms</span><span class="unit">ms</span></div>
+        <div class="kpi-foot"><span class="delta delta-down">&#9660; 8 ms</span><span class="label-suffix">vs prior 30d</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Rate-limit hits · 7d<span class="dot" style="background:var(--warning);"></span></div>
+        <div class="kpi-value mono">@Model.Kpis.RateLimitHits7d</div>
+        <div class="kpi-foot"><span class="label-suffix">2 credentials throttled</span></div>
+    </div>
+</div>
+
+@* ── Toolbar ─────────────────────────────────────────────────────────── *@
+<form id="apicred-env-form" asp-controller="ApiCredentials" asp-action="Index" method="get" autocomplete="off">
+    <input type="hidden" name="revoked" value="@(Model.IncludeRevoked ? "true" : "false")" />
+    <div class="fleet-toolbar" style="margin-bottom:14px; border-radius:var(--radius-sm); border:1px solid var(--line);">
+        <span style="text-transform:uppercase; letter-spacing:0.08em;">Environment</span>
+        <div class="seg" role="tablist">
+            <button type="submit" name="env" value=""     class="@SegActiveEnv("all")">All</button>
+            <button type="submit" name="env" value="live" class="@SegActiveEnv("live")">Live · @liveCount</button>
+            <button type="submit" name="env" value="test" class="@SegActiveEnv("test")">Test · @testCount</button>
+        </div>
+        <span style="text-transform:uppercase; letter-spacing:0.08em;">Status</span>
+        <span class="seg" role="tablist">
+            <button type="submit" form="apicred-status-form-active" class="@SegActiveStatus(false)">Active</button>
+            <button type="submit" form="apicred-status-form-revoked" class="@SegActiveStatus(true)">Revoked</button>
+        </span>
+        <span style="flex:1;"></span>
+        <span style="color:var(--ink-faint);">Cleartext secrets are shown <strong>once</strong> at generation · hashes only at rest</span>
+    </div>
+</form>
+@* Status toggles re-submit with the same env filter but flip revoked=true/false *@
+<form id="apicred-status-form-active"  asp-controller="ApiCredentials" asp-action="Index" method="get" style="display:none;">
+    <input type="hidden" name="env"     value="@(Model.EnvironmentFilter == "all" ? "" : Model.EnvironmentFilter)" />
+    <input type="hidden" name="revoked" value="false" />
+</form>
+<form id="apicred-status-form-revoked" asp-controller="ApiCredentials" asp-action="Index" method="get" style="display:none;">
+    <input type="hidden" name="env"     value="@(Model.EnvironmentFilter == "all" ? "" : Model.EnvironmentFilter)" />
+    <input type="hidden" name="revoked" value="true" />
+</form>
+
+@* ── Credentials table ───────────────────────────────────────────────── *@
+<section class="card">
+    <div style="overflow-x:auto;">
+        <table class="user-table">
+            <thead>
+                <tr>
+                    <th style="width:22%;">Label</th>
+                    <th style="width:18%;">App ID</th>
+                    <th style="width:14%;">Key prefix</th>
+                    <th style="width:20%;">Scopes</th>
+                    <th style="width:8%;">Env</th>
+                    <th style="width:10%;">Last used</th>
+                    <th style="width:8%;">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Model.Rows.Count == 0)
+                {
+                    <tr>
+                        <td colspan="7" style="text-align:center; padding:40px 22px; color:var(--ink-faint); font-size:13px;">
+                            No credentials yet. Click <strong>Generate credential</strong> in the page header to create your first <code class="mono">app_id</code> + <code class="mono">app_key</code> pair.
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    foreach (var row in Model.Rows)
+                    {
+                        var rowOpacity = row.RevokedAt is null ? "" : "opacity:0.6;";
+                        <tr style="@rowOpacity">
+                            <td>
+                                <strong>@row.Label</strong>
+                                <div style="font-size:11px; color:var(--ink-faint);">
+                                    @if (row.RevokedAt is not null)
+                                    {
+                                        @:revoked @FormatRelativeUtc(row.RevokedAt)
+                                        @if (!string.IsNullOrWhiteSpace(row.RevokedReason))
+                                        {
+                                            @: · @row.RevokedReason
+                                        }
+                                    }
+                                    else
+                                    {
+                                        @:created by @row.CreatedByName · @FormatRelativeUtc(row.CreatedAt)
+                                    }
+                                </div>
+                            </td>
+                            <td class="mono" style="font-size:12px;">@row.AppId</td>
+                            <td class="mono" style="font-size:12px; color:var(--ink-faint);">@row.AppKeyPrefix ••••</td>
+                            <td>
+                                @if (row.Scopes.Count == 0)
+                                {
+                                    <span style="font-size:11px; color:var(--ink-faint);">—</span>
+                                }
+                                else
+                                {
+                                    foreach (var s in row.Scopes)
+                                    {
+                                        <span class="@PillForScope(s)" style="font-size:10px;">@s</span>
+                                    }
+                                }
+                            </td>
+                            <td>
+                                @if (row.Environment == "live")
+                                {
+                                    <span class="status-pill s-active" style="background:var(--success-soft); color:var(--success);">Live</span>
+                                }
+                                else
+                                {
+                                    <span class="status-pill s-pending" style="background:var(--warning-soft); color:var(--warning);">Test</span>
+                                }
+                            </td>
+                            <td class="mono" style="font-size:12px;">@FormatRelativeUtc(row.LastUsedAt)</td>
+                            <td>
+                                @if (row.RevokedAt is null)
+                                {
+                                    <form asp-controller="ApiCredentials" asp-action="Revoke" method="post" style="display:inline-flex; gap:6px; align-items:center;"
+                                          onsubmit="return confirm('Revoke this credential? Any service using it will start receiving 401s within seconds.');">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@row.Id" />
+                                        <input type="hidden" name="reason" value="revoked from admin dashboard" />
+                                        <button type="submit" class="btn btn-ghost btn-sm" title="Revoke credential">Revoke</button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <span class="status-pill s-disabled">Revoked</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@* ── How to use ──────────────────────────────────────────────────────── *@
+<div class="split-2-1" style="margin-top:32px; margin-bottom:32px;">
+    <section class="card">
+        <header class="card-head">
+            <div>
+                <h2 class="card-title">Authenticating your requests</h2>
+                <div class="card-meta" style="margin-top:6px;"><span>Bearer token over HTTPS · TLS 1.3+ · rate-limited per credential</span></div>
+            </div>
+            <a href="#" style="font-size:13px; color:var(--accent);">Full API reference →</a>
+        </header>
+        <div class="card-body" style="padding:0;">
+            <div class="code-sample-label">cURL</div>
+<pre class="code-sample">curl https://api.goldkiosk.io/v1/transactions \
+  -H "X-App-Id: <span style="color:var(--accent);">gk_live_a4f2c19b3e8d</span>" \
+  -H "Authorization: Bearer <span style="color:var(--accent);">sk_live_a4f2c19b3e8d…</span>" \
+  -H "X-Tenant: emirates-gold-bank" \
+  -H "Idempotency-Key: $(uuidgen)" \
+  -G --data-urlencode "from=2026-05-01" \
+     --data-urlencode "to=2026-05-23"</pre>
+
+            <div class="code-sample-label">Node · fetch</div>
+<pre class="code-sample">const res = await fetch(<span style="color:var(--accent);">'https://api.goldkiosk.io/v1/transactions'</span>, {
+  headers: {
+    <span style="color:var(--accent);">'X-App-Id'</span>:        process.env.GK_APP_ID,
+    <span style="color:var(--accent);">'Authorization'</span>:   <span style="color:var(--accent);">`Bearer ${process.env.GK_APP_KEY}`</span>,
+    <span style="color:var(--accent);">'X-Tenant'</span>:         <span style="color:var(--accent);">'emirates-gold-bank'</span>,
+    <span style="color:var(--accent);">'Idempotency-Key'</span>:  crypto.randomUUID(),
+  },
+});</pre>
+
+            <div class="code-sample-label">.NET · HttpClient</div>
+<pre class="code-sample">var http = new HttpClient { BaseAddress = new Uri(<span style="color:var(--accent);">"https://api.goldkiosk.io/v1/"</span>) };
+http.DefaultRequestHeaders.Add(<span style="color:var(--accent);">"X-App-Id"</span>, appId);
+http.DefaultRequestHeaders.Authorization =
+    new AuthenticationHeaderValue(<span style="color:var(--accent);">"Bearer"</span>, appKey);
+http.DefaultRequestHeaders.Add(<span style="color:var(--accent);">"X-Tenant"</span>, <span style="color:var(--accent);">"emirates-gold-bank"</span>);
+
+var res = await http.GetAsync(<span style="color:var(--accent);">$"transactions?from={from:O}&amp;to={to:O}"</span>);</pre>
+        </div>
+    </section>
+
+    <section class="card">
+        <header class="card-head">
+            <div>
+                <h2 class="card-title">Best practices</h2>
+                <div class="card-meta" style="margin-top:6px;"><span>Recommended posture</span></div>
+            </div>
+        </header>
+        <div class="card-body">
+            <ul class="bp-list">
+                <li><strong>Rotate keys every 90 days.</strong> We surface a reminder; you keep the cadence.</li>
+                <li><strong>One credential per integration</strong>, never shared across services. Easier to revoke when one is compromised.</li>
+                <li><strong>Use <code class="mono">test</code> environment keys</strong> in non-production. Live keys cannot touch the sandbox.</li>
+                <li><strong>Store the secret in a vault</strong> (Azure Key Vault, HashiCorp Vault, AWS Secrets Manager). Never in <code class="mono">.env</code> committed to git.</li>
+                <li><strong>Set IP allow-lists</strong> on production credentials when your backend has a stable egress.</li>
+                <li><strong>Always send <code class="mono">Idempotency-Key</code></strong> on mutating calls — duplicates within 24h return the original response.</li>
+                <li><strong>Rate limit:</strong> 600 req/min default. Returns <code class="mono">429</code> with <code class="mono">Retry-After</code> when exceeded.</li>
+            </ul>
+        </div>
+    </section>
+</div>
+
+@* ============================================================================
+   Generate credential drawer (one-time reveal)
+   - The form view POSTs to ApiCredentials/Create.
+   - On redirect back to Index, if TempData carries the cleartext, the drawer
+     auto-opens in "revealed" mode showing the new app_id + app_key once.
+   ============================================================================ *@
+<div id="gen-drawer" class="gen-drawer-shell @(Model.HasJustCreatedKey ? "open revealed" : "")">
+    <div class="gen-drawer-scrim" data-action="close-gen-drawer"></div>
+    <aside class="gen-drawer">
+        <header class="gen-drawer-head">
+            <div>
+                <div class="eyebrow" style="margin-bottom:6px;">Administration · Integration</div>
+                <h2 class="gen-drawer-title">Generate API <em style="font-style:italic; color:var(--accent);">credential.</em></h2>
+            </div>
+            <button type="button" class="icon-btn" data-action="close-gen-drawer" aria-label="Close">
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M4 4L14 14M14 4L4 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </button>
+        </header>
+
+        @* ─── Form view ─────────────────────────────────────────────── *@
+        <form class="gen-form" asp-controller="ApiCredentials" asp-action="Create" method="post" autocomplete="off">
+            @Html.AntiForgeryToken()
+
+            <div class="field">
+                <label>Label · how you'll recognise this credential</label>
+                <input type="text" name="Label" placeholder="e.g. Core banking sync · production" required maxlength="120" />
+            </div>
+
+            <div class="field">
+                <label>Environment</label>
+                <div class="seg env-seg" data-target="env-input">
+                    <button type="button" class="active" data-value="live">Live</button>
+                    <button type="button" data-value="test">Test</button>
+                </div>
+                <input type="hidden" name="Environment" id="env-input" value="live" />
+            </div>
+
+            <div class="field">
+                <label>Scopes · what this credential can do</label>
+                <div class="scope-grid">
+                    @foreach (var s in scopes)
+                    {
+                        <label class="checkbox">
+                            <input type="checkbox" name="Scopes" value="@s" />
+                            <span>@s</span>
+                        </label>
+                    }
+                </div>
+            </div>
+
+            <div class="field">
+                <label>IP allow-list <span class="field-suffix">· optional · CIDR notation</span></label>
+                <input type="text" name="AllowedIpsCidr" placeholder="e.g. 80.252.10.0/24, 80.252.11.0/24" />
+            </div>
+
+            <div class="field">
+                <label>Expiry <span class="field-suffix">· optional</span></label>
+                <div class="seg expiry-seg" data-target="expires-input">
+                    <button type="button" class="active" data-days="">Never</button>
+                    <button type="button" data-days="30">30 days</button>
+                    <button type="button" data-days="90">90 days</button>
+                    <button type="button" data-days="365">1 year</button>
+                </div>
+                <input type="hidden" name="ExpiresAt" id="expires-input" value="" />
+            </div>
+
+            <div class="callout">
+                <span class="ico">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1L13 4V7C13 10.5 10.5 12.5 7 13C3.5 12.5 1 10.5 1 7V4L7 1Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+                </span>
+                <div class="body"><strong>You'll see the secret exactly once.</strong> Copy it into your vault before closing this drawer. We store only a SHA-256 hash and cannot recover the cleartext later.</div>
+            </div>
+
+            <div class="gen-drawer-actions">
+                <button type="submit" class="btn btn-gold" style="flex:1;">Generate &amp; reveal secret</button>
+                <button type="button" class="btn btn-ghost" data-action="close-gen-drawer">Cancel</button>
+            </div>
+        </form>
+
+        @* ─── Reveal view ──────────────────────────────────────────── *@
+        <div class="gen-reveal">
+            <div class="callout" style="margin-top:0;">
+                <span class="ico">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1L13 4V7C13 10.5 10.5 12.5 7 13C3.5 12.5 1 10.5 1 7V4L7 1Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M5 7L6.5 8.5L9 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </span>
+                <div class="body"><strong>Credential created.</strong> The secret below is shown for the first and last time. Closing this drawer will discard it from view permanently.</div>
+            </div>
+
+            <div class="key-card" style="margin-top:18px;">
+                <div class="key-label">App ID · public · safe to share</div>
+                <div class="key-value mono" id="reveal-appid" style="font-size:18px;">@(Model.ClearTextAppId ?? "")</div>
+                <div class="key-meta">
+                    <span><strong>Environment:</strong> <span class="mono">@(Model.JustCreatedEnvironment ?? "live")</span></span>
+                    <button type="button" class="btn btn-ghost btn-sm" data-action="copy" data-copy-target="reveal-appid" style="border-color:rgba(212,175,55,0.4); color:#d4af37;">Copy</button>
+                </div>
+            </div>
+
+            <div class="key-card key-card-secret">
+                <div class="key-label key-label-secret">App Key · secret · store in a vault now</div>
+                <div class="key-value mono key-value-secret" id="reveal-appkey">@(Model.ClearTextAppKey ?? "")</div>
+                <div class="key-meta key-meta-secret">
+                    <span><strong style="color:#fff;">Hash stored:</strong> sha256 only</span>
+                    <button type="button" class="btn btn-ghost btn-sm key-copy-secret" data-action="copy" data-copy-target="reveal-appkey">Copy secret</button>
+                </div>
+            </div>
+
+            @if (Model.JustCreatedScopes.Count > 0)
+            {
+                <div class="eyebrow" style="margin-top:28px; margin-bottom:10px;">Granted scopes</div>
+                <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                    @foreach (var s in Model.JustCreatedScopes)
+                    {
+                        <span class="@PillForScope(s)">@s</span>
+                    }
+                </div>
+            }
+
+            <div class="gen-drawer-actions">
+                <button type="button" class="btn btn-primary" style="flex:1;" data-action="close-gen-drawer">I've stored the secret · close</button>
+            </div>
+        </div>
+    </aside>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    // ─── Drawer open/close ────────────────────────────────────────────
+    const drawer = document.getElementById('gen-drawer');
+    if (!drawer) return;
+
+    function open()  { drawer.classList.add('open'); }
+    function close() { drawer.classList.remove('open', 'revealed'); }
+
+    document.querySelectorAll('[data-action="open-gen-drawer"]').forEach(b => b.addEventListener('click', open));
+    document.querySelectorAll('[data-action="close-gen-drawer"]').forEach(b => b.addEventListener('click', close));
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+
+    // ─── Segmented controls (env, expiry) ─────────────────────────────
+    drawer.querySelectorAll('.seg.env-seg button').forEach(btn => {
+        btn.addEventListener('click', () => {
+            drawer.querySelectorAll('.seg.env-seg button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('env-input').value = btn.dataset.value;
+        });
+    });
+
+    drawer.querySelectorAll('.seg.expiry-seg button').forEach(btn => {
+        btn.addEventListener('click', () => {
+            drawer.querySelectorAll('.seg.expiry-seg button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const days = btn.dataset.days;
+            if (!days) {
+                document.getElementById('expires-input').value = '';
+            } else {
+                const when = new Date(Date.now() + parseInt(days, 10) * 86400 * 1000);
+                document.getElementById('expires-input').value = when.toISOString();
+            }
+        });
+    });
+
+    // ─── Copy buttons (cleartext reveal) ──────────────────────────────
+    drawer.querySelectorAll('[data-action="copy"]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const target = document.getElementById(btn.dataset.copyTarget);
+            if (!target) return;
+            try {
+                await navigator.clipboard.writeText(target.innerText.trim());
+                const original = btn.innerText;
+                btn.innerText = 'Copied ✓';
+                setTimeout(() => { btn.innerText = original; }, 1500);
+            } catch (_) { /* clipboard blocked */ }
+        });
+    });
+})();
+</script>
+}
+
+<style>
+    /* TODO promote — Generate-credential drawer + view-local helpers */
+    .gen-drawer-shell { position:fixed; inset:0; z-index:200; display:none; }
+    .gen-drawer-shell.open { display:block; }
+    .gen-drawer-scrim {
+        position:absolute; inset:0;
+        background:rgba(8,8,6,0.55);
+        backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+    }
+    .gen-drawer {
+        position:absolute; top:0; right:0; bottom:0; width:min(520px, 90vw);
+        background:var(--canvas);
+        border-left:1px solid var(--line);
+        display:flex; flex-direction:column;
+        box-shadow: -24px 0 60px rgba(0,0,0,0.25);
+        animation: drawer-in var(--dur-med) var(--ease-out-expo);
+    }
+    @@keyframes drawer-in { from { transform:translateX(20px); opacity:0; } to { transform:none; opacity:1; } }
+
+    .gen-drawer-head {
+        padding:24px 28px;
+        border-bottom:1px solid var(--line);
+        display:flex; justify-content:space-between; align-items:center;
+    }
+    .gen-drawer-title {
+        font-family:var(--font-display);
+        font-size:24px; font-weight:400;
+        letter-spacing:var(--tracking-snug);
+        margin:0;
+    }
+
+    .gen-form { display:flex; flex-direction:column; padding:24px 28px; flex:1; overflow-y:auto; }
+    .gen-reveal { display:none; flex-direction:column; padding:24px 28px; flex:1; overflow-y:auto; }
+    .gen-drawer-shell.revealed .gen-form { display:none; }
+    .gen-drawer-shell.revealed .gen-reveal { display:flex; }
+
+    .gen-drawer-actions { display:flex; gap:8px; margin-top:24px; }
+
+    .scope-grid {
+        display:grid;
+        grid-template-columns:repeat(2, 1fr);
+        gap:8px 18px;
+        margin-top:8px;
+    }
+
+    .field-suffix {
+        text-transform:none;
+        letter-spacing:0;
+        color:var(--ink-ghost);
+        font-weight:400;
+    }
+
+    /* Code samples in the "Authenticating your requests" card */
+    .code-sample-label {
+        border-top:1px solid var(--line);
+        border-bottom:1px solid var(--line);
+        padding:14px 22px;
+        font-family:var(--font-mono);
+        font-size:11px;
+        letter-spacing:0.06em;
+        text-transform:uppercase;
+        color:var(--ink-faint);
+    }
+    .code-sample-label:first-child { border-top:0; }
+    .code-sample {
+        margin:0; padding:18px 22px;
+        font-family:var(--font-mono);
+        font-size:12px; line-height:1.7;
+        background:var(--canvas-sunken);
+        overflow-x:auto;
+        color:var(--ink);
+        white-space:pre;
+    }
+
+    /* Best-practices list */
+    .bp-list { margin:0; padding-left:18px; line-height:1.8; font-size:13px; color:var(--ink-soft); }
+    .bp-list strong { color:var(--ink); }
+
+    /* Secret key-card uses an amber gradient to signal "danger / one-time" */
+    .key-card-secret {
+        margin-top:14px;
+        background:linear-gradient(135deg, #1a0f0a 0%, #2a1a10 100%);
+        border-color:rgba(255,140,0,0.32);
+    }
+    .key-label-secret { color:rgba(255,200,150,0.6); }
+    .key-value-secret { font-size:15px; word-break:break-all; color:#ffba6e; }
+    .key-meta-secret  { color:rgba(255,200,150,0.55); }
+    .key-copy-secret  { border-color:rgba(255,186,110,0.4); color:#ffba6e; }
+</style>

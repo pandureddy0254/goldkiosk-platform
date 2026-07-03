@@ -1,0 +1,103 @@
+@using GoldKiosk.Cloud.AdminPortal.Models
+@using System.Globalization
+@model IEnumerable<WalletTopupRequestViewModel>
+@{
+    var showActions = ViewData["ShowActions"] as bool? ?? false;
+
+    string StatusPill(string? s) => (s ?? "").ToLowerInvariant() switch
+    {
+        "approved"  => "s-active",
+        "pending"   => "s-pending",
+        "rejected"  => "s-disabled",
+        "cancelled" or "canceled" => "s-disabled",
+        _ => "s-pending"
+    };
+    string StatusLabel(string? s) => string.IsNullOrWhiteSpace(s)
+        ? "—"
+        : char.ToUpperInvariant(s[0]) + s.Substring(1).ToLowerInvariant();
+}
+
+<div style="overflow-x:auto;">
+    <table class="user-table">
+        <thead>
+            <tr>
+                <th style="width:26%;">Merchant</th>
+                <th style="width:11%;">Code</th>
+                <th style="width:14%; text-align:right;">Amount</th>
+                <th style="width:8%;">Currency</th>
+                <th style="width:14%;">Requested</th>
+                <th style="width:12%;">Status</th>
+                <th style="width:@(showActions ? "11%" : "15%");">Reference</th>
+                @if (showActions)
+                {
+                    <th style="width:14%; text-align:right; padding-right:22px;">Actions</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @if (Model != null && Model.Any())
+            {
+                foreach (var r in Model)
+                {
+                    var curr = string.IsNullOrWhiteSpace(r.CurrencyCode) ? "AED" : r.CurrencyCode;
+                    <tr>
+                        <td>
+                            <div class="user-cell">
+                                <div class="meta">
+                                    <strong>@r.MerchantName</strong>
+                                    <span class="mono">req · @r.Id.ToString().Substring(0, 8)</span>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="mono">@r.MerchantCode</td>
+                        <td class="mono" style="text-align:right;">
+                            @r.RequestedAmount.ToString("N2", CultureInfo.InvariantCulture)
+                        </td>
+                        <td class="mono">@curr</td>
+                        <td class="mono">@r.RequestedOn.ToString("dd MMM yy · HH:mm", CultureInfo.InvariantCulture)</td>
+                        <td><span class="status-pill @StatusPill(r.Status)">@StatusLabel(r.Status)</span></td>
+                        <td class="mono">
+                            @if (!string.IsNullOrWhiteSpace(r.PaymentReference))
+                            {
+                                @r.PaymentReference
+                            }
+                            else
+                            {
+                                <span style="color:var(--ink-faint);">—</span>
+                            }
+                        </td>
+                        @if (showActions)
+                        {
+                            <td style="text-align:right; padding-right:22px;">
+                                <form method="post" asp-controller="MerchantManagement" asp-action="ApproveTopup" style="display:inline;">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="topupId" value="@r.Id" />
+                                    <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--success); border-color:rgba(42,125,79,0.3);" title="Approve">
+                                        Approve
+                                    </button>
+                                </form>
+                                <form method="post" asp-controller="MerchantManagement" asp-action="RejectTopup" style="display:inline;"
+                                      onsubmit="var reason = prompt('Rejection reason?'); if (!reason) return false; this.querySelector('[name=reason]').value = reason;">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="topupId" value="@r.Id" />
+                                    <input type="hidden" name="reason" value="" />
+                                    <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger); border-color:rgba(168,50,50,0.3);" title="Reject">
+                                        Reject
+                                    </button>
+                                </form>
+                            </td>
+                        }
+                    </tr>
+                }
+            }
+            else
+            {
+                <tr>
+                    <td colspan="@(showActions ? 8 : 7)" style="text-align:center; padding:36px 0; color:var(--ink-faint);">
+                        No top-up requests in this window.
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

@@ -1,0 +1,86 @@
+@inject GoldKiosk.Cloud.AdminPortal.Services.IUserContextService UserCtx
+@{
+    var userDisplayName  = await UserCtx.GetDisplayNameAsync();
+    var userInitials     = await UserCtx.GetInitialsAsync();
+    var userPrimaryRole  = await UserCtx.GetPrimaryRoleNameAsync() ?? "Member";
+    var tenantLegalName  = await UserCtx.GetTenantLegalNameAsync()  ?? "Gold Kiosk · Dev tenant";
+    var tenantRegion     = (await UserCtx.GetTenantRegionAsync())   ?? "UAE · primary · production";
+    var tenantCode       = (await UserCtx.GetTenantCodeAsync())     ?? "GK-DEV";
+    var pageTitle        = (string?)ViewBag.PageTitle ?? (string?)ViewBag.Title ?? "Admin";
+    // pageTitle may contain raw HTML (e.g. "Good morning, <em>Aman.</em>") so the
+    // <h1> renders italic — but the browser <title> must be plain text. Strip tags.
+    var pageTitleText    = System.Text.RegularExpressions.Regex.Replace(pageTitle, "<.*?>", "").Trim();
+    var pageEyebrow      = (string?)ViewBag.Eyebrow;
+    var pageSubtitle     = (string?)ViewBag.Subtitle;
+    var activeNav        = (string?)ViewBag.ActiveNav ?? "";
+}
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/png" sizes="32x32"  href="~/img/logo-mark-3d-opt.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="~/img/logo-mark-3d-opt-3x.png" />
+    <link rel="apple-touch-icon" href="~/img/logo-mark-3d-opt-3x.png" />
+    <title>@pageTitleText — Gold Kiosk</title>
+
+    <link rel="stylesheet" href="~/css/tokens.css"        asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/main.css"          asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/admin-extras.css"  asp-append-version="true" />
+    <partial name="_BrandingPartial" />
+
+    <script src="~/js/theme.js" defer asp-append-version="true"></script>
+    <script src="~/js/admin.js" defer asp-append-version="true"></script>
+    @await RenderSectionAsync("Head", required: false)
+</head>
+<body>
+
+    <div class="app">
+
+        <partial name="_HeaderPartial" model="@(new GoldKiosk.Cloud.AdminPortal.Models.Layout.LayoutChromeViewModel {
+            UserDisplayName = userDisplayName,
+            UserInitials    = userInitials,
+            UserPrimaryRole = userPrimaryRole
+        })" />
+
+        <partial name="_SidebarPartial" model="@(new GoldKiosk.Cloud.AdminPortal.Models.Layout.SidebarViewModel {
+            ActiveNav       = activeNav,
+            TenantLegalName = tenantLegalName,
+            TenantRegion    = tenantRegion,
+            TenantCode      = tenantCode
+        })" />
+
+        <main class="main">
+
+            @if (!string.IsNullOrWhiteSpace(pageTitle) && (bool?)ViewBag.HidePageHead != true)
+            {
+                <partial name="_PageHeadPartial" model="@(new GoldKiosk.Cloud.AdminPortal.Models.Layout.PageHeadViewModel {
+                    Eyebrow    = pageEyebrow,
+                    Title      = pageTitle,
+                    Subtitle   = pageSubtitle,
+                    ActionsRaw = (string?)ViewBag.PageHeadActions
+                })" />
+            }
+
+            @RenderBody()
+
+            <partial name="_FooterPartial" model="@(new GoldKiosk.Cloud.AdminPortal.Models.Layout.FooterViewModel {
+                TenantCode = tenantCode
+            })" />
+
+        </main>
+
+    </div>
+
+    @if (TempData["FlashSuccess"] is string ok)
+    {
+        <div class="flash flash-success">@ok</div>
+    }
+    @if (TempData["FlashError"] is string err)
+    {
+        <div class="flash flash-error">@err</div>
+    }
+
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

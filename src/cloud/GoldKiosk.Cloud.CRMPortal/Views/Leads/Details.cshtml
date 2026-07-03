@@ -1,0 +1,293 @@
+@using Newtonsoft.Json.Linq
+@using GoldKiosk.Cloud.CRMPortal.Models.Domain
+@using GoldKiosk.Cloud.CRMPortal.Models.ViewModels
+@model LeadDetailViewModel
+@{
+    var l = Model.Lead;
+    ViewData["Title"] = l.CompanyName;
+    string Money(decimal? v) => v.HasValue ? string.Format("{0} {1:N0}", l.CurrencyCode, v.Value) : "—";
+    string SourcePill(string s) => s switch
+    {
+        "website"          => "src-website",
+        "inbound_call"     => "src-call",
+        "partner_referral" => "src-referral",
+        "conference"       => "src-conference",
+        "outbound"         => "src-outbound",
+        _ => "src-website"
+    };
+    string SourceLabel(string s) => s switch
+    {
+        "website"          => "Website",
+        "inbound_call"     => "Inbound call",
+        "partner_referral" => "Partner referral",
+        "conference"       => "Conference",
+        "outbound"         => "Outbound",
+        _ => s
+    };
+    string StageClass(string s) => s switch
+    {
+        "new" => "var(--ink-faint)",
+        "contacted" => "var(--accent)",
+        "qualified" => "var(--accent)",
+        "proposal" => "var(--warning)",
+        "won" => "var(--success)",
+        "lost" => "var(--danger)",
+        _ => "var(--ink-faint)"
+    };
+    string ActivityClass(string t) => t switch
+    {
+        "note"         => "tl-note",
+        "call"         => "tl-call",
+        "email"        => "tl-email",
+        "meeting"      => "tl-call",
+        "stage_change" => "tl-stage",
+        "system_event" => "tl-stage",
+        _ => "tl-note"
+    };
+
+    string ExtractText(JObject? payload)
+    {
+        if (payload is null) return "";
+        foreach (var key in new[] { "text", "summary", "body", "note", "message" })
+        {
+            var v = payload[key]?.ToString();
+            if (!string.IsNullOrWhiteSpace(v)) return v;
+        }
+        return "";
+    }
+
+    string ActivityHeadline(LeadActivity a)
+    {
+        var t = a.Type;
+        if (t == "stage_change")
+        {
+            var to = a.Payload?["to"]?.ToString();
+            if (!string.IsNullOrWhiteSpace(to))
+                return $"Stage → {char.ToUpperInvariant(to[0])}{to[1..]}";
+            return "Stage change";
+        }
+        if (t == "call")    return "Call logged";
+        if (t == "email")   return "Email sent";
+        if (t == "meeting") return "Meeting";
+        if (t == "system_event") return "System event";
+        return "";
+    }
+
+    string Owner = Model.Owner?.FullName ?? "Unassigned";
+    string OwnerInitials = Model.Owner?.Initials ?? "—";
+    var locParts = new[] { l.Region, l.Country }.Where(x => !string.IsNullOrWhiteSpace(x)).ToArray();
+    string Location = locParts.Length > 0 ? string.Join(" · ", locParts) : "—";
+    string shortId = l.Id.ToString("N").Substring(0, 8);
+}
+
+<div class="page-head">
+    <div class="page-title-block">
+        <div class="eyebrow">
+            <a asp-action="Index" style="color:var(--ink-faint);">← Leads</a>
+            · LEAD-@shortId · <span class="src-pill @SourcePill(l.Source)">@SourceLabel(l.Source)</span>
+        </div>
+        <h1 class="page-title">@l.CompanyName <em>.</em></h1>
+        <p class="page-subtitle">
+            Stage <strong style="color:@StageClass(l.Stage);">@(char.ToUpperInvariant(l.Stage[0]) + l.Stage[1..])</strong>
+            · est. <span class="mono">@Money(l.EstimatedValue)</span> first-year value
+            @if (l.EstimatedKioskCount.HasValue)
+            {
+                <text> · @l.EstimatedKioskCount kiosks</text>
+            }
+        </p>
+    </div>
+</div>
+
+<div class="action-bar">
+    <span class="ab-title">Actions</span>
+    <form method="post" asp-action="MoveStage" asp-route-id="@l.Id" style="display:inline;">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="newStage" value="qualified" />
+        <button class="btn btn-ghost btn-sm" type="submit">Mark qualified</button>
+    </form>
+    <form method="post" asp-action="MoveStage" asp-route-id="@l.Id" style="display:inline;">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="newStage" value="proposal" />
+        <button class="btn btn-ghost btn-sm" type="submit">Send proposal</button>
+    </form>
+    <button type="button" class="btn btn-ghost btn-sm" id="open-proposal-modal"
+            data-pdf-url="@Url.Action("ProposalPdf", new { id = l.Id })"
+            data-full-url="@Url.Action("ProposalView", new { id = l.Id })">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M2 2h7l3 3v7H2V2z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+            <path d="M9 2v3h3M4 7h6M4 9.5h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        Generate proposal
+    </button>
+    <a class="btn btn-gold btn-sm" href="/Onboard?leadId=@l.Id">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7L6 11L12 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Mark won &amp; onboard
+    </a>
+    <form method="post" asp-action="MoveStage" asp-route-id="@l.Id" style="display:inline;">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="newStage" value="lost" />
+        <button class="btn btn-ghost btn-sm" type="submit" style="color:var(--danger); border-color:rgba(168,50,50,0.22);">Mark lost</button>
+    </form>
+    <span style="flex:1;"></span>
+</div>
+
+<!-- Proposal preview modal -->
+<div class="modal-overlay" id="proposal-modal" hidden>
+    <div class="modal" style="width:90vw; max-width:1100px;">
+        <header class="modal-head">
+            <h2>Proposal preview</h2>
+            <button type="button" class="modal-close" id="close-proposal" aria-label="Close">&#215;</button>
+        </header>
+        <div class="modal-body" style="padding:0;">
+            <iframe id="proposal-frame" src="" title="Proposal PDF"
+                    style="width:100%; height:80vh; border:0;"></iframe>
+        </div>
+        <footer class="modal-foot">
+            <a id="download-proposal" href="" download class="btn btn-ghost btn-sm">
+                <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+                    <path d="M7 1v8M4 6l3 3 3-3M2 11h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Download PDF
+            </a>
+            <button type="button" id="open-fullpage" class="btn btn-gold btn-sm">Open full view</button>
+        </footer>
+    </div>
+</div>
+
+<div class="detail-rail">
+    <section style="display:flex; flex-direction:column; gap:16px;">
+        <div class="card">
+            <header class="card-head"><div><h2 class="card-title">Company &amp; contact</h2></div></header>
+            <div class="info-list">
+                <div class="info-row"><div class="info-label">Company</div><div class="info-value">@l.CompanyName</div></div>
+                <div class="info-row"><div class="info-label">Primary contact</div><div class="info-value">@l.ContactName</div></div>
+                <div class="info-row"><div class="info-label">Email</div><div class="info-value mono">@(l.ContactEmail ?? "—")</div></div>
+                <div class="info-row"><div class="info-label">Phone</div><div class="info-value mono">@(l.ContactPhone ?? "—")</div></div>
+                <div class="info-row"><div class="info-label">Region</div><div class="info-value">@Location</div></div>
+                <div class="info-row"><div class="info-label">Source</div><div class="info-value"><span class="src-pill @SourcePill(l.Source)">@SourceLabel(l.Source)</span></div></div>
+                <div class="info-row"><div class="info-label">Owner</div><div class="info-value"><span class="mini-avatar">@OwnerInitials</span> @Owner</div></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <header class="card-head"><div><h2 class="card-title">Deal estimate</h2></div></header>
+            <div class="info-list">
+                <div class="info-row"><div class="info-label">Est. first-year value</div><div class="info-value mono">@Money(l.EstimatedValue)</div></div>
+                <div class="info-row"><div class="info-label">Currency</div><div class="info-value mono">@l.CurrencyCode</div></div>
+                <div class="info-row"><div class="info-label">Kiosk count</div><div class="info-value mono">@(l.EstimatedKioskCount?.ToString("N0") ?? "—")</div></div>
+                <div class="info-row"><div class="info-label">Stage</div><div class="info-value"><strong style="color:@StageClass(l.Stage);">@(char.ToUpperInvariant(l.Stage[0]) + l.Stage[1..])</strong></div></div>
+                <div class="info-row"><div class="info-label">Created</div><div class="info-value mono">@l.CreatedAt.ToString("yyyy-MM-dd HH:mm 'UTC'")</div></div>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(l.Notes))
+        {
+            <div class="card">
+                <header class="card-head"><div><h2 class="card-title">Notes</h2></div></header>
+                <div class="card-body" style="font-size:var(--fs-13); color:var(--ink-soft); line-height:1.6;">
+                    @l.Notes
+                </div>
+            </div>
+        }
+    </section>
+
+    <section class="card">
+        <header class="card-head">
+            <div>
+                <h2 class="card-title">Timeline</h2>
+                <div class="card-meta" style="margin-top:6px;"><span>@Model.Activities.Count touchpoints · oldest first</span></div>
+            </div>
+        </header>
+        <div class="timeline">
+            @if (!Model.Activities.Any())
+            {
+                <div class="tl-item tl-stage"><div class="tl-body">No activity recorded yet.</div></div>
+            }
+            @foreach (var a in Model.Activities)
+            {
+                var headline = ActivityHeadline(a);
+                var bodyText = ExtractText(a.Payload);
+                <div class="tl-item @ActivityClass(a.Type)">
+                    <div class="tl-body">
+                        @if (!string.IsNullOrEmpty(headline))
+                        {
+                            <strong>@headline</strong>
+                            if (!string.IsNullOrEmpty(bodyText))
+                            {
+                                <text> · @bodyText</text>
+                            }
+                        }
+                        else
+                        {
+                            @bodyText
+                        }
+                        <span class="tl-meta">@Model.ActorName(a.ActorId) · @a.Type</span>
+                    </div>
+                    <span class="tl-time">@a.OccurredAt.ToString("dd MMM · HH:mm")</span>
+                </div>
+            }
+        </div>
+
+        <form method="post" asp-action="AddNote" asp-route-id="@l.Id" class="note-composer">
+            @Html.AntiForgeryToken()
+            <span class="avatar" style="width:32px; height:32px; font-size:11px;">@OwnerInitials</span>
+            <textarea name="text" placeholder="Add a note, log a call, or paste an email summary…" required></textarea>
+            <button class="btn btn-gold btn-sm" type="submit" style="align-self:flex-end;">Add</button>
+        </form>
+    </section>
+</div>
+
+<footer class="crm-foot">
+    <span>Gold Kiosk · CRM · © AI Kiosks International Inc. 2026</span>
+    <span class="mono">lead_id: @l.Id · created_at: @l.CreatedAt.ToString("yyyy-MM-ddTHH:mm'Z'")</span>
+</footer>
+
+@section Scripts {
+<script>
+(function () {
+    var openBtn   = document.getElementById('open-proposal-modal');
+    var modal     = document.getElementById('proposal-modal');
+    var closeBtn  = document.getElementById('close-proposal');
+    var frame     = document.getElementById('proposal-frame');
+    var dlLink    = document.getElementById('download-proposal');
+    var fullBtn   = document.getElementById('open-fullpage');
+
+    if (!openBtn || !modal) return;
+
+    var pdfUrl  = openBtn.dataset.pdfUrl;
+    var fullUrl = openBtn.dataset.fullUrl;
+
+    openBtn.addEventListener('click', function () {
+        frame.src        = pdfUrl;
+        // ?download=1 makes the controller respond with Content-Disposition: attachment,
+        // forcing a real .pdf download instead of letting the browser open it inline.
+        dlLink.href      = pdfUrl + (pdfUrl.indexOf('?') >= 0 ? '&' : '?') + 'download=1';
+        dlLink.download  = 'proposal-@(shortId).pdf';
+        modal.hidden     = false;
+        modal.classList.add('open');
+        document.body.style.overflow = 'hidden';
+    });
+
+    function closeModal() {
+        modal.hidden = true;
+        modal.classList.remove('open');
+        frame.src    = '';  // stop loading / free memory
+        document.body.style.overflow = '';
+    }
+
+    closeBtn.addEventListener('click', closeModal);
+
+    modal.addEventListener('click', function (e) {
+        if (e.target === modal) closeModal();
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && !modal.hidden) closeModal();
+    });
+
+    fullBtn.addEventListener('click', function () {
+        window.open(fullUrl, '_blank');
+    });
+}());
+</script>
+}

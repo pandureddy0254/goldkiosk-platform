@@ -1,0 +1,337 @@
+@model IEnumerable<GoldKiosk.Cloud.CRMPortal.Models.Domain.Subscription>
+@{
+    ViewData["Title"] = "Subscriptions";
+    var partners  = (Dictionary<Guid, GoldKiosk.Cloud.CRMPortal.Models.Domain.Partner>) (ViewBag.Partners  ?? new Dictionary<Guid, GoldKiosk.Cloud.CRMPortal.Models.Domain.Partner>());
+    var reminders = (List<GoldKiosk.Cloud.CRMPortal.Models.Domain.RenewalReminder>)     (ViewBag.Reminders ?? new List<GoldKiosk.Cloud.CRMPortal.Models.Domain.RenewalReminder>());
+    var invoices  = (List<GoldKiosk.Cloud.CRMPortal.Models.Domain.SubscriptionPeriod>)  (ViewBag.Invoices  ?? new List<GoldKiosk.Cloud.CRMPortal.Models.Domain.SubscriptionPeriod>());
+    bool isManager = ViewBag.IsManager == true;
+
+    var rows = Model.ToList();
+    var active   = rows.Count(s => s.Status == "active");
+    var trial    = rows.Count(s => s.Status == "trialing");
+    var pastDue  = rows.Count(s => s.Status == "past_due");
+    var arr      = rows.Where(s => s.Status == "active" || s.Status == "trialing").Sum(s => s.AnnualAmount);
+    var arrCcy   = rows.Where(s => s.Status == "active" || s.Status == "trialing").Select(s => s.CurrencyCode).Distinct().ToList();
+    var arrCcyLabel = arrCcy.Count == 1 ? arrCcy[0] : "mixed";
+
+    string PlanPill(string plan) => plan?.ToLowerInvariant() switch
+    {
+        "enterprise" => "role-pill r-admin",
+        "pro"        => "role-pill r-manager",
+        _            => "role-pill r-operator"
+    };
+    string PlanLabel(string plan) => string.IsNullOrEmpty(plan)
+        ? "Basic"
+        : char.ToUpperInvariant(plan[0]) + plan.Substring(1);
+
+    string StatusPill(string status) => status switch
+    {
+        "active"      => "t-pill t-active",
+        "trialing"    => "t-pill t-provisioning",
+        "past_due"    => "t-pill t-suspended",
+        "suspended"   => "t-pill t-suspended",
+        "cancelled"   => "t-pill t-churned",
+        "expired"     => "t-pill t-churned",
+        _             => "t-pill"
+    };
+    string StatusLabel(string status) => status switch
+    {
+        "active"    => "Active",
+        "trialing"  => "Trialing",
+        "past_due"  => "Past-due",
+        "suspended" => "Suspended",
+        "cancelled" => "Cancelled",
+        "expired"   => "Expired",
+        _ => status
+    };
+
+    decimal renewals30Sum = rows
+        .Where(r => (r.Status == "active" || r.Status == "trialing")
+                 && r.DaysUntilRenewal >= 0 && r.DaysUntilRenewal <= 30)
+        .Sum(r => r.AnnualAmount);
+    int renewals30Cnt = rows.Count(r => (r.Status == "active" || r.Status == "trialing")
+                                      && r.DaysUntilRenewal >= 0 && r.DaysUntilRenewal <= 30);
+
+    decimal mrr = rows.Where(r => r.Status == "active" || r.Status == "trialing").Sum(r => r.MrrAmount);
+    var mrrCcy = rows.Where(r => r.Status == "active" || r.Status == "trialing").Select(r => r.CurrencyCode).Distinct().ToList();
+    string mrrCcyLabel = mrrCcy.Count == 1 ? mrrCcy[0] : "mixed";
+}
+
+<div class="page-head">
+    <div class="page-title-block">
+        <div class="eyebrow">Billing · subscriptions</div>
+        <h1 class="page-title">Subscriptions <em>register.</em></h1>
+        <p class="page-subtitle">@active active · @trial trialing · @pastDue past-due · ARR <span class="mono">@arrCcyLabel @arr.ToString("N0")</span> · Stripe webhook + SES reminders · daily 02:00 / 02:30 / 03:00 cron.</p>@* TODO(GK-CRM-1): Stripe webhook + renewal crons not ported yet. *@
+    </div>
+    <div style="display:flex; gap:10px;">
+        <button class="btn btn-ghost btn-sm">Export CSV</button>
+        <button class="btn btn-gold btn-sm">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 3V11M3 7H11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            New subscription
+        </button>
+    </div>
+</div>
+
+@if (TempData["BillingFlash"] is string flash)
+{
+    <div class="callout" style="margin-bottom:12px;">
+        <div class="ico">i</div>
+        <div class="body">@flash</div>
+    </div>
+}
+
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Renewals · next 30d<span class="dot" style="background:var(--warning);"></span></div>
+        <div class="kpi-value">@renewals30Cnt</div>
+        <div class="kpi-foot"><span class="delta delta-flat">@arrCcyLabel @renewals30Sum.ToString("N0") renewing</span></div>
+        <svg class="spark" viewBox="0 0 72 28" preserveAspectRatio="none"><path d="M0,20 L18,18 L36,12 L54,8 L72,5" fill="none" stroke="var(--warning)" stroke-width="1.4" stroke-linecap="round"/></svg>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Active MRR<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value">@mrr.ToString("N0")<span class="unit">@mrrCcyLabel</span></div>
+        <div class="kpi-foot"><span class="delta delta-up">▲ from subscriptions</span></div>
+        <svg class="spark" viewBox="0 0 72 28" preserveAspectRatio="none"><path d="M0,22 L9,20 L18,18 L27,16 L36,14 L45,12 L54,10 L63,8 L72,5" fill="none" stroke="var(--success)" stroke-width="1.4" stroke-linecap="round"/></svg>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Past-due<span class="dot" style="background:var(--danger);"></span></div>
+        <div class="kpi-value">@pastDue</div>
+        <div class="kpi-foot"><span class="delta delta-flat">status = past_due</span></div>
+        <svg class="spark" viewBox="0 0 72 28" preserveAspectRatio="none"><path d="M0,10 L24,14 L48,18 L72,22" fill="none" stroke="var(--danger)" stroke-width="1.4" stroke-linecap="round" stroke-dasharray="2 3"/></svg>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">ARR · YTD<span class="dot"></span></div>
+        <div class="kpi-value">@arr.ToString("N0")<span class="unit">@arrCcyLabel</span></div>
+        <div class="kpi-foot"><span class="delta delta-flat">active + trialing</span></div>
+        <svg class="spark" viewBox="0 0 72 28" preserveAspectRatio="none"><path d="M0,24 L12,21 L24,18 L36,14 L48,11 L60,7 L72,3" fill="none" stroke="var(--accent)" stroke-width="1.4" stroke-linecap="round"/></svg>
+    </div>
+</div>
+
+<form method="get" class="filter-bar">
+    <input type="search" name="q" value="@(ViewBag.Q as string ?? "")" placeholder="Search partner name…" style="flex:0 0 280px;" />
+    <span class="filter-label">Status</span>
+    <select name="status">
+        <option value="all"       selected="@(string.IsNullOrEmpty(ViewBag.Status as string) || ViewBag.Status == "all")">All</option>
+        <option value="trialing"  selected="@(ViewBag.Status == "trialing")">Trialing</option>
+        <option value="active"    selected="@(ViewBag.Status == "active")">Active</option>
+        <option value="past_due"  selected="@(ViewBag.Status == "past_due")">Past-due</option>
+        <option value="suspended" selected="@(ViewBag.Status == "suspended")">Suspended</option>
+        <option value="cancelled" selected="@(ViewBag.Status == "cancelled")">Cancelled</option>
+        <option value="expired"   selected="@(ViewBag.Status == "expired")">Expired</option>
+    </select>
+    <span class="filter-label">Cycle</span>
+    <select name="cycle">
+        <option value="all"       selected="@(string.IsNullOrEmpty(ViewBag.Cycle as string) || ViewBag.Cycle == "all")">All</option>
+        <option value="annual"    selected="@(ViewBag.Cycle == "annual")">Annual</option>
+        <option value="quarterly" selected="@(ViewBag.Cycle == "quarterly")">Quarterly</option>
+        <option value="monthly"   selected="@(ViewBag.Cycle == "monthly")">Monthly</option>
+        <option value="biennial"  selected="@(ViewBag.Cycle == "biennial")">Biennial</option>
+    </select>
+    <span class="filter-label">Renewal window</span>
+    <select name="renewal">
+        <option value="any"      selected="@(string.IsNullOrEmpty(ViewBag.Renewal as string) || ViewBag.Renewal == "any")">Any</option>
+        <option value="next_7d"  selected="@(ViewBag.Renewal == "next_7d")">Next 7d</option>
+        <option value="next_30d" selected="@(ViewBag.Renewal == "next_30d")">Next 30d</option>
+        <option value="next_60d" selected="@(ViewBag.Renewal == "next_60d")">Next 60d</option>
+        <option value="past_due" selected="@(ViewBag.Renewal == "past_due")">Past due</option>
+    </select>
+    <span class="filter-label">Auto-renew</span>
+    <select name="autorenew">
+        <option value="any" selected="@(string.IsNullOrEmpty(ViewBag.Autorenew as string) || ViewBag.Autorenew == "any")">Any</option>
+        <option value="on"  selected="@(ViewBag.Autorenew == "on")">On</option>
+        <option value="off" selected="@(ViewBag.Autorenew == "off")">Off</option>
+    </select>
+    <button type="submit" class="btn btn-ghost btn-sm">Apply</button>
+</form>
+
+<section class="card">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">All subscriptions</h2>
+            <div class="card-meta" style="margin-top:6px;"><span>@rows.Count partners · sorted by next-renewal asc</span></div>
+        </div>
+        <div style="font-size:13px; color:var(--ink-faint); font-family:var(--font-mono);">1–@rows.Count of @rows.Count</div>
+    </header>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Partner</th>
+                <th>Plan</th>
+                <th>Cycle</th>
+                <th style="text-align:right;">Annual</th>
+                <th>Status</th>
+                <th>Next renewal</th>
+                <th>Auto-renew</th>
+                <th>Reminders</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var s in rows)
+        {
+            partners.TryGetValue(s.PartnerId, out var partner);
+            var name = partner?.DisplayName ?? partner?.LegalName ?? s.PartnerId.ToString("N").Substring(0, 8);
+            var days = s.DaysUntilRenewal;
+            var rowReminders = reminders.Where(r => r.SubscriptionId == s.Id).ToList();
+            var remSummary = rowReminders.Count == 0
+                ? "—"
+                : string.Join(" · ", rowReminders.Take(3).Select(r => $"{r.Kind} {r.DeliveryStatus}"));
+            var remColor = rowReminders.Any(r => r.DeliveryStatus == "failed" || r.DeliveryStatus == "bounced")
+                ? "var(--danger)" : "var(--ink-faint)";
+            var rowStyle = (s.Status == "cancelled" || s.Status == "expired") ? "opacity:0.55;" : "";
+            <tr style="@rowStyle">
+                <td><span class="row-link">@name</span><span class="secondary">@s.PlanCode</span></td>
+                <td><span class="@PlanPill(s.PlanCode)">@PlanLabel(s.PlanCode)</span></td>
+                <td>@(char.ToUpperInvariant(s.BillingCycle[0]) + s.BillingCycle.Substring(1))</td>
+                <td class="num-cell" style="text-align:right;">@s.CurrencyCode @s.AnnualAmount.ToString("N0")</td>
+                <td><span class="@StatusPill(s.Status)">@StatusLabel(s.Status)</span></td>
+                <td>
+                    @if (s.Status == "past_due")
+                    {
+                        <strong>@Math.Abs(days) days overdue</strong>
+                    }
+                    else if (days >= 0)
+                    {
+                        <strong>in @days days</strong>
+                    }
+                    else
+                    {
+                        <span>—</span>
+                    }
+                    <span class="secondary">@s.CurrentPeriodEnd.ToString("dd MMM yyyy")</span>
+                </td>
+                <td><span class="status-pill @(s.AutoRenew ? "s-active" : "s-disabled")">@(s.AutoRenew ? "On" : "Off")</span></td>
+                <td><span class="mono" style="color:@remColor;">@remSummary</span></td>
+                <td style="white-space:nowrap;">
+                    @{
+                        var canCancel = isManager && (s.Status == "active" || s.Status == "trialing" || s.Status == "past_due");
+                    }
+                    @if (canCancel)
+                    {
+                        <details class="sub-cancel">
+                            <summary style="cursor:pointer; color:var(--danger); font-size:12px;">Cancel</summary>
+                            <form asp-action="Cancel" method="post" style="margin-top:8px; padding:10px; border:1px solid var(--line); border-radius:8px; background:var(--bg-elev); min-width:280px;">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@s.Id" />
+                                <div class="field" style="margin-bottom:8px;">
+                                    <label style="font-size:11px; display:block; margin-bottom:4px;">Reason</label>
+                                    <textarea name="reason" required rows="2" placeholder="e.g. partner closing operations" style="width:100%; font-size:12px;"></textarea>
+                                </div>
+                                <div class="field" style="margin-bottom:10px;">
+                                    <label style="font-size:11px; display:block; margin-bottom:4px;">Effective (UTC, optional)</label>
+                                    <input type="date" name="effectiveAt" style="width:100%; font-size:12px;" />
+                                </div>
+                                <div style="display:flex; gap:6px; justify-content:flex-end;">
+                                    <button type="reset" class="btn btn-ghost btn-sm">Cancel</button>
+                                    <button type="submit" class="btn btn-sm" style="background:var(--danger); color:#fff;">Confirm cancel</button>
+                                </div>
+                            </form>
+                        </details>
+                    }
+                </td>
+            </tr>
+        }
+        @if (!rows.Any())
+        {
+            <tr><td colspan="9" style="text-align:center; color:var(--ink-faint); padding:24px;">No subscriptions in this window.</td></tr>
+        }
+        </tbody>
+    </table>
+</section>
+
+<div class="split-2-1">
+    <section class="card">
+        <header class="card-head">
+            <div>
+                <h2 class="card-title">Reminder queue · next 60 days</h2>
+                <div class="card-meta" style="margin-top:6px;"><span>Daily at 02:00 · backed by <code>renewal_reminders</code> · idempotent</span></div>
+            </div>
+            <a asp-controller="Renewals" asp-action="Index" style="font-size:13px; color:var(--accent);">All reminders →</a>
+        </header>
+        <div class="attn-list">
+            @if (!reminders.Any())
+            {
+                <div class="attn-row"><div class="attn-meta">No reminders queued in the next 60 days.</div></div>
+            }
+            @foreach (var r in reminders.Take(6))
+            {
+                partners.TryGetValue(rows.FirstOrDefault(x => x.Id == r.SubscriptionId)?.PartnerId ?? Guid.Empty, out var pp);
+                var pname = pp?.DisplayName ?? pp?.LegalName ?? "—";
+                string pillCls = r.DeliveryStatus switch
+                {
+                    "queued"   => "stage-pill s-qualified",
+                    "sent"     => "stage-pill s-new",
+                    "opened"   => "stage-pill s-qualified",
+                    "bounced"  => "stage-pill s-lost",
+                    "failed"   => "stage-pill s-lost",
+                    _          => "stage-pill s-new"
+                };
+                <div class="attn-row">
+                    <span class="src-pill src-website" style="text-transform:none;">@r.Kind</span>
+                    <div>
+                        <div class="attn-co">@pname · renewal reminder</div>
+                        <div class="attn-meta">To <span class="mono">@r.RecipientEmail</span> · scheduled @r.ScheduledFor.ToString("dd MMM")</div>
+                    </div>
+                    <span class="@pillCls">@(char.ToUpperInvariant(r.DeliveryStatus[0]) + r.DeliveryStatus.Substring(1))</span>
+                </div>
+            }
+        </div>
+    </section>
+
+    <section class="card">
+        <header class="card-head">
+            <div>
+                <h2 class="card-title">Recent invoices</h2>
+                <div class="card-meta" style="margin-top:6px;"><span>last 30 days</span></div>
+            </div>
+        </header>
+        <div class="feed">
+            @if (!invoices.Any())
+            {
+                <div class="feed-row"><div class="feed-meta">No invoices yet.</div></div>
+            }
+            @foreach (var inv in invoices.Take(6))
+            {
+                var sub = rows.FirstOrDefault(x => x.Id == inv.SubscriptionId);
+                partners.TryGetValue(sub?.PartnerId ?? Guid.Empty, out var pp);
+                var pname = pp?.DisplayName ?? pp?.LegalName ?? "—";
+                string statusCls = inv.Status switch
+                {
+                    "paid"     => "feed-status ok",
+                    "pending"  => "feed-status pending",
+                    "refunded" => "feed-status pending",
+                    "voided"   => "feed-status fail",
+                    _          => "feed-status pending"
+                };
+                string statusGlyph = inv.Status switch
+                {
+                    "paid"     => "✓",
+                    "pending"  => "⏳",
+                    "refunded" => "↺",
+                    "voided"   => "!",
+                    _          => "⏳"
+                };
+                <div class="feed-row">
+                    <span class="feed-code">@(inv.ExternalInvoiceId ?? "—")</span>
+                    <div class="feed-meta"><strong>@pname</strong> · @(sub?.PlanCode ?? "—") · @(sub?.BillingCycle ?? "—")</div>
+                    <span class="feed-amount">@inv.CurrencyCode @inv.Amount.ToString("N0")</span>
+                    <span class="@statusCls">@statusGlyph</span>
+                </div>
+            }
+        </div>
+    </section>
+</div>
+
+<div class="callout" style="margin-top:8px;">
+    <div class="ico">i</div>
+    <div class="body">
+        <strong>Reminder schedule.</strong>
+        Eight windows are queued per renewal cycle — <span class="mono">T-60</span>, <span class="mono">T-30</span>, <span class="mono">T-14</span>, <span class="mono">T-7</span>, <span class="mono">T-1</span>, <span class="mono">T+1</span>, <span class="mono">T+7</span>, <span class="mono">T+30</span>. A subscription past-due for 14 days auto-flips to <em>suspended</em>; the partner's <span class="mono">tenant_status</span> mirrors that.
+    </div>
+</div>
+
+<footer class="crm-foot">
+    <span>Gold Kiosk · CRM · © AI Kiosks International Inc. 2026</span>
+    @* TODO(GK-CRM-1): Stripe ingestion not ported yet. *@
+    <span class="mono">subscriptions · provider: stripe · email: ses (me-central-1)</span>
+</footer>

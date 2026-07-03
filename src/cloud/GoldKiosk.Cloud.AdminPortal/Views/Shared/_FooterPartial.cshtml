@@ -1,0 +1,9 @@
+@model GoldKiosk.Cloud.AdminPortal.Models.Layout.FooterViewModel
+@{
+    var year = DateTime.UtcNow.Year;
+}
+
+<footer class="app-footer">
+    <span>Gold Kiosk · v0.1 · © AI Kiosks International Inc. @year</span>
+    <span style="font-family:var(--font-mono);">tenant: @Model.TenantCode.ToLowerInvariant() · region: ae-1 · prod</span>
+</footer>

@@ -1,0 +1,72 @@
+@{
+}
+
+<div class="modal fade zoomIn" id="CommonModal" tabindex="-1" style="display: none;" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mt-2 text-center">
+                    <img id="modalIcon" style="width:100px;height:100px;">
+                    <div class="mt-4 pt-2 fs-15 mx-4 mx-sm-5">
+                        <div class="col-md-12">
+                            <h2 id="modalTitle"></h2>
+                            <h4 id="modalMessage"></h4>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer text-center">
+                <button type="button" class="btn w-sm btn-success" data-bs-dismiss="modal">Okay</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.lordicon.com/ritcuqlt.js"></script>
+<script>
+    $(document).ready(function () {
+        if ((performance && performance.navigation.type === performance.navigation.TYPE_BACK_FORWARD) ||
+            (window.performance.getEntriesByType("navigation")[0].type === "reload")) {
+            return;
+        }
+        var errType = '@TempData["ErrType"]';
+        var errTitle = '@TempData["ErrTitle"]';
+        var errMessage = '@TempData["ErrMessage"]';
+        var iconUrl = "";
+
+        if (errType) {
+            switch (errType) {
+                case "SUCCESS":
+                    iconUrl = '@Url.Content("~/assets/images/icons_sweetalert/success.png")';
+                    break;
+                case "ERROR":
+                    iconUrl = '@Url.Content("~/assets/images/icons_sweetalert/close.png")';
+                    break;
+                case "WARNING":
+                    iconUrl = '@Url.Content("~/assets/images/icons_sweetalert/warning.png")';
+                    break;
+                case "INFO":
+                    iconUrl = '@Url.Content("~/assets/images/icons_sweetalert/info.png")';
+                    break;
+                default:
+                    iconUrl = '@Url.Content("~/assets/images/icons_sweetalert/warning.png")';
+            }
+
+            // Debugging
+            console.log("Resolved Icon URL:", iconUrl);
+
+            // Set modal values
+            $('#modalIcon').attr('src', iconUrl);
+            $('#modalTitle').text(errTitle);
+            $('#modalMessage').text(errMessage);
+
+            // Show modal
+            $('#CommonModal').modal('show');
+        }
+    });
+</script>
+
+

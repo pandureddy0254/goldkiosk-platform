@@ -1,0 +1,39 @@
+@{
+    var pageTitle = (string?)ViewBag.Title ?? "Sign in";
+}
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/png" sizes="32x32"   href="~/img/logo-mark-3d-opt.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="~/img/logo-mark-3d-opt-3x.png" />
+    <link rel="apple-touch-icon" href="~/img/logo-mark-3d-opt-3x.png" />
+    <title>@System.Text.RegularExpressions.Regex.Replace(pageTitle, "<.*?>", "").Trim() — Gold Kiosk</title>
+
+    <link rel="stylesheet" href="~/css/tokens.css"       asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/main.css"         asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/admin-extras.css" asp-append-version="true" />
+
+    <script src="~/js/theme.js" defer asp-append-version="true"></script>
+    @await RenderSectionAsync("Head", required: false)
+</head>
+<body>
+    <button class="theme-toggle login-theme-toggle" data-action="toggle-theme" title="Toggle theme" aria-label="Toggle theme">
+        <span class="ring"></span>
+    </button>
+
+    @RenderBody()
+
+    @if (TempData["FlashSuccess"] is string ok)
+    {
+        <div class="flash flash-success">@ok</div>
+    }
+    @if (TempData["FlashError"] is string err)
+    {
+        <div class="flash flash-error">@err</div>
+    }
+
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

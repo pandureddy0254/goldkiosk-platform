@@ -1,0 +1,196 @@
+@{
+    ViewBag.PageTitle = "Locations<em>.</em>";
+    ViewBag.Eyebrow   = "Operations · Footprint";
+    ViewBag.Subtitle  = "Sites across the GCC that host one or more Gold Kiosk units. Manage site metadata, opening dates, and on-site managers from one directory.";
+    ViewBag.ActiveNav = "operations";
+}
+
+<div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin: -16px 0 22px;">
+    <div class="seg seg-tabs">
+        <a asp-controller="Operations" asp-action="CollectionTickets">Collections</a>
+        <a asp-controller="Operations" asp-action="MaintenanceTickets">Maintenance</a>
+        <a asp-controller="Operations" asp-action="TechnicianManagement">Technicians</a>
+        <a asp-controller="Operations" asp-action="SystemHealthCheck">System health</a>
+        <a asp-controller="Operations" asp-action="DeploymentTickets">Deployment</a>
+        <a class="active" asp-controller="Operations" asp-action="LocationConfiguration">Locations</a>
+    </div>
+    <span style="flex:1;"></span>
+    <button type="button" class="btn btn-ghost btn-sm">Export CSV</button>
+    <button type="button" class="btn btn-primary btn-sm" data-action="open-modal" data-target="addSiteModal">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 3V11M3 7H11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        New site
+    </button>
+</div>
+
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Sites<span class="dot"></span></div>
+        <div class="kpi-value mono">15</div>
+        <div class="kpi-foot"><span class="label-suffix">12 live · 2 setup · 1 dormant</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Kiosks deployed<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value mono">52</div>
+        <div class="kpi-foot"><span class="label-suffix">avg 3.5 per site</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Regions<span class="dot"></span></div>
+        <div class="kpi-value mono">7</div>
+        <div class="kpi-foot"><span class="label-suffix">DXB · AUH · SHJ · RAK · AJM · FUJ · UAQ</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Under construction<span class="dot" style="background:var(--warning);"></span></div>
+        <div class="kpi-value mono">2</div>
+        <div class="kpi-foot"><span class="label-suffix">opening Q3 2026</span></div>
+    </div>
+</div>
+
+<section class="card" style="margin-bottom:32px;">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Site directory</h2>
+            <div class="card-meta" style="margin-top:6px;"><span>Click any row to open the site drawer</span></div>
+        </div>
+        <div style="display:flex; gap:6px;">
+            <button type="button" class="btn btn-ghost btn-sm">Columns</button>
+            <button type="button" class="btn btn-ghost btn-sm">Map view</button>
+        </div>
+    </header>
+
+    <div class="fleet-toolbar">
+        <span style="text-transform:uppercase; letter-spacing:0.08em;">City</span>
+        <div class="seg">
+            <button type="button" class="active">All</button>
+            <button type="button">DXB</button><button type="button">AUH</button><button type="button">SHJ</button>
+            <button type="button">RAK</button><button type="button">AJM</button><button type="button">FUJ</button><button type="button">UAQ</button>
+        </div>
+        <span style="text-transform:uppercase; letter-spacing:0.08em;">Status</span>
+        <div class="seg">
+            <button type="button" class="active">All</button><button type="button">Live</button><button type="button">Setup</button><button type="button">Dormant</button>
+        </div>
+    </div>
+
+    <div style="overflow-x:auto;">
+        <table class="user-table loc-table">
+            <thead>
+                <tr>
+                    <th>Code</th><th>Site name</th><th>City</th><th>Address</th>
+                    <th style="text-align:right;">Kiosks</th><th>Manager</th><th>Status</th><th>Opened</th>
+                    <th style="text-align:right; padding-right:22px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr onclick="openSite('S-DXB-MALL')"><td><span class="row-code">S-DXB-MALL</span></td><td><strong>Dubai Mall · North Wing</strong></td><td class="mono">DXB</td><td class="row-sub">Financial Centre Rd, Downtown Dubai&hellip;</td><td class="mono" style="text-align:right;">4</td><td>Ahmed Khoury</td><td><span class="status-pill s-active">Live</span></td><td class="mono">14 Mar 2024</td><td><div class="row-actions" style="justify-content:flex-end;"><button type="button" class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11" cy="7" r="1.2"/></svg></button></div></td></tr>
+                <tr onclick="openSite('S-DXB-JBR')"><td><span class="row-code">S-DXB-JBR</span></td><td><strong>JBR · The Beach</strong></td><td class="mono">DXB</td><td class="row-sub">Marina Promenade, Plaza 3, JBR&hellip;</td><td class="mono" style="text-align:right;">3</td><td>Fatima Karim</td><td><span class="status-pill s-active">Live</span></td><td class="mono">22 Jun 2024</td><td><div class="row-actions" style="justify-content:flex-end;"><button type="button" class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11" cy="7" r="1.2"/></svg></button></div></td></tr>
+                <tr onclick="openSite('S-DXB-BUR')"><td><span class="row-code">S-DXB-BUR</span></td><td><strong>BurJuman Centre</strong></td><td class="mono">DXB</td><td class="row-sub">Khalid Bin Al Waleed Rd, Karama&hellip;</td><td class="mono" style="text-align:right;">2</td><td>Rahul Pillai</td><td><span class="status-pill s-active">Live</span></td><td class="mono">04 Sep 2024</td><td><div class="row-actions" style="justify-content:flex-end;"><button type="button" class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11" cy="7" r="1.2"/></svg></button></div></td></tr>
+                <tr onclick="openSite('S-DXB-DEIRA')"><td><span class="row-code">S-DXB-DEIRA</span></td><td><strong>Deira City Centre</strong></td><td class="mono">DXB</td><td class="row-sub">Port Saeed, Garhoud&hellip;</td><td class="mono" style="text-align:right;">3</td><td>Priya Nair</td><td><span class="status-pill s-active">Live</span></td><td class="mono">12 Nov 2024</td><td><div class="row-actions" style="justify-content:flex-end;"><button type="button" class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11" cy="7" r="1.2"/></svg></button></div></td></tr>
+                <tr onclick="openSite('S-DXB-CITY')"><td><span class="row-code">S-DXB-CITY</span></td><td><strong>City Walk · Block 11</strong></td><td class="mono">DXB</td><td class="row-sub">Al Wasl Rd, Jumeirah&hellip;</td><td class="mono" style="text-align:right;">2</td><td>Hassan Maktoum</td><td><span class="status-pill s-pending">Setup</span></td><td class="mono">opens 14 Jul 2026</td><td><div class="row-actions" style="justify-content:flex-end;"><button type="button" class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11" cy="7" r="1.2"/></svg></button></div></td></tr>
+                <tr onclick="openSite('S-AUH-MARINA')"><td><span class="row-code">S-AUH-MARINA</span></td><td><strong>Marina Mall · Breakwater</strong></td><td class="mono">AUH</td><td class="row-sub">Breakwater, Corniche, Abu Dhabi&hellip;</td><td class="mono" style="text-align:right;">3</td><td>Yusuf Akhtar</td><td><span class="status-pill s-active">Live</span></td><td class="mono">18 Apr 2024</td><td><div class="row-actions" style="justify-content:flex-end;"><button type="button" class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11" cy="7" r="1.2"/></svg></button></div></td></tr>
+                <tr onclick="openSite('S-AUH-YAS')"><td><span class="row-code">S-AUH-YAS</span></td><td><strong>Yas Mall · West Wing</strong></td><td class="mono">AUH</td><td class="row-sub">Yas Island, Abu Dhabi&hellip;</td><td class="mono" style="text-align:right;">4</td><td>Nikita Sharma</td><td><span class="status-pill s-active">Live</span></td><td class="mono">02 Aug 2024</td><td><div class="row-actions" style="justify-content:flex-end;"><button type="button" class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11" cy="7" r="1.2"/></svg></button></div></td></tr>
+                <tr onclick="openSite('S-AUH-WAHDA')"><td><span class="row-code">S-AUH-WAHDA</span></td><td><strong>Al Wahda Mall</strong></td><td class="mono">AUH</td><td class="row-sub">Hazza Bin Zayed St, Abu Dhabi&hellip;</td><td class="mono" style="text-align:right;">2</td><td>Jamal Darwish</td><td><span class="status-pill s-active">Live</span></td><td class="mono">17 Oct 2024</td><td><div class="row-actions" style="justify-content:flex-end;"><button type="button" class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11" cy="7" r="1.2"/></svg></button></div></td></tr>
+                <tr onclick="openSite('S-SHJ-SAQR')"><td><span class="row-code">S-SHJ-SAQR</span></td><td><strong>Souk Saqr · Al Majaz</strong></td><td class="mono">SHJ</td><td class="row-sub">Al Majaz Waterfront, Sharjah&hellip;</td><td class="mono" style="text-align:right;">2</td><td>Mariam Hosseini</td><td><span class="status-pill s-active">Live</span></td><td class="mono">11 May 2024</td><td><div class="row-actions" style="justify-content:flex-end;"><button type="button" class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11" cy="7" r="1.2"/></svg></button></div></td></tr>
+                <tr onclick="openSite('S-SHJ-SAHARA')"><td><span class="row-code">S-SHJ-SAHARA</span></td><td><strong>Sahara Centre</strong></td><td class="mono">SHJ</td><td class="row-sub">King Faisal St, Al Nahda, Sharjah&hellip;</td><td class="mono" style="text-align:right;">3</td><td>Faiz Al Khoury</td><td><span class="status-pill s-active">Live</span></td><td class="mono">22 Jul 2024</td><td><div class="row-actions" style="justify-content:flex-end;"><button type="button" class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11" cy="7" r="1.2"/></svg></button></div></td></tr>
+                <tr onclick="openSite('S-RAK-HAMRA')"><td><span class="row-code">S-RAK-HAMRA</span></td><td><strong>RAK City Centre · Al Hamra</strong></td><td class="mono">RAK</td><td class="row-sub">Al Hamra Blvd, Ras Al Khaimah&hellip;</td><td class="mono" style="text-align:right;">2</td><td>Raj Kumaran</td><td><span class="status-pill s-active">Live</span></td><td class="mono">06 Sep 2024</td><td><div class="row-actions" style="justify-content:flex-end;"><button type="button" class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11" cy="7" r="1.2"/></svg></button></div></td></tr>
+                <tr onclick="openSite('S-RAK-MANAR')"><td><span class="row-code">S-RAK-MANAR</span></td><td><strong>Manar Mall</strong></td><td class="mono">RAK</td><td class="row-sub">Al Muntasar Rd, RAK&hellip;</td><td class="mono" style="text-align:right;">1</td><td>Diana Reyes</td><td><span class="status-pill s-disabled">Dormant</span></td><td class="mono">04 Dec 2024</td><td><div class="row-actions" style="justify-content:flex-end;"><button type="button" class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11" cy="7" r="1.2"/></svg></button></div></td></tr>
+                <tr onclick="openSite('S-AJM-CITY')"><td><span class="row-code">S-AJM-CITY</span></td><td><strong>Ajman City Centre</strong></td><td class="mono">AJM</td><td class="row-sub">Sheikh Khalifa St, Ajman&hellip;</td><td class="mono" style="text-align:right;">2</td><td>Aman Choudhury</td><td><span class="status-pill s-active">Live</span></td><td class="mono">15 Jan 2025</td><td><div class="row-actions" style="justify-content:flex-end;"><button type="button" class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11" cy="7" r="1.2"/></svg></button></div></td></tr>
+                <tr onclick="openSite('S-FUJ-CITY')"><td><span class="row-code">S-FUJ-CITY</span></td><td><strong>Fujairah City Centre</strong></td><td class="mono">FUJ</td><td class="row-sub">Hamad Bin Abdullah Rd, Fujairah&hellip;</td><td class="mono" style="text-align:right;">2</td><td>Ahmed Khoury</td><td><span class="status-pill s-active">Live</span></td><td class="mono">28 Feb 2025</td><td><div class="row-actions" style="justify-content:flex-end;"><button type="button" class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11" cy="7" r="1.2"/></svg></button></div></td></tr>
+                <tr onclick="openSite('S-UAQ-MALL')"><td><span class="row-code">S-UAQ-MALL</span></td><td><strong>Umm Al-Quwain Mall</strong></td><td class="mono">UAQ</td><td class="row-sub">King Faisal Rd, Umm Al-Quwain&hellip;</td><td class="mono" style="text-align:right;">1</td><td>Hassan Maktoum</td><td><span class="status-pill s-pending">Setup</span></td><td class="mono">opens 02 Sep 2026</td><td><div class="row-actions" style="justify-content:flex-end;"><button type="button" class="icon-btn"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="11" cy="7" r="1.2"/></svg></button></div></td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@* ── Site detail drawer (opened from row click) ─────────────────── *@
+<div class="loc-drawer-scrim" id="locScrim" onclick="closeSite()"></div>
+<aside class="loc-drawer" id="locDrawer" aria-hidden="true">
+    <header class="loc-drawer-head">
+        <div>
+            <div class="eyebrow" id="drCode">S-DXB-MALL</div>
+            <h2 class="loc-drawer-title" id="drTitle">Dubai Mall · <em>North Wing</em></h2>
+        </div>
+        <button type="button" class="icon-btn" onclick="closeSite()" aria-label="Close">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 2L12 12M12 2L2 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </button>
+    </header>
+    <div class="loc-drawer-body">
+        <dl class="loc-meta">
+            <div><dt>Full address</dt><dd id="drAddr">Dubai Mall, Financial Centre Rd, Downtown Dubai, Dubai 00000, United Arab Emirates</dd></div>
+            <div><dt>Geo</dt><dd class="mono">25.1972&deg; N · 55.2796&deg; E</dd></div>
+            <div><dt>Manager</dt><dd>Ahmed Khoury · ahmed.k@@emiratesgold.ae · +971 50 122 4488</dd></div>
+            <div><dt>Hours</dt><dd>Sun&ndash;Wed 10:00&ndash;23:00 · Thu&ndash;Sat 10:00&ndash;01:00</dd></div>
+            <div><dt>Mall ops contact</dt><dd>Emaar Mall Operations · mall-ops@@emaar.ae</dd></div>
+            <div><dt>Opened</dt><dd class="mono">14 March 2024</dd></div>
+        </dl>
+
+        <h3 class="loc-section-h">Kiosks at this site</h3>
+        <table class="user-table" style="margin-top:8px;">
+            <thead><tr><th>Code</th><th>Position</th><th>Status</th><th>Version</th><th>Tx today</th></tr></thead>
+            <tbody>
+                <tr><td><span class="row-code">K-DXB-01</span></td><td>North Atrium · L1</td><td><span class="status-pill s-active">Online</span></td><td class="mono">v4.8.2</td><td class="mono">38</td></tr>
+                <tr><td><span class="row-code">K-DXB-02</span></td><td>South Concourse · L2</td><td><span class="status-pill s-active">Online</span></td><td class="mono">v4.8.2</td><td class="mono">22</td></tr>
+                <tr><td><span class="row-code">K-DXB-05</span></td><td>Fashion Avenue · L1</td><td><span class="status-pill s-active">Online</span></td><td class="mono">v4.9.0-rc2</td><td class="mono">29</td></tr>
+                <tr><td><span class="row-code">K-DXB-06</span></td><td>Grand Atrium · LG</td><td><span class="status-pill s-active">Online</span></td><td class="mono">v4.8.2</td><td class="mono">17</td></tr>
+            </tbody>
+        </table>
+
+        <div class="loc-drawer-foot">
+            <button type="button" class="btn btn-ghost btn-sm">Edit site</button>
+            <button type="button" class="btn btn-primary btn-sm">Add kiosk to site</button>
+        </div>
+    </div>
+</aside>
+
+<form asp-controller="Operations" asp-action="AddLocation" method="post" style="display:none;" id="addSiteForm">
+    @Html.AntiForgeryToken()
+</form>
+
+@section Scripts {
+    <script>
+        function openSite(code) {
+            var d = document.getElementById('locDrawer');
+            var s = document.getElementById('locScrim');
+            document.getElementById('drCode').textContent = code;
+            d.classList.add('open'); s.classList.add('open'); d.setAttribute('aria-hidden', 'false');
+        }
+        function closeSite() {
+            var d = document.getElementById('locDrawer');
+            var s = document.getElementById('locScrim');
+            d.classList.remove('open'); s.classList.remove('open'); d.setAttribute('aria-hidden', 'true');
+        }
+    </script>
+}
+
+@* TODO promote: drawer + loc-table — promote to main.css when reused. *@
+<style>
+    .seg.seg-tabs { display:inline-flex; border:1px solid var(--line-strong); border-radius:var(--radius-md); overflow:hidden; background:var(--canvas-elevated); flex-wrap:wrap; }
+    .seg.seg-tabs a { padding:8px 14px; font-size:13px; color:var(--ink-soft); border-right:1px solid var(--line); text-decoration:none; }
+    .seg.seg-tabs a:last-child { border-right:none; }
+    .seg.seg-tabs a.active { background: var(--ink); color: var(--canvas); }
+    .seg.seg-tabs a:hover:not(.active) { background: var(--canvas-sunken); color: var(--ink); }
+    .loc-table tr { cursor: pointer; }
+    .loc-table tr:hover td { background: var(--canvas-sunken); }
+    .loc-table .row-code, .row-code { font-family: var(--font-mono); font-size: 12px; color: var(--accent); font-weight: 500; }
+    .row-sub { font-size: 12px; color: var(--ink-faint); }
+
+    .loc-drawer-scrim {
+        position: fixed; inset: 0; background: rgba(0,0,0,0.32); opacity: 0; pointer-events: none;
+        transition: opacity var(--dur-med); z-index: 90;
+    }
+    .loc-drawer-scrim.open { opacity: 1; pointer-events: auto; }
+    .loc-drawer {
+        position: fixed; top: 0; right: 0; height: 100vh; width: 560px; max-width: 92vw;
+        background: var(--canvas); border-left: 1px solid var(--line);
+        transform: translateX(102%); transition: transform var(--dur-med) var(--ease-out-quart);
+        z-index: 91; display: flex; flex-direction: column; box-shadow: var(--shadow-md);
+    }
+    .loc-drawer.open { transform: translateX(0); }
+    .loc-drawer-head { display:flex; justify-content:space-between; align-items:flex-start; padding: 22px 24px; border-bottom: 1px solid var(--line); }
+    .loc-drawer-title { font-family: var(--font-display); font-size: 26px; font-weight: 400; margin: 4px 0 0; }
+    .loc-drawer-body { flex: 1; overflow-y: auto; padding: 18px 24px 24px; }
+    .loc-meta { display: grid; grid-template-columns: 1fr; gap: 10px; margin: 12px 0 22px; }
+    .loc-meta > div { display: grid; grid-template-columns: 130px 1fr; gap: 14px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+    .loc-meta dt { color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.08em; font-size: 11px; align-self: center; }
+    .loc-meta dd { margin: 0; color: var(--ink); }
+    .loc-section-h { font-family: var(--font-display); font-size: 18px; font-weight: 400; margin: 22px 0 6px; }
+    .loc-drawer-foot { display:flex; gap:8px; justify-content:flex-end; padding-top: 22px; }
+</style>

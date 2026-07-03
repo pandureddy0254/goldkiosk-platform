@@ -1,0 +1,203 @@
+@model GoldKiosk.Cloud.AdminPortal.Models.UserActivityList
+@using System.Globalization
+@{
+    var inv = CultureInfo.InvariantCulture;
+
+    ViewBag.PageTitle = "User <em>activity.</em>";
+    ViewBag.Eyebrow   = "MONITORING · ACCESS & SESSIONS";
+    ViewBag.Subtitle  = "Live stream of operator and admin actions across the kiosk fleet and admin dashboard, with geographic distribution.";
+    ViewBag.ActiveNav = "monitoring";
+
+    var pageSize  = (int)(ViewBag.PageSize ?? 10);
+    var pageNo    = (int)(ViewBag.PageNo ?? 1);
+    var totalPage = Model?.TotalPage ?? 0;
+    var items     = Model?.ActivityList ?? new List<GoldKiosk.Cloud.AdminPortal.Models.UserActivity>();
+    var total     = Model?.Total ?? items.Count;
+    var searchTerm = (string?)ViewBag.SearchTerm;
+    var logTypeFilter = (string?)ViewBag.LogType;
+
+    string ActorInitials(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "—";
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 1) return parts[0][..Math.Min(2, parts[0].Length)].ToUpperInvariant();
+        return ($"{parts[0][0]}{parts[^1][0]}").ToUpperInvariant();
+    }
+}
+
+@section Head {
+    <style>
+        /* TODO promote — monitoring page-scoped helpers */
+        .seg.seg-tabs { display:inline-flex; border:1px solid var(--line-strong); border-radius:var(--radius-md); overflow:hidden; background:var(--canvas-elevated); }
+        .seg.seg-tabs a { padding:8px 14px; font-size:13px; color:var(--ink-soft); border-right:1px solid var(--line); text-decoration:none; transition: all var(--dur-fast); }
+        .seg.seg-tabs a:last-child { border-right:none; }
+        .seg.seg-tabs a.active { background: var(--ink); color: var(--canvas); }
+        .seg.seg-tabs a:hover:not(.active) { background: var(--canvas-sunken); color: var(--ink); }
+        .map-card { background: var(--canvas-sunken); border:1px solid var(--line); border-radius: var(--radius-md); padding: 12px; }
+    </style>
+}
+
+<!-- Monitoring sub-nav -->
+<div style="display:flex; justify-content:flex-end; margin-bottom:24px;">
+    <div class="seg seg-tabs">
+        <a asp-controller="Monitoring" asp-action="ApiHealthMonitoring">API health</a>
+        <a asp-controller="Monitoring" asp-action="ExceptionMonitoring">Exceptions</a>
+        <a class="active" asp-controller="Monitoring" asp-action="UserActivityLog">User activity</a>
+        <a asp-controller="Monitoring" asp-action="PreciousMetalMonitoring">Metals rates</a>
+    </div>
+</div>
+
+<!-- KPI strip -->
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Events &middot; window<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value"><span class="mono">@total.ToString("N0", inv)</span></div>
+        <div class="kpi-foot"><span class="delta delta-up">&#9650; 4.1%</span><span class="label-suffix">vs prior 24h</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Distinct actors<span class="dot"></span></div>
+        <div class="kpi-value"><span class="mono">@items.Select(a => a.UpdatedBy).Where(b => !string.IsNullOrEmpty(b)).Distinct().Count()</span></div>
+        <div class="kpi-foot"><span class="label-suffix">unique operators</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Failed sign-ins<span class="dot" style="background:var(--danger);"></span></div>
+        <div class="kpi-value"><span class="mono">7</span></div>
+        <div class="kpi-foot"><span class="delta delta-down">&#9660; 4</span><span class="label-suffix">3 locked accounts</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Geo-distinct<span class="dot"></span></div>
+        <div class="kpi-value"><span class="mono">9</span></div>
+        <div class="kpi-foot"><span class="label-suffix">7 UAE &middot; 1 IN &middot; 1 SG</span></div>
+    </div>
+</div>
+
+<!-- Filter toolbar -->
+<section class="card" style="margin-bottom:24px;">
+    <div class="fleet-toolbar">
+        <form method="get" asp-controller="Monitoring" asp-action="UserActivityLog"
+              style="display:flex; gap:10px; align-items:center; width:100%; flex-wrap:wrap;">
+            <input type="text" name="search" value="@searchTerm" placeholder="Search activity / module / actor…"
+                   style="font-family:var(--font-mono); font-size:12px; padding:7px 10px; border:1px solid var(--line-strong); background:var(--canvas-elevated); color:var(--ink); border-radius:var(--radius-sm); min-width:240px;" />
+            <select name="logType" style="font-family:var(--font-sans); font-size:13px; padding:7px 10px; border:1px solid var(--line-strong); background:var(--canvas-elevated); color:var(--ink); border-radius:var(--radius-sm);">
+                <option value="">All log types</option>
+                @foreach (var item in (ViewBag.LogTypeDropdown as IEnumerable<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>) ?? Enumerable.Empty<Microsoft.AspNetCore.Mvc.Rendering.SelectListItem>())
+                {
+                    <option value="@item.Value" selected="@(logTypeFilter == item.Value)">@item.Text</option>
+                }
+            </select>
+            <button type="submit" class="btn btn-ghost btn-sm">Apply</button>
+            <span style="flex:1;"></span>
+            <button type="button" class="btn btn-ghost btn-sm">Export &middot; CSV</button>
+        </form>
+    </div>
+</section>
+
+<div class="split-2-1">
+    <!-- Activity stream -->
+    <section class="card">
+        <header class="card-head">
+            <div>
+                <h2 class="card-title">Live activity stream</h2>
+                <div class="card-meta" style="margin-top:6px;">
+                    <span class="dot-pulse"></span><span>Streaming &middot; @items.Count events shown</span>
+                </div>
+            </div>
+            <span style="font-size:13px; color:var(--accent);">Export &middot; last 24h &rarr;</span>
+        </header>
+        <div class="feed">
+            @if (items.Count == 0)
+            {
+                <div class="feed-row" style="grid-template-columns:1fr;"><div class="feed-meta" style="text-align:center; color:var(--ink-faint); padding:18px;">No activity to display.</div></div>
+            }
+            else
+            {
+                foreach (var a in items)
+                {
+                    var initials = ActorInitials(a.UpdatedBy);
+                    var moduleLabel = string.IsNullOrWhiteSpace(a.Module) ? "platform" : a.Module.ToLowerInvariant();
+                    <div class="feed-row" style="grid-template-columns:auto 1fr auto auto;">
+                        <span class="feed-code mono">@a.UpdatedOn.ToString("HH:mm:ss", inv)</span>
+                        <div class="feed-meta">
+                            <strong>@(string.IsNullOrWhiteSpace(a.UpdatedBy) ? "—" : a.UpdatedBy)</strong>
+                            <span style="color:var(--ink-faint);">&middot;</span>
+                            <span>@a.Activity</span>
+                            @if (!string.IsNullOrWhiteSpace(a.SubModule))
+                            {
+                                <span style="color:var(--ink-faint);">&middot;</span>
+                                <span class="mono" style="color:var(--accent);">@a.SubModule</span>
+                            }
+                        </div>
+                        <span class="feed-amount mono" style="font-size:12px; color:var(--ink-faint);">@moduleLabel</span>
+                        <span class="feed-status ok">&#10003;</span>
+                    </div>
+                }
+            }
+        </div>
+
+        @if (totalPage > 1)
+        {
+            <div style="padding:14px 22px; display:flex; justify-content:flex-end; gap:8px; border-top:1px solid var(--line);">
+                @if (pageNo > 1)
+                {
+                    <a class="btn btn-ghost btn-sm" href="?pageSize=@pageSize&pageNo=@(pageNo-1)&search=@searchTerm&logType=@logTypeFilter">Previous</a>
+                }
+                <span class="mono" style="font-size:12px; color:var(--ink-faint); align-self:center;">Page @pageNo / @totalPage</span>
+                @if (pageNo < totalPage)
+                {
+                    <a class="btn btn-ghost btn-sm" href="?pageSize=@pageSize&pageNo=@(pageNo+1)&search=@searchTerm&logType=@logTypeFilter">Next</a>
+                }
+            </div>
+        }
+    </section>
+
+    <!-- Geographic distribution -->
+    <section class="card">
+        <header class="card-head">
+            <div>
+                <h2 class="card-title">Geographic distribution</h2>
+                <div class="card-meta" style="margin-top:6px;">
+                    <span class="dot-pulse" style="background:var(--accent);"></span><span>142 active sessions</span>
+                </div>
+            </div>
+        </header>
+        <div class="card-body" style="padding:18px 22px;">
+            <div class="map-card">
+                <svg viewBox="0 0 360 280" preserveAspectRatio="xMidYMid meet" width="100%">
+                    <defs>
+                        <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+                            <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.4"/>
+                            <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/>
+                        </radialGradient>
+                    </defs>
+                    <path d="M40,80 Q60,40 120,30 Q200,20 260,50 Q320,70 330,140 Q340,200 280,240 Q200,260 130,250 Q70,240 40,180 Q30,130 40,80 Z" fill="var(--canvas-sunken)" stroke="var(--line-strong)" stroke-width="1"/>
+                    <path d="M220,80 Q260,90 280,130 Q290,170 260,200 Q230,210 210,180 Q200,140 220,80 Z" fill="var(--canvas-elevated)" stroke="var(--accent)" stroke-width="1" stroke-dasharray="2 3" opacity="0.6"/>
+                    <g>
+                        <circle cx="240" cy="138" r="14" fill="url(#glow)"/><circle cx="240" cy="138" r="4" fill="var(--accent)"/>
+                        <text x="252" y="142" font-size="9" font-family="var(--font-mono)" fill="var(--ink-soft)">DXB &middot; 68</text>
+                        <circle cx="225" cy="160" r="10" fill="url(#glow)"/><circle cx="225" cy="160" r="3" fill="var(--accent)"/>
+                        <text x="200" y="178" font-size="9" font-family="var(--font-mono)" fill="var(--ink-soft)">AUH &middot; 32</text>
+                        <circle cx="252" cy="125" r="8" fill="url(#glow)"/><circle cx="252" cy="125" r="3" fill="var(--accent)"/>
+                        <text x="262" y="120" font-size="9" font-family="var(--font-mono)" fill="var(--ink-soft)">SHJ &middot; 18</text>
+                        <circle cx="262" cy="108" r="6" fill="url(#glow)"/><circle cx="262" cy="108" r="2.5" fill="var(--accent)"/>
+                        <text x="270" y="100" font-size="9" font-family="var(--font-mono)" fill="var(--ink-soft)">RAK &middot; 8</text>
+                        <circle cx="258" cy="118" r="5" fill="url(#glow)"/><circle cx="258" cy="118" r="2" fill="var(--accent)"/>
+                        <text x="244" y="92" font-size="9" font-family="var(--font-mono)" fill="var(--ink-soft)">AJM &middot; 6</text>
+                        <circle cx="278" cy="148" r="4" fill="url(#glow)"/><circle cx="278" cy="148" r="2" fill="var(--accent)"/>
+                        <text x="285" y="150" font-size="9" font-family="var(--font-mono)" fill="var(--ink-soft)">FUJ &middot; 5</text>
+                        <circle cx="80" cy="230" r="4" fill="url(#glow)"/><circle cx="80" cy="230" r="2" fill="var(--info)"/>
+                        <text x="88" y="234" font-size="9" font-family="var(--font-mono)" fill="var(--ink-soft)">IN &middot; 3</text>
+                        <circle cx="320" cy="220" r="3" fill="url(#glow)"/><circle cx="320" cy="220" r="1.5" fill="var(--info)"/>
+                        <text x="280" y="234" font-size="9" font-family="var(--font-mono)" fill="var(--ink-soft)">SG &middot; 2</text>
+                    </g>
+                    <text x="180" y="22" font-size="9" font-family="var(--font-sans)" fill="var(--ink-faint)" text-anchor="middle" letter-spacing="0.14em">GULF REGION · LIVE SESSIONS</text>
+                </svg>
+            </div>
+            <div style="margin-top:18px; padding-top:18px; border-top:1px solid var(--line);">
+                <div style="display:flex; justify-content:space-between; padding:8px 0; font-size:13px;"><span>Emirates Gold Bank &middot; DXB HQ</span><span class="mono" style="color:var(--accent);">68 sessions</span></div>
+                <div style="display:flex; justify-content:space-between; padding:8px 0; font-size:13px;"><span>Emirates Gold Bank &middot; AUH branch</span><span class="mono">32 sessions</span></div>
+                <div style="display:flex; justify-content:space-between; padding:8px 0; font-size:13px;"><span>Field operators &middot; all emirates</span><span class="mono">37 sessions</span></div>
+                <div style="display:flex; justify-content:space-between; padding:8px 0; font-size:13px;"><span>AIKI Inc. support &middot; IN/SG</span><span class="mono" style="color:var(--info);">5 sessions</span></div>
+            </div>
+        </div>
+    </section>
+</div>

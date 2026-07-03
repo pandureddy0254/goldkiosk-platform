@@ -1,0 +1,139 @@
+@model HoldingSalesReportViewModel
+@using System.Globalization
+@{
+    var report = Model ?? throw new InvalidOperationException("This report view requires a model.");
+
+    var inv = CultureInfo.InvariantCulture;
+
+    ViewBag.PageTitle = "Holding <em>vs sales.</em>";
+    ViewBag.Eyebrow   = "R-02 · HOLDING REPORT · REFRESH · 15 MIN";
+    ViewBag.Subtitle  = "Stock on hand vs gold/silver settled across the kiosk fleet. Backed by mv_holding_sales — the source of truth for inventory exposure by metal.";
+    ViewBag.ActiveNav = "reports";
+
+    var rows = report.Rows ?? new List<HoldingSalesReportRow>();
+    var from = report.From?.ToString("yyyy-MM-dd", inv) ?? "";
+    var to   = report.To?.ToString("yyyy-MM-dd", inv) ?? "";
+}
+
+@section Head {
+    @await Html.PartialAsync("_ReportDetailStyles")
+}
+
+<div class="breadcrumb">
+    <a asp-controller="Reports" asp-action="Index">Reports library</a>
+    <span class="sep">&rsaquo;</span>
+    <span>R-02 &middot; Holding</span>
+</div>
+
+<form method="get" asp-controller="Reports" asp-action="HoldingSales" class="report-filter">
+    @Html.AntiForgeryToken()
+    <label>From <input type="date" name="from" value="@from" /></label>
+    <label>To <input type="date" name="to" value="@to" /></label>
+    <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+    <a class="btn btn-ghost btn-sm" asp-controller="Reports" asp-action="HoldingSales">Reset</a>
+    <span style="flex:1;"></span>
+    <button type="button" class="btn btn-ghost btn-sm">Export &middot; CSV</button>
+    <button type="button" class="btn btn-ghost btn-sm">Export &middot; PDF</button>
+</form>
+
+<section class="card" style="margin-bottom:24px;">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Stock vs settled &middot; selected window</h2>
+            <div class="card-meta" style="margin-top:6px;">
+                <span><span class="mono">@report.TotalHoldingWeightG.ToString("N3", inv)</span> g on hand &middot;
+                <span class="mono">@report.TotalSoldWeightG.ToString("N3", inv)</span> g settled &middot;
+                <span class="mono">@report.TotalSoldPayout.ToString("N2", inv)</span> AED payout</span>
+            </div>
+        </div>
+        <div style="display:flex; gap:6px;">
+            <button class="btn btn-ghost btn-sm" style="border-color:var(--accent); color:var(--accent);">Range</button>
+            <button class="btn btn-ghost btn-sm">YTD</button>
+        </div>
+    </header>
+    <div class="card-body">
+        <div class="chart">
+            <svg viewBox="0 0 1000 280" preserveAspectRatio="none">
+                <g stroke="var(--line)" stroke-dasharray="2 4">
+                    <line x1="0" x2="1000" y1="40" y2="40"/><line x1="0" x2="1000" y1="100" y2="100"/>
+                    <line x1="0" x2="1000" y1="160" y2="160"/><line x1="0" x2="1000" y1="220" y2="220"/>
+                </g>
+                <path d="M0,180 L60,168 L120,172 L180,150 L240,158 L300,140 L360,128 L420,135 L480,115 L540,108 L600,118 L660,90 L720,95 L780,72 L840,68 L900,55 L960,42 L1000,38" fill="none" stroke="var(--accent)" stroke-width="2"/>
+                <path d="M0,200 L60,195 L120,190 L180,182 L240,178 L300,170 L360,160 L420,150 L480,140 L540,135 L600,128 L660,120 L720,115 L780,105 L840,100 L900,90 L960,85 L1000,80" fill="none" stroke="var(--info)" stroke-width="1.6" stroke-dasharray="3 3"/>
+            </svg>
+        </div>
+    </div>
+</section>
+
+<div class="kpi-strip">
+    <div class="kpi-cell">
+        <div class="kpi-label">Holding (g)<span class="dot"></span></div>
+        <div class="kpi-value"><span class="mono">@report.TotalHoldingWeightG.ToString("N0", inv)</span><span class="unit">g</span></div>
+        <div class="kpi-foot"><span class="delta delta-up">&#9650; 4.2%</span><span class="label-suffix">across all metals</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Sold (g)<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value"><span class="mono">@report.TotalSoldWeightG.ToString("N0", inv)</span><span class="unit">g</span></div>
+        <div class="kpi-foot"><span class="delta delta-up">&#9650; 9.1%</span><span class="label-suffix">vs prior window</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Payout<span class="dot"></span></div>
+        <div class="kpi-value"><span class="mono">@report.TotalSoldPayout.ToString("N0", inv)</span><span class="unit">AED</span></div>
+        <div class="kpi-foot"><span class="delta delta-up">&#9650; 12.6%</span><span class="label-suffix">customer cash-out</span></div>
+    </div>
+    <div class="kpi-cell">
+        <div class="kpi-label">Turnover<span class="dot" style="background:var(--success);"></span></div>
+        <div class="kpi-value"><span class="mono">@(report.TotalHoldingWeightG > 0 ? (report.TotalSoldWeightG / report.TotalHoldingWeightG * 100).ToString("F1", inv) : "0.0")</span><span class="unit">%</span></div>
+        <div class="kpi-foot"><span class="label-suffix">sold ÷ holding</span></div>
+    </div>
+</div>
+
+<section class="card" style="margin-bottom:24px;">
+    <header class="card-head">
+        <div>
+            <h2 class="card-title">Breakdown by metal</h2>
+            <div class="card-meta" style="margin-top:6px;"><span>As-of snapshots aggregated to metal grain</span></div>
+        </div>
+    </header>
+    <div style="overflow-x:auto;">
+        <table class="report-table">
+            <thead>
+                <tr>
+                    <th>As of</th>
+                    <th>Metal</th>
+                    <th class="num">Holding (g)</th>
+                    <th class="num">Sold (g)</th>
+                    <th class="num">Sold payout</th>
+                    <th>Currency</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (rows.Count == 0)
+                {
+                    <tr><td colspan="6" style="text-align:center; padding:32px 18px; color:var(--ink-faint);">No holdings in the selected window.</td></tr>
+                }
+                else
+                {
+                    foreach (var r in rows)
+                    {
+                        <tr>
+                            <td class="mono"><strong>@r.AsOfDate.ToString("yyyy-MM-dd", inv)</strong></td>
+                            <td>@r.Metal</td>
+                            <td class="num mono">@r.HoldingWeightG.ToString("N3", inv)</td>
+                            <td class="num mono">@r.SoldWeightG.ToString("N3", inv)</td>
+                            <td class="num mono">@r.SoldPayout.ToString("N2", inv)</td>
+                            <td>@r.CurrencyCode</td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+</section>
+
+@await Html.PartialAsync("_ReportMetaCard", new ReportMetaCardModel {
+    ReportCode = "R-02",
+    Matview    = "mv_holding_sales",
+    Cadence    = "Every 15 minutes",
+    Rows       = rows.Count
+})
