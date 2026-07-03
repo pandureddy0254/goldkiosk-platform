@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:blazor="clr-namespace:Microsoft.AspNetCore.Components.WebView.Wpf;assembly=Microsoft.AspNetCore.Components.WebView.Wpf"
         Title="GoldKiosk"
+        Icon="Assets/goldkiosk-logo.png"
         WindowStyle="None"
         WindowState="Maximized"
         ResizeMode="NoResize"

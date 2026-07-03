@@ -42,7 +42,10 @@ public sealed class SimulatedMetalAnalyser : SimulatedDeviceBase, IMetalAnalyser
         {
             foreach ((int percent, string stage) in _progressScript)
             {
-                await DelayAsync(500, cancellationToken).ConfigureAwait(false);
+                // ~10s total across the six steps so the mock feels like a real XRF cycle;
+                // each step is pushed to the UI over SignalR as it completes. Scaled by
+                // Simulation:LatencyMultiplier (tests run at 0 and skip the wait entirely).
+                await DelayAsync(1650, cancellationToken).ConfigureAwait(false);
                 ProgressChanged?.Invoke(this, new AnalysisProgress(percent, stage));
             }
 
