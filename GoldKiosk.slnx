@@ -19,4 +19,11 @@
     <Project Path="src/shared/GoldKiosk.Domain/GoldKiosk.Domain.csproj" />
     <Project Path="src/shared/GoldKiosk.Infrastructure/GoldKiosk.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/GoldKiosk.Domain.Tests/GoldKiosk.Domain.Tests.csproj" />
+    <Project Path="tests/GoldKiosk.Kiosk.Api.Tests/GoldKiosk.Kiosk.Api.Tests.csproj" />
+    <Project Path="tests/GoldKiosk.Kiosk.Core.Tests/GoldKiosk.Kiosk.Core.Tests.csproj" />
+    <Project Path="tests/GoldKiosk.Kiosk.Devices.Tests/GoldKiosk.Kiosk.Devices.Tests.csproj" />
+    <Project Path="tests/GoldKiosk.TestKit/GoldKiosk.TestKit.csproj" />
+  </Folder>
 </Solution>

@@ -116,3 +116,6 @@ api.MapDeviceEndpoints();
 api.MapRatesEndpoints();
 
 app.Run();
+
+/// <summary>Marker type so WebApplicationFactory-based integration tests can target this host.</summary>
+public partial class Program;
