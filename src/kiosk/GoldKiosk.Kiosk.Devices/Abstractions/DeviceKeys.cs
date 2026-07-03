@@ -44,6 +44,9 @@ public static class DeviceKeys
     /// <summary>Bagging unit (arm-driven, status-command interlock).</summary>
     public const string Bagger = "bagger";
 
+    /// <summary>Customer item tray (motorized drawer with tray-closed sensor bit).</summary>
+    public const string Tray = "tray";
+
     /// <summary>
     /// Every known device key, in the canonical registration order. Hosts use this to
     /// validate configuration override keys and to compose the full device set.
@@ -62,5 +65,6 @@ public static class DeviceKeys
         CashDispenser,
         LabelPrinter,
         Bagger,
+        Tray,
     ];
 }

@@ -1,0 +1,23 @@
+@page "/place-item"
+
+<div class="screen screen-place">
+    <span class="mono-label screen-kicker">@L["place.kicker"]</span>
+    <h1 class="serif-hero screen-title">@Title</h1>
+    <p class="screen-subtitle">@L["place.subtitle"]</p>
+
+    <div class="tray-visual @TrayClass">
+        <div class="tray-glow"></div>
+        <div class="tray-slot">
+            <div class="tray-plate"></div>
+        </div>
+    </div>
+
+    <div class="screen-actions">
+        <button class="btn-primary" disabled="@(!CanConfirm)" @onclick="ConfirmAsync">
+            @L["place.confirm"]
+        </button>
+        <button class="btn-glass" disabled="@_busy" @onclick="BackOutAsync">
+            @L["place.backout"]
+        </button>
+    </div>
+</div>

@@ -1,0 +1,43 @@
+@page "/identity"
+
+<div class="screen screen-identity">
+    @if (ShowSignature)
+    {
+        <span class="mono-label screen-kicker">@L["signature.kicker"]</span>
+        <h1 class="serif-hero screen-title">@L["signature.title"]</h1>
+        <p class="screen-subtitle">@L["signature.subtitle"]</p>
+
+        <div class="signature-frame glass">
+            <canvas id="signature-canvas" width="880" height="520"></canvas>
+        </div>
+
+        <div class="screen-actions">
+            <button class="btn-primary" disabled="@_busy" @onclick="SubmitSignatureAsync">
+                @L["signature.submit"]
+            </button>
+            <button class="btn-glass" disabled="@_busy" @onclick="ClearSignatureAsync">
+                @L["signature.clear"]
+            </button>
+        </div>
+    }
+    else
+    {
+        <div class="scan-card glass">
+            <div class="scanline"></div>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+                <circle cx="12" cy="9.5" r="3.2" />
+                <path d="M5.5 19.5c1.4-2.8 3.7-4.2 6.5-4.2s5.1 1.4 6.5 4.2" />
+            </svg>
+        </div>
+
+        <h1 class="serif-hero screen-title">@L["identity.title"]</h1>
+        <p class="screen-subtitle">@L["identity.subtitle"]</p>
+
+        <div class="checklist">
+            @foreach (IdentityStepDto step in Store.IdentitySteps)
+            {
+                <ChecklistRow Label="@L[$"identity.step.{step.Step}"]" State="StateFor(step)" />
+            }
+        </div>
+    }
+</div>

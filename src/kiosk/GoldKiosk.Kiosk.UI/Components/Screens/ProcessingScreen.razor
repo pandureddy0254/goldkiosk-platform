@@ -1,0 +1,38 @@
+@page "/processing"
+
+<div class="screen screen-processing">
+    <span class="mono-label screen-kicker">@L["processing.kicker"]</span>
+    <h1 class="serif-hero screen-title">@Title</h1>
+    <p class="screen-subtitle">@L["processing.subtitle"]</p>
+
+    <div class="arm-visual">
+        <svg viewBox="0 0 600 320" class="arm-svg">
+            <polyline class="arm-path" points="60,270 60,140 300,140 300,70 520,70 520,210" />
+            <circle class="arm-joint" cx="60" cy="270" r="7" />
+            <circle class="arm-joint" cx="300" cy="140" r="7" />
+            <circle class="arm-joint" cx="520" cy="210" r="7" />
+            <circle class="arm-dot" r="9">
+                <animateMotion dur="3.2s" repeatCount="indefinite"
+                               path="M60,270 L60,140 L300,140 L300,70 L520,70 L520,210" />
+            </circle>
+        </svg>
+    </div>
+
+    @if (BillCount is { } bills)
+    {
+        <div class="bills-readout">
+            <span class="mono-label">@L.Format("processing.bills", bills)</span>
+            <div class="bill-mix mono-label">
+                @foreach (KeyValuePair<string, int> entry in Store.SettlementBills!)
+                {
+                    <span class="bill-chip">@entry.Key × @entry.Value</span>
+                }
+            </div>
+        </div>
+    }
+
+    <div class="stage-dots">
+        <span class="stage-dot @(StageIndex >= 0 ? "on" : null)"></span>
+        <span class="stage-dot @(StageIndex >= 1 ? "on" : null)"></span>
+    </div>
+</div>

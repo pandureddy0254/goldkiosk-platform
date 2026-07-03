@@ -1,0 +1,46 @@
+@page "/"
+
+<div class="screen screen-attract">
+    <div class="attract-medallion">
+        <svg class="medallion-ring" viewBox="0 0 200 200">
+            <circle class="ring-track" cx="100" cy="100" r="86" />
+            <g class="orbit-spin">
+                <path class="orbit-arc cyan" d="M 100 14 A 86 86 0 0 1 186 100" fill="none" />
+            </g>
+            <g class="orbit-spin-reverse">
+                <path class="orbit-arc blue" d="M 100 186 A 86 86 0 0 1 14 100" fill="none" />
+            </g>
+        </svg>
+        <div class="medallion-disc">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 13h16l-1.2 3.6a2 2 0 0 1-1.9 1.4H7.1a2 2 0 0 1-1.9-1.4Z" />
+                <path d="M8 13V9.8L12 7l4 2.8V13" />
+            </svg>
+        </div>
+    </div>
+
+    <div class="attract-hero">
+        <span class="attract-prefix">@CurrentPrefix</span>
+        <span class="serif-hero attract-word fade-cycle" @key="_wordIndex">@CurrentWord</span>
+    </div>
+
+    <div class="attract-footer">
+        @if (_rates is not null)
+        {
+            <div class="rates-ticker mono-label">
+                @foreach (MetalRateDto rate in _rates.Rates)
+                {
+                    <span class="ticker-item">
+                        @L[$"attract.rates.{rate.Metal}"] @rate.PerGram.Display
+                        <span class="@(rate.ChangePercent >= 0 ? "up" : "down")">@FormatChange(rate.ChangePercent)</span>
+                    </span>
+                }
+            </div>
+        }
+
+        <button class="begin-button" @onclick="BeginAsync" disabled="@_busy">
+            <span class="begin-dot"></span>
+        </button>
+        <span class="mono-label touch-label">@L["attract.touch_to_begin"]</span>
+    </div>
+</div>

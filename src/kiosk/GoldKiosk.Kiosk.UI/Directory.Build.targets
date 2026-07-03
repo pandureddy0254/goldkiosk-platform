@@ -1,0 +1,11 @@
+<Project>
+
+  <!-- Local to GoldKiosk.Kiosk.UI only (no Directory.Build.targets exists above this
+       folder, so nothing is shadowed). Copies the package-default appsettings.json next
+       to the executable — configuration layer 1 per configuration-and-operations §1. -->
+
+  <ItemGroup>
+    <None Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

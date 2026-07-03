@@ -1,0 +1,20 @@
+@if (Flow.TimeoutSecondsRemaining is { } seconds)
+{
+    <div class="overlay-backdrop">
+        <div class="overlay-panel glass">
+            <div class="countdown-ring">
+                <svg viewBox="0 0 120 120">
+                    <circle class="ring-track" cx="60" cy="60" r="52" />
+                    <circle class="ring-value" cx="60" cy="60" r="52" style="@RingStyle(seconds)" />
+                </svg>
+                <span class="countdown-number">@seconds</span>
+            </div>
+            <h2 class="serif-hero overlay-title">@L["timeout.title"]</h2>
+            <p class="overlay-message">@L["timeout.subtitle"]</p>
+            <div class="overlay-actions">
+                <button class="btn-primary" @onclick="Resume">@L["timeout.resume"]</button>
+                <button class="btn-glass" @onclick="AbortAsync">@L["timeout.abort"]</button>
+            </div>
+        </div>
+    </div>
+}

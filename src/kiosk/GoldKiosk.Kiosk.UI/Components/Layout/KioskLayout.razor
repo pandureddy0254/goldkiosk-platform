@@ -1,0 +1,13 @@
+@inherits LayoutComponentBase
+
+<div class="kiosk-viewport" @onpointerdown="OnActivity">
+    <div class="kiosk-stage">
+        <div class="stage-bg"></div>
+        @Body
+        <DeviceBanner />
+        <AgentOverlay />
+        <ErrorOverlay />
+        <TimeoutOverlay />
+        <div class="led-strip"></div>
+    </div>
+</div>

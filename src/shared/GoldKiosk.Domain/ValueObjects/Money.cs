@@ -112,13 +112,15 @@ public sealed record Money
     /// <summary>
     /// Floors the amount down to the nearest multiple of <paramref name="step"/>
     /// (house-favorable offer rounding, e.g. step <c>5.00</c> turns 8,463.75 into 8,460.00).
+    /// The result is re-normalized through <see cref="From"/> so fractional steps (e.g.
+    /// <c>0.001</c>) still land on the currency's minor-unit scale.
     /// </summary>
     /// <param name="step">The positive rounding step in major units.</param>
-    /// <returns>The floored monetary value.</returns>
+    /// <returns>The floored monetary value, normalized to the currency scale.</returns>
     public Money FloorToNearest(decimal step)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(step);
-        return new Money(Math.Floor(Amount / step) * step, CurrencyCode);
+        return From(Math.Floor(Amount / step) * step, CurrencyCode);
     }
 
     /// <summary>Formats the value invariantly for display, e.g. <c>$8,460.00</c> for USD.</summary>

@@ -1,0 +1,17 @@
+@if (IsVisible)
+{
+    <div class="agent-overlay glass">
+        <div class="agent-video">
+            <div class="agent-pulse"></div>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+                <circle cx="12" cy="9" r="3.2" />
+                <path d="M5.5 19c1.4-2.8 3.7-4.2 6.5-4.2s5.1 1.4 6.5 4.2" />
+            </svg>
+        </div>
+        <div class="agent-copy">
+            <span class="mono-label">@L["agent.chip"]</span>
+            <h3>@Title</h3>
+            <p>@Subtitle</p>
+        </div>
+    </div>
+}

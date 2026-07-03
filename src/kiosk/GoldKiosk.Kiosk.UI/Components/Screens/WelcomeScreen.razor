@@ -1,0 +1,64 @@
+@page "/welcome"
+
+<div class="screen screen-welcome">
+    <span class="mono-label screen-kicker">@L["welcome.kicker"]</span>
+    <h1 class="serif-hero screen-title">@L["welcome.title"]</h1>
+
+    <div class="service-cards">
+        <button class="select-card @(_serviceType == "sell" ? "selected" : null)"
+                @onclick='() => SelectService("sell")'>
+            <span class="card-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 3v14" /><path d="m6 11 6 6 6-6" /><path d="M5 21h14" />
+                </svg>
+            </span>
+            <span class="card-copy">
+                <span class="card-title">@L["welcome.sell.title"]</span>
+                <span class="card-subtitle">@L["welcome.sell.subtitle"]</span>
+            </span>
+            <span class="card-check"></span>
+        </button>
+
+        @if (Store.Features?.PawnEnabled != false)
+        {
+            <button class="select-card @(_serviceType == "pawn" ? "selected" : null)"
+                    @onclick='() => SelectService("pawn")'>
+                <span class="card-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 8a4 4 0 1 0-4-4" /><path d="M12 8v8a5 5 0 0 0 10 0" /><path d="M12 8H2" />
+                    </svg>
+                </span>
+                <span class="card-copy">
+                    <span class="card-title">@L["welcome.pawn.title"]</span>
+                    <span class="card-subtitle">@L["welcome.pawn.subtitle"]</span>
+                </span>
+                <span class="card-check"></span>
+            </button>
+        }
+    </div>
+
+    <div class="terms-row">
+        <button class="terms-check @(_termsAccepted ? "checked" : null)" @onclick="ToggleTerms">
+            @if (_termsAccepted)
+            {
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="m5 12.5 4.5 4.5L19 7.5" />
+                </svg>
+            }
+        </button>
+        <span class="terms-label">@L["welcome.terms.label"]</span>
+        <button class="link-button" @onclick="OpenTerms">@L["welcome.terms.link"]</button>
+    </div>
+
+    <div class="screen-actions">
+        <button class="btn-primary" disabled="@(!CanContinue)" @onclick="ContinueAsync">
+            @L["common.continue"]
+        </button>
+        <button class="btn-glass" @onclick="CancelAsync">@L["welcome.cancel"]</button>
+    </div>
+
+    <Sheet Visible="_showTerms" Title="@L["terms.sheet.title"]" CloseLabel="@L["common.close"]" OnClose="CloseTerms">
+        <p>@L["terms.sheet.body"]</p>
+        <p class="mono-label terms-version">@Store.TermsVersion</p>
+    </Sheet>
+</div>
