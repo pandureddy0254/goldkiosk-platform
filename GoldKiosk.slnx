@@ -1,5 +1,9 @@
 <Solution>
   <Folder Name="/src/" />
+  <Folder Name="/src/cloud/">
+    <Project Path="src/cloud/GoldKiosk.Cloud.AdminPortal/GoldKiosk.Cloud.AdminPortal.csproj" />
+    <Project Path="src/cloud/GoldKiosk.Cloud.CRMPortal/GoldKiosk.Cloud.CRMPortal.csproj" />
+  </Folder>
   <Folder Name="/src/kiosk/">
     <Project Path="src/kiosk/GoldKiosk.Kiosk.Api/GoldKiosk.Kiosk.Api.csproj" />
     <Project Path="src/kiosk/GoldKiosk.Kiosk.Core/GoldKiosk.Kiosk.Core.csproj" />
@@ -13,5 +17,6 @@
   <Folder Name="/src/shared/">
     <Project Path="src/shared/GoldKiosk.Contracts/GoldKiosk.Contracts.csproj" />
     <Project Path="src/shared/GoldKiosk.Domain/GoldKiosk.Domain.csproj" />
+    <Project Path="src/shared/GoldKiosk.Infrastructure/GoldKiosk.Infrastructure.csproj" />
   </Folder>
 </Solution>
