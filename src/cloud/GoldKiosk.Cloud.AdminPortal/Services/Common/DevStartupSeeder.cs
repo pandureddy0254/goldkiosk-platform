@@ -1,6 +1,6 @@
-using GoldKiosk.Cloud.AdminPortal.Logging;
 using System.Security.Cryptography;
 using System.Text;
+using GoldKiosk.Cloud.AdminPortal.Logging;
 using GoldKiosk.Infrastructure.Data;
 using GoldKiosk.Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;

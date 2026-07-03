@@ -10,8 +10,8 @@ namespace GoldKiosk.Cloud.AdminPortal.Services;
 /// <summary>Maintenance ticket service.</summary>
 public sealed class MaintenanceTicketService(AppDbContext db, ICurrentUserService currentUser) : IMaintenanceTicketService
 {
-    private static readonly string[] AllowedStatuses = ["open", "in_progress", "resolved", "closed", "reopened", "other"];
-    private static readonly string[] AllowedTypes = ["preventive", "corrective", "calibration", "cleaning"];
+    private static readonly string[] _allowedStatuses = ["open", "in_progress", "resolved", "closed", "reopened", "other"];
+    private static readonly string[] _allowedTypes = ["preventive", "corrective", "calibration", "cleaning"];
 
     /// <summary>List.</summary>
     public async Task<MaintenanceTicketList> ListAsync(string? search, string? status, string? ticketType, int pageSize, int pageNo, CancellationToken ct = default)
@@ -144,7 +144,7 @@ public sealed class MaintenanceTicketService(AppDbContext db, ICurrentUserServic
             return OperationResult.Fail("Description is required.");
         }
 
-        if (!AllowedTypes.Contains(vm.TicketType))
+        if (!_allowedTypes.Contains(vm.TicketType))
         {
             vm.TicketType = "preventive";
         }
@@ -165,7 +165,7 @@ public sealed class MaintenanceTicketService(AppDbContext db, ICurrentUserServic
             TicketType = vm.TicketType,
             Description = vm.Description,
             Priority = string.IsNullOrWhiteSpace(vm.Priority) ? "normal" : vm.Priority,
-            Status = AllowedStatuses.Contains(vm.Status) ? vm.Status : "open",
+            Status = _allowedStatuses.Contains(vm.Status) ? vm.Status : "open",
             TechnicianId = vm.TechnicianId,
             ScheduledAt = vm.ScheduledAt.HasValue ? new DateTimeOffset(vm.ScheduledAt.Value, TimeSpan.Zero) : null,
         };
@@ -202,12 +202,12 @@ public sealed class MaintenanceTicketService(AppDbContext db, ICurrentUserServic
             t.Priority = vm.Priority;
         }
 
-        if (!string.IsNullOrWhiteSpace(vm.TicketType) && AllowedTypes.Contains(vm.TicketType))
+        if (!string.IsNullOrWhiteSpace(vm.TicketType) && _allowedTypes.Contains(vm.TicketType))
         {
             t.TicketType = vm.TicketType;
         }
 
-        if (!string.IsNullOrWhiteSpace(vm.Status) && AllowedStatuses.Contains(vm.Status))
+        if (!string.IsNullOrWhiteSpace(vm.Status) && _allowedStatuses.Contains(vm.Status))
         {
             t.Status = vm.Status;
         }
@@ -255,7 +255,7 @@ public sealed class MaintenanceTicketService(AppDbContext db, ICurrentUserServic
             return OperationResult.Fail("No tenant context.");
         }
 
-        if (!AllowedStatuses.Contains(newStatus))
+        if (!_allowedStatuses.Contains(newStatus))
         {
             return OperationResult.Fail($"Status '{newStatus}' is not allowed.");
         }

@@ -14,7 +14,7 @@ public static class VantaChemistryMapper
     private const double SaturatedConcentration = 100d;
     private const double SaturatedErrorThreshold = 15d;
 
-    private static readonly string[] NotPlatedIndicators = ["none", "no", "0", "false", "notplated"];
+    private static readonly string[] _notPlatedIndicators = ["none", "no", "0", "false", "notplated"];
 
     /// <summary>Maps the run's final results (usually one blob, occasionally more) to the port contract.</summary>
     /// <param name="finalResults">Every result blob received with <c>analysis.final == true</c>.</param>
@@ -80,7 +80,7 @@ public static class VantaChemistryMapper
         }
 
         string normalized = auPlating.Trim().Replace(" ", string.Empty, StringComparison.Ordinal);
-        return !NotPlatedIndicators.Contains(normalized, StringComparer.OrdinalIgnoreCase);
+        return !_notPlatedIndicators.Contains(normalized, StringComparer.OrdinalIgnoreCase);
     }
 
     private static string Normalize(string symbol)

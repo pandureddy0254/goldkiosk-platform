@@ -13,8 +13,8 @@ public sealed class DashboardService(AppDbContext db, ICurrentUserService curren
     // which the EF Core funcletizer cannot evaluate ("ReadOnlySpan violates
     // type-parameter constraint" TypeLoadException). List<T>.Contains is a
     // plain instance method and translates cleanly.
-    private static readonly List<string> PaidStatuses = new() { "paid", "accepted" };
-    private static readonly List<string> OpenTicketStatuses = new() { "open", "in_progress", "waiting_customer", "reopened" };
+    private static readonly List<string> _paidStatuses = new() { "paid", "accepted" };
+    private static readonly List<string> _openTicketStatuses = new() { "open", "in_progress", "waiting_customer", "reopened" };
 
     /// <summary>Get.</summary>
     public async Task<DashboardViewModel> GetAsync(CancellationToken ct = default)
@@ -42,7 +42,7 @@ public sealed class DashboardService(AppDbContext db, ICurrentUserService curren
             .Where(t => t.TenantId == tenantId
                 && t.OccurredAt >= startOfDay
                 && t.OccurredAt < endOfDay
-                && PaidStatuses.Contains(t.Status));
+                && _paidStatuses.Contains(t.Status));
 
         var todaysTxCount = await todaysTxQuery.CountAsync(ct);
         var todaysGross = await todaysTxQuery.SumAsync(t => (decimal?)t.TotalAmount, ct) ?? 0m;
@@ -56,7 +56,7 @@ public sealed class DashboardService(AppDbContext db, ICurrentUserService curren
         var openTickets = await db.SupportTickets.AsNoTracking()
             .CountAsync(t => t.TenantId == tenantId
                 && !t.IsClosed
-                && OpenTicketStatuses.Contains(t.Status), ct);
+                && _openTicketStatuses.Contains(t.Status), ct);
 
         var unresolvedExceptions = await db.ExceptionLogs.AsNoTracking()
             .CountAsync(e => (e.TenantId == tenantId || e.TenantId == null) && !e.IsResolved, ct);
@@ -65,7 +65,7 @@ public sealed class DashboardService(AppDbContext db, ICurrentUserService curren
         // Nullable<DateTime> for in-SQL conversions like .UtcDateTime. Pull the
         // raw DateTimeOffset from SQL, convert to DateTime client-side.
         var recentTxRaw = await db.Transactions.AsNoTracking()
-            .Where(t => t.TenantId == tenantId && PaidStatuses.Contains(t.Status))
+            .Where(t => t.TenantId == tenantId && _paidStatuses.Contains(t.Status))
             .OrderByDescending(t => t.OccurredAt)
             .Take(10)
             .Select(t => new

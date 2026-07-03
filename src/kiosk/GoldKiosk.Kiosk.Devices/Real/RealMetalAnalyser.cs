@@ -31,7 +31,7 @@ namespace GoldKiosk.Kiosk.Devices.Real;
 /// </remarks>
 public sealed class RealMetalAnalyser : RealDeviceBase, IMetalAnalyser
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly ConnectionOptions _connection;
     private readonly MetalAnalyserOptions _options;
@@ -267,7 +267,7 @@ public sealed class RealMetalAnalyser : RealDeviceBase, IMetalAnalyser
         int id = Interlocked.Increment(ref _commandCounter) % 100;
         string json = JsonSerializer.Serialize(
             new { commandId = (int)commandId, id, @params = parameters },
-            JsonOptions);
+            _jsonOptions);
         return SendTextAsync(webSocket, json, cancellationToken);
     }
 
@@ -370,7 +370,7 @@ public sealed class RealMetalAnalyser : RealDeviceBase, IMetalAnalyser
         VantaEnvelope? envelope;
         try
         {
-            envelope = JsonSerializer.Deserialize<VantaEnvelope>(message, JsonOptions);
+            envelope = JsonSerializer.Deserialize<VantaEnvelope>(message, _jsonOptions);
         }
         catch (JsonException)
         {

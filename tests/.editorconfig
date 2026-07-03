@@ -1,0 +1,19 @@
+# Test-tree overrides. The testing standard (docs/standards/testing-standards.md) mandates
+# Method_Scenario_ExpectedOutcome test names, which the production PascalCase method naming
+# rule would flag; fixtures dispose their resources in [TearDown] (enforced by NUnit1032),
+# which CA1001 cannot see. Production code keeps the full ruleset.
+[*.cs]
+dotnet_naming_rule.types_and_members_pascal.severity = none
+# Async test methods use Method_Scenario_ExpectedOutcome names, never an Async suffix.
+dotnet_naming_rule.async_methods_end_in_async.severity = none
+# Fixture/builder field-and-local casing follows test-readability conventions; the testing
+# standard governs test naming, not member naming.
+dotnet_naming_rule.private_fields_underscore_camel.severity = none
+dotnet_naming_rule.locals_camel.severity = none
+dotnet_naming_rule.constants_pascal.severity = none
+dotnet_diagnostic.CA1001.severity = none
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA1861.severity = none
+# IDE0005-on-build demands GenerateDocumentationFile=true (roslyn#41640); test projects
+# deliberately build without XML docs, so the on-build variant is disabled here.
+dotnet_diagnostic.IDE0005.severity = none

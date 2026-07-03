@@ -1,5 +1,5 @@
-using GoldKiosk.Cloud.AdminPortal.Logging;
 using System.Text.Json;
+using GoldKiosk.Cloud.AdminPortal.Logging;
 
 namespace GoldKiosk.Cloud.AdminPortal.Services.Licensing;
 

@@ -1,6 +1,6 @@
-using GoldKiosk.Cloud.AdminPortal.Logging;
 using System.Globalization;
 using System.Text.Json;
+using GoldKiosk.Cloud.AdminPortal.Logging;
 using GoldKiosk.Cloud.AdminPortal.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

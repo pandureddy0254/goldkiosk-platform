@@ -10,7 +10,7 @@ namespace GoldKiosk.Cloud.AdminPortal.Services;
 /// <summary>Technician service.</summary>
 public sealed class TechnicianService(AppDbContext db, ICurrentUserService currentUser) : ITechnicianService
 {
-    private static readonly string[] AllowedStatuses = ["active", "on_leave", "inactive"];
+    private static readonly string[] _allowedStatuses = ["active", "on_leave", "inactive"];
 
     /// <summary>List.</summary>
     public async Task<TechnicianList> ListAsync(string? search, Guid? clusterId, string? status, int pageSize, int pageNo, CancellationToken ct = default)
@@ -138,7 +138,7 @@ public sealed class TechnicianService(AppDbContext db, ICurrentUserService curre
             return OperationResult.Fail("Cluster is required.");
         }
 
-        if (!AllowedStatuses.Contains(vm.Status))
+        if (!_allowedStatuses.Contains(vm.Status))
         {
             vm.Status = "active";
         }
@@ -183,7 +183,7 @@ public sealed class TechnicianService(AppDbContext db, ICurrentUserService curre
             t.ClusterId = vm.ClusterId;
         }
 
-        if (!string.IsNullOrWhiteSpace(vm.Status) && AllowedStatuses.Contains(vm.Status))
+        if (!string.IsNullOrWhiteSpace(vm.Status) && _allowedStatuses.Contains(vm.Status))
         {
             t.Status = vm.Status;
         }

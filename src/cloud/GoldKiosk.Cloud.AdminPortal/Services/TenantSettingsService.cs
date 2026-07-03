@@ -27,7 +27,7 @@ public sealed class TenantSettingsService(
     private static readonly int[] _txRetentionBuckets = [1825, 2555, 36500];
     private static readonly int[] _auditRetentionBuckets = [365, 1095, 2555, 36500];
 
-    private static readonly FeatureFlagDefinition[] FeatureCatalog =
+    private static readonly FeatureFlagDefinition[] _featureCatalog =
     {
         new("cash_dispense",      "Cash dispense",
             "Allow customers to receive payout in cash at the kiosk. Requires cassette stock + reconciliation."),
@@ -145,7 +145,7 @@ public sealed class TenantSettingsService(
             .ToListAsync(ct);
 
         var enabledLookup = enabledFeatures.ToDictionary(x => x.Code, x => x.Enabled, StringComparer.OrdinalIgnoreCase);
-        var features = FeatureCatalog.Select(f => new FeatureFlagRow
+        var features = _featureCatalog.Select(f => new FeatureFlagRow
         {
             Code = f.Code,
             DisplayName = f.DisplayName,
@@ -493,7 +493,7 @@ public sealed class TenantSettingsService(
             return;
         }
 
-        var validCodes = FeatureCatalog.Select(f => f.Code).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var validCodes = _featureCatalog.Select(f => f.Code).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var conn = db.Database.GetDbConnection();
         var opened = await conn.EnsureOpenAsync(ct);
@@ -501,7 +501,7 @@ public sealed class TenantSettingsService(
 
         try
         {
-            foreach (var f in FeatureCatalog)
+            foreach (var f in _featureCatalog)
             {
                 var enabled = featureFlags.TryGetValue(f.Code, out var v) && v;
 

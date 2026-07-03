@@ -1,6 +1,6 @@
-using GoldKiosk.Cloud.AdminPortal.Logging;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using GoldKiosk.Cloud.AdminPortal.Logging;
 using Microsoft.Extensions.Options;
 
 namespace GoldKiosk.Cloud.AdminPortal.Services.Licensing;

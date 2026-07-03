@@ -23,7 +23,7 @@ public sealed class RealFingerprintScanner : RealDeviceBase, IFingerprintScanner
 {
     private const string SdkName = "Interop.FlexCodeSDK";
 
-    private static readonly string[] BenignStatuses =
+    private static readonly string[] _benignStatuses =
         ["r_OK", "r_RegistrationCaptureStart", "r_RegistrationCaptureStop"];
 
     private readonly ConnectionOptions _connection;
@@ -194,7 +194,7 @@ public sealed class RealFingerprintScanner : RealDeviceBase, IFingerprintScanner
     private void OnStatus(object?[] args)
     {
         string status = args.Length > 0 ? args[0]?.ToString() ?? string.Empty : string.Empty;
-        if (BenignStatuses.Contains(status, StringComparer.Ordinal))
+        if (_benignStatuses.Contains(status, StringComparer.Ordinal))
         {
             return;
         }

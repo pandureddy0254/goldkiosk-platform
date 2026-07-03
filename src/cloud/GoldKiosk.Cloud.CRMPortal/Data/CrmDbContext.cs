@@ -65,13 +65,13 @@ public class CrmDbContext : DbContext
     // ── jsonb <-> JObject converter (Newtonsoft) ───────────────────────────────
     // Serialise compactly on write; parse back on read. NULL/empty round-trips to
     // a C# null so the computed helpers (BillingAddressLine etc.) behave.
-    private static readonly ValueConverter<JObject?, string?> JsonbConverter = new(
+    private static readonly ValueConverter<JObject?, string?> _jsonbConverter = new(
         v => v == null ? null : v.ToString(Newtonsoft.Json.Formatting.None),
         v => string.IsNullOrEmpty(v) ? null : JObject.Parse(v));
 
     // JObject has no usable structural equality for EF's change tracker; compare
     // on the serialised string and snapshot via a fresh parse.
-    private static readonly ValueComparer<JObject?> JsonbComparer = new(
+    private static readonly ValueComparer<JObject?> _jsonbComparer = new(
         (a, b) => (a == null && b == null) ||
                   (a != null && b != null && a.ToString(Newtonsoft.Json.Formatting.None) == b.ToString(Newtonsoft.Json.Formatting.None)),
         v => v == null ? 0 : v.ToString(Newtonsoft.Json.Formatting.None).GetHashCode(StringComparison.Ordinal),
@@ -113,8 +113,8 @@ public class CrmDbContext : DbContext
             e.Property(x => x.Payload)
                 .HasColumnName("payload")
                 .HasColumnType("jsonb")
-                .HasConversion(JsonbConverter)
-                .Metadata.SetValueComparer(JsonbComparer);
+                .HasConversion(_jsonbConverter)
+                .Metadata.SetValueComparer(_jsonbComparer);
             // occurred_at is set by the DB default; never write it.
             e.Property(x => x.OccurredAt).ValueGeneratedOnAdd();
             IgnoreOnWrite(e.Metadata, nameof(LeadActivity.OccurredAt));
@@ -130,8 +130,8 @@ public class CrmDbContext : DbContext
             e.Property(x => x.BillingAddress)
                 .HasColumnName("billing_address")
                 .HasColumnType("jsonb")
-                .HasConversion(JsonbConverter)
-                .Metadata.SetValueComparer(JsonbComparer);
+                .HasConversion(_jsonbConverter)
+                .Metadata.SetValueComparer(_jsonbComparer);
             ServerTimestamps(e.Metadata);
         });
 
@@ -216,12 +216,12 @@ public class CrmDbContext : DbContext
             e.Property(x => x.Id).ValueGeneratedOnAdd();
             e.Property(x => x.Before)
                 .HasColumnType("jsonb")
-                .HasConversion(JsonbConverter)
-                .Metadata.SetValueComparer(JsonbComparer);
+                .HasConversion(_jsonbConverter)
+                .Metadata.SetValueComparer(_jsonbComparer);
             e.Property(x => x.After)
                 .HasColumnType("jsonb")
-                .HasConversion(JsonbConverter)
-                .Metadata.SetValueComparer(JsonbComparer);
+                .HasConversion(_jsonbConverter)
+                .Metadata.SetValueComparer(_jsonbComparer);
             e.Property(x => x.CreatedAt).ValueGeneratedOnAdd();
             IgnoreOnWrite(e.Metadata, nameof(AuditLogEntry.CreatedAt));
         });

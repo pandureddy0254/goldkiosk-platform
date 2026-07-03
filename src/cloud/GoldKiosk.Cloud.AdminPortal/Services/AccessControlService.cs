@@ -10,8 +10,8 @@ namespace GoldKiosk.Cloud.AdminPortal.Services;
 /// <summary>Access control service.</summary>
 public sealed class AccessControlService(AppDbContext db, ICurrentUserService currentUser) : IAccessControlService
 {
-    // Verbs map permission codes to the matrix columns.
-    private static readonly string[] Verbs = ["view", "add", "edit", "delete", "other"];
+    // _verbs map permission codes to the matrix columns.
+    private static readonly string[] _verbs = ["view", "add", "edit", "delete", "other"];
 
     /// <summary>List.</summary>
     public async Task<AccessControlPageViewModel> ListAsync(string? roleCode, string? search, int pageSize, int pageNo, CancellationToken ct = default)
@@ -71,7 +71,7 @@ public sealed class AccessControlService(AppDbContext db, ICurrentUserService cu
                 Type = m.Type,
                 IsActive = m.IsActive,
                 RoleCode = roleCode ?? string.Empty,
-                AvailableTypes = new HashSet<string>(Verbs),
+                AvailableTypes = new HashSet<string>(_verbs),
                 IsView = grantedCodes.Contains($"{prefix}.view"),
                 IsAdd = grantedCodes.Contains($"{prefix}.add"),
                 IsEdit = grantedCodes.Contains($"{prefix}.edit"),

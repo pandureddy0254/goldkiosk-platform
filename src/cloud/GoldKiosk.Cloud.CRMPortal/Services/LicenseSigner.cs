@@ -140,7 +140,7 @@ public class LicenseSigner : ILicenseSigner
     /// <summary>Every token starts with this prefix.</summary>
     public const string TokenPrefix = "AIKI-";
 
-    private static readonly JsonSerializerOptions Json = new()
+    private static readonly JsonSerializerOptions _json = new()
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         WriteIndented = false,
@@ -206,7 +206,7 @@ public class LicenseSigner : ILicenseSigner
             payload.ExpiresAt = DateTimeOffset.UtcNow.AddDays(_opts.DefaultTermDays).ToUnixTimeSeconds();
         }
 
-        var payloadBytes = JsonSerializer.SerializeToUtf8Bytes(payload, Json);
+        var payloadBytes = JsonSerializer.SerializeToUtf8Bytes(payload, _json);
         var sk = _privateKeys[_opts.ActiveKid];
         var sig = SignatureAlgorithm.Ed25519.Sign(sk, payloadBytes);
 

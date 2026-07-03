@@ -1,5 +1,5 @@
-using GoldKiosk.Cloud.AdminPortal.Logging;
 using System.Text.Json;
+using GoldKiosk.Cloud.AdminPortal.Logging;
 using GoldKiosk.Cloud.AdminPortal.Models.Identity;
 using GoldKiosk.Cloud.AdminPortal.Services.Common;
 using GoldKiosk.Infrastructure.Common;
@@ -25,19 +25,19 @@ public sealed class RolesPermissionsService(
     ILogger<RolesPermissionsService> logger) : IRolesPermissionsService
 {
     // System role codes — must never be createable as a "custom" role nor deletable.
-    private static readonly HashSet<string> SystemRoleCodes = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> _systemRoleCodes = new(StringComparer.OrdinalIgnoreCase)
     {
         "owner", "manager", "operator", "analyst", "support", "auditor",
     };
 
     // The four permissions that render with the "sensitive" warn badge.
-    private static readonly HashSet<string> SensitivePerms = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> _sensitivePerms = new(StringComparer.OrdinalIgnoreCase)
     {
         "users:admin", "tenant:admin", "api_credentials:admin", "roles:write",
     };
 
     // Perms whose use is audited and rendered with the neutral "audited" tag.
-    private static readonly HashSet<string> AuditedPerms = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> _auditedPerms = new(StringComparer.OrdinalIgnoreCase)
     {
         "customers:unmask",
     };
@@ -45,7 +45,7 @@ public sealed class RolesPermissionsService(
     // Mapping of every permission code → display module group + sort order.
     // Order here determines the order inside each group; group order is set
     // in the static module list further down.
-    private static readonly (string Module, string Code)[] PermissionModuleMap =
+    private static readonly (string Module, string Code)[] _permissionModuleMap =
     [
         ("Dashboard",                                       "dashboard:read"),
 
@@ -93,7 +93,7 @@ public sealed class RolesPermissionsService(
         ("Administration",                                  "webhooks:write"),
     ];
 
-    private static readonly (string Module, string Meta)[] ModuleOrder =
+    private static readonly (string Module, string Meta)[] _moduleOrder =
     [
         ("Dashboard",                                       "Operator home, KPI overview"),
         ("Kiosks",                                          "Fleet config, deployment, decommission"),
@@ -120,9 +120,9 @@ public sealed class RolesPermissionsService(
         var permsByCode = allPerms.ToDictionary(p => p.Code, p => p, StringComparer.OrdinalIgnoreCase);
 
         // Group + order according to the static map above.
-        var moduleGroups = ModuleOrder.Select(m =>
+        var moduleGroups = _moduleOrder.Select(m =>
         {
-            var rows = PermissionModuleMap
+            var rows = _permissionModuleMap
                 .Where(x => x.Module == m.Module)
                 .Select(x => permsByCode.TryGetValue(x.Code, out var p)
                     ? new PermissionRow
@@ -130,8 +130,8 @@ public sealed class RolesPermissionsService(
                         Code = p.Code,
                         DisplayName = p.DisplayName,
                         Description = p.Description,
-                        IsSensitive = SensitivePerms.Contains(p.Code),
-                        IsAudited = AuditedPerms.Contains(p.Code),
+                        IsSensitive = _sensitivePerms.Contains(p.Code),
+                        IsAudited = _auditedPerms.Contains(p.Code),
                     }
                     : null)
                 .Where(p => p is not null)
@@ -268,7 +268,7 @@ public sealed class RolesPermissionsService(
         code = code.Trim();
         name = name.Trim();
 
-        if (SystemRoleCodes.Contains(code))
+        if (_systemRoleCodes.Contains(code))
         {
             return OperationResult<Guid>.Fail($"Role code '{code}' is reserved for a system role.");
         }

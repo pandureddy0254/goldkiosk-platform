@@ -1,5 +1,5 @@
-using GoldKiosk.Cloud.AdminPortal.Logging;
 using System.Security.Claims;
+using GoldKiosk.Cloud.AdminPortal.Logging;
 using GoldKiosk.Cloud.AdminPortal.Models.Licensing;
 using GoldKiosk.Cloud.AdminPortal.Services.Common;
 using GoldKiosk.Cloud.AdminPortal.Services.Licensing;

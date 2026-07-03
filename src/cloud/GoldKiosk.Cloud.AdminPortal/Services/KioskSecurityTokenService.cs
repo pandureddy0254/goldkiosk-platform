@@ -11,7 +11,7 @@ namespace GoldKiosk.Cloud.AdminPortal.Services;
 /// <summary>Kiosk security token service.</summary>
 public sealed class KioskSecurityTokenService(AppDbContext db, ICurrentUserService currentUser) : IKioskSecurityTokenService
 {
-    private static readonly TimeSpan DefaultValidity = TimeSpan.FromDays(90);
+    private static readonly TimeSpan _defaultValidity = TimeSpan.FromDays(90);
 
     /// <summary>List.</summary>
     public async Task<KioskSecurityTokenList> ListAsync(Guid? kioskId, int pageSize, int pageNo, CancellationToken ct = default)
@@ -129,7 +129,7 @@ public sealed class KioskSecurityTokenService(AppDbContext db, ICurrentUserServi
             KioskId = kioskId,
             TokenHash = hash,
             IssuedAt = DateTimeOffset.UtcNow,
-            ExpiresAt = DateTimeOffset.UtcNow.Add(validity ?? DefaultValidity),
+            ExpiresAt = DateTimeOffset.UtcNow.Add(validity ?? _defaultValidity),
             IssuedByUserId = currentUser.UserId,
         };
 

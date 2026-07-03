@@ -1,5 +1,5 @@
-using GoldKiosk.Cloud.AdminPortal.Logging;
 using System.Globalization;
+using GoldKiosk.Cloud.AdminPortal.Logging;
 using GoldKiosk.Cloud.AdminPortal.Services;
 using GoldKiosk.Cloud.AdminPortal.Services.Common;
 using GoldKiosk.Cloud.AdminPortal.Services.Email;

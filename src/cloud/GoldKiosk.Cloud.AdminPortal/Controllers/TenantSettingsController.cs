@@ -20,7 +20,7 @@ public sealed class TenantSettingsController(
     ICurrentUserService currentUser,
     ILogger<TenantSettingsController> logger) : Controller
 {
-    private static readonly HashSet<string> KnownTabs = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> _knownTabs = new(StringComparer.OrdinalIgnoreCase)
     {
         "general", "branding", "features", "keys", "billing", "compliance"
     };
@@ -33,7 +33,7 @@ public sealed class TenantSettingsController(
     {
         var vm = await tenantSettings.GetAsync(ct);
 
-        var resolved = !string.IsNullOrWhiteSpace(tab) && KnownTabs.Contains(tab) ? tab.ToLowerInvariant() : "general";
+        var resolved = !string.IsNullOrWhiteSpace(tab) && _knownTabs.Contains(tab) ? tab.ToLowerInvariant() : "general";
         return View(new TenantSettingsViewModel
         {
             TenantId = vm.TenantId,

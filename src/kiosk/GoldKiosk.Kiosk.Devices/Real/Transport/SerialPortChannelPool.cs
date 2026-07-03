@@ -10,8 +10,8 @@ namespace GoldKiosk.Kiosk.Devices.Real.Transport;
 /// </summary>
 internal static class SerialPortChannelPool
 {
-    private static readonly Lock SyncRoot = new();
-    private static readonly Dictionary<string, PooledChannel> Channels = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Lock _syncRoot = new();
+    private static readonly Dictionary<string, PooledChannel> _channels = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Acquires a lease on the shared channel for a port, creating it on first use.</summary>
     /// <param name="portName">The COM port name.</param>
@@ -23,9 +23,9 @@ internal static class SerialPortChannelPool
         ArgumentException.ThrowIfNullOrWhiteSpace(portName);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(baudRate);
 
-        lock (SyncRoot)
+        lock (_syncRoot)
         {
-            if (Channels.TryGetValue(portName, out PooledChannel? pooled))
+            if (_channels.TryGetValue(portName, out PooledChannel? pooled))
             {
                 if (pooled.BaudRate != baudRate)
                 {
@@ -38,7 +38,7 @@ internal static class SerialPortChannelPool
             }
 
             var created = new PooledChannel(new SerialPortChannel(portName, baudRate), baudRate);
-            Channels[portName] = created;
+            _channels[portName] = created;
             return new SerialPortLease(portName, created.Channel);
         }
     }
@@ -47,9 +47,9 @@ internal static class SerialPortChannelPool
     /// <param name="portName">The COM port name of the lease being released.</param>
     internal static void Release(string portName)
     {
-        lock (SyncRoot)
+        lock (_syncRoot)
         {
-            if (!Channels.TryGetValue(portName, out PooledChannel? pooled))
+            if (!_channels.TryGetValue(portName, out PooledChannel? pooled))
             {
                 return;
             }
@@ -57,7 +57,7 @@ internal static class SerialPortChannelPool
             pooled.LeaseCount--;
             if (pooled.LeaseCount <= 0)
             {
-                Channels.Remove(portName);
+                _channels.Remove(portName);
                 pooled.Channel.Dispose();
             }
         }

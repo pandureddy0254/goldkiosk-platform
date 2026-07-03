@@ -20,13 +20,13 @@ namespace GoldKiosk.Kiosk.Devices.Real;
 /// </summary>
 public sealed class RealIdScanner : RealDeviceBase, IIdScanner
 {
-    private static readonly string[] ScanMemberCandidates = ["ScanDocument", "ReadDocument", "Scan"];
-    private static readonly string[] FirstNameCandidates = ["FirstName", "GivenName", "NameFirst", "Forename"];
-    private static readonly string[] LastNameCandidates = ["LastName", "Surname", "NameLast", "FamilyName"];
-    private static readonly string[] DateOfBirthCandidates = ["DateOfBirth", "BirthDate", "DOB"];
-    private static readonly string[] ExpiryCandidates = ["ExpiresOn", "ExpirationDate", "ExpiryDate", "Expiration"];
-    private static readonly string[] DocumentNumberCandidates = ["DocumentNumber", "LicenseNumber", "IdNumber", "Number"];
-    private static readonly string[] PortraitCandidates = ["PortraitImage", "Portrait", "Photo", "FaceImage"];
+    private static readonly string[] _scanMemberCandidates = ["ScanDocument", "ReadDocument", "Scan"];
+    private static readonly string[] _firstNameCandidates = ["FirstName", "GivenName", "NameFirst", "Forename"];
+    private static readonly string[] _lastNameCandidates = ["LastName", "Surname", "NameLast", "FamilyName"];
+    private static readonly string[] _dateOfBirthCandidates = ["DateOfBirth", "BirthDate", "DOB"];
+    private static readonly string[] _expiryCandidates = ["ExpiresOn", "ExpirationDate", "ExpiryDate", "Expiration"];
+    private static readonly string[] _documentNumberCandidates = ["DocumentNumber", "LicenseNumber", "IdNumber", "Number"];
+    private static readonly string[] _portraitCandidates = ["PortraitImage", "Portrait", "Photo", "FaceImage"];
 
     private readonly ConnectionOptions _connection;
     private readonly IdScannerOptions _options;
@@ -136,7 +136,7 @@ public sealed class RealIdScanner : RealDeviceBase, IIdScanner
     private static IdScanResult RunScan(object sdk)
     {
         object? scanOutput = null;
-        foreach (string member in ScanMemberCandidates)
+        foreach (string member in _scanMemberCandidates)
         {
             try
             {
@@ -162,12 +162,12 @@ public sealed class RealIdScanner : RealDeviceBase, IIdScanner
     private static bool TryExtractDocument(object scanOutput, out IdDocument? document)
     {
         document = null;
-        string? firstName = ReadString(scanOutput, FirstNameCandidates);
-        string? lastName = ReadString(scanOutput, LastNameCandidates);
-        DateOnly? dateOfBirth = ReadDate(scanOutput, DateOfBirthCandidates);
-        DateOnly? expiresOn = ReadDate(scanOutput, ExpiryCandidates);
-        string? documentNumber = ReadString(scanOutput, DocumentNumberCandidates);
-        byte[]? portrait = ReadBytes(scanOutput, PortraitCandidates);
+        string? firstName = ReadString(scanOutput, _firstNameCandidates);
+        string? lastName = ReadString(scanOutput, _lastNameCandidates);
+        DateOnly? dateOfBirth = ReadDate(scanOutput, _dateOfBirthCandidates);
+        DateOnly? expiresOn = ReadDate(scanOutput, _expiryCandidates);
+        string? documentNumber = ReadString(scanOutput, _documentNumberCandidates);
+        byte[]? portrait = ReadBytes(scanOutput, _portraitCandidates);
 
         if (firstName is null || lastName is null || dateOfBirth is null || expiresOn is null || documentNumber is null)
         {

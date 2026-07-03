@@ -10,7 +10,7 @@ namespace GoldKiosk.Cloud.AdminPortal.Services;
 /// <summary>Deployment ticket service.</summary>
 public sealed class DeploymentTicketService(AppDbContext db, ICurrentUserService currentUser) : IDeploymentTicketService
 {
-    private static readonly string[] AllowedStatuses = ["open", "in_progress", "resolved", "closed", "reopened", "other"];
+    private static readonly string[] _allowedStatuses = ["open", "in_progress", "resolved", "closed", "reopened", "other"];
 
     /// <summary>List.</summary>
     public async Task<DeploymentTicketList> ListAsync(string? search, string? status, int pageSize, int pageNo, CancellationToken ct = default)
@@ -131,7 +131,7 @@ public sealed class DeploymentTicketService(AppDbContext db, ICurrentUserService
             return OperationResult.Fail("Description is required.");
         }
 
-        if (!AllowedStatuses.Contains(vm.Status))
+        if (!_allowedStatuses.Contains(vm.Status))
         {
             vm.Status = "open";
         }
@@ -188,7 +188,7 @@ public sealed class DeploymentTicketService(AppDbContext db, ICurrentUserService
             t.Priority = vm.Priority;
         }
 
-        if (!string.IsNullOrWhiteSpace(vm.Status) && AllowedStatuses.Contains(vm.Status))
+        if (!string.IsNullOrWhiteSpace(vm.Status) && _allowedStatuses.Contains(vm.Status))
         {
             t.Status = vm.Status;
         }
@@ -242,7 +242,7 @@ public sealed class DeploymentTicketService(AppDbContext db, ICurrentUserService
             return OperationResult.Fail("No tenant context.");
         }
 
-        if (!AllowedStatuses.Contains(newStatus))
+        if (!_allowedStatuses.Contains(newStatus))
         {
             return OperationResult.Fail($"Status '{newStatus}' is not allowed.");
         }

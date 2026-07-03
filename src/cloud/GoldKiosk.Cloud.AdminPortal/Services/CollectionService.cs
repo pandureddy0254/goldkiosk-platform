@@ -10,8 +10,8 @@ namespace GoldKiosk.Cloud.AdminPortal.Services;
 /// <summary>Collection service.</summary>
 public sealed class CollectionService(AppDbContext db, ICurrentUserService currentUser) : ICollectionService
 {
-    private static readonly string[] AllowedRunStatuses = ["planned", "in_progress", "completed", "cancelled"];
-    private static readonly string[] AllowedTicketStatuses = ["pending", "collected", "skipped", "discrepancy"];
+    private static readonly string[] _allowedRunStatuses = ["planned", "in_progress", "completed", "cancelled"];
+    private static readonly string[] _allowedTicketStatuses = ["pending", "collected", "skipped", "discrepancy"];
 
     /// <summary>List.</summary>
     public async Task<CollectionTicketList> ListAsync(string? search, string? status, int pageSize, int pageNo, CancellationToken ct = default)
@@ -144,7 +144,7 @@ public sealed class CollectionService(AppDbContext db, ICurrentUserService curre
             return OperationResult.Fail("Run code is required.");
         }
 
-        if (!AllowedRunStatuses.Contains(vm.Status))
+        if (!_allowedRunStatuses.Contains(vm.Status))
         {
             vm.Status = "planned";
         }
@@ -191,7 +191,7 @@ public sealed class CollectionService(AppDbContext db, ICurrentUserService curre
         }
 
         r.LeadTechnicianId = vm.LeadTechnicianId;
-        if (!string.IsNullOrWhiteSpace(vm.Status) && AllowedRunStatuses.Contains(vm.Status))
+        if (!string.IsNullOrWhiteSpace(vm.Status) && _allowedRunStatuses.Contains(vm.Status))
         {
             r.Status = vm.Status;
             if (vm.Status == "in_progress")
@@ -272,7 +272,7 @@ public sealed class CollectionService(AppDbContext db, ICurrentUserService curre
             AmountCollected = vm.AmountCollected,
             CurrencyCode = vm.CurrencyCode,
             ItemsCollected = vm.ItemsCollected,
-            Status = AllowedTicketStatuses.Contains(vm.Status) ? vm.Status : "pending",
+            Status = _allowedTicketStatuses.Contains(vm.Status) ? vm.Status : "pending",
             CollectedAt = vm.Status == "collected" ? DateTimeOffset.UtcNow : (vm.CollectedAt.HasValue ? new DateTimeOffset(vm.CollectedAt.Value, TimeSpan.Zero) : null),
         };
         db.CollectionTickets.Add(t);
@@ -305,7 +305,7 @@ public sealed class CollectionService(AppDbContext db, ICurrentUserService curre
             t.CurrencyCode = vm.CurrencyCode;
         }
 
-        if (!string.IsNullOrWhiteSpace(vm.Status) && AllowedTicketStatuses.Contains(vm.Status))
+        if (!string.IsNullOrWhiteSpace(vm.Status) && _allowedTicketStatuses.Contains(vm.Status))
         {
             t.Status = vm.Status;
             if (vm.Status == "collected")

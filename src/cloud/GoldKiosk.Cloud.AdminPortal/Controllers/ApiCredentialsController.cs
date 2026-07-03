@@ -1,5 +1,5 @@
-using GoldKiosk.Cloud.AdminPortal.Logging;
 using System.Text.Json;
+using GoldKiosk.Cloud.AdminPortal.Logging;
 using GoldKiosk.Cloud.AdminPortal.Models.Integration;
 using GoldKiosk.Cloud.AdminPortal.Services;
 using GoldKiosk.Infrastructure.Common;
