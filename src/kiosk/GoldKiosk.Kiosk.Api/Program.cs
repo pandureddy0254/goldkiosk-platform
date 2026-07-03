@@ -73,7 +73,8 @@ builder.Services.AddSingleton(TimeProvider.System);
 // the resolved mode; the effective mode is logged by DeviceLifecycleService.
 builder.Services.AddSingleton<IDeviceRegistry>(static sp => DeviceComposition.CreateRegistry(
     sp.GetRequiredService<IOptions<DevicesOptions>>().Value,
-    sp.GetRequiredService<TimeProvider>()));
+    sp.GetRequiredService<TimeProvider>(),
+    sp.GetRequiredService<IConfiguration>()));
 
 builder.Services.AddSingleton<SessionRegistry>();
 builder.Services.AddSingleton<IdempotencyStore>();
