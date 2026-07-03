@@ -27,6 +27,19 @@ public sealed class KioskUiOptions
     public int AttractWordCycleMs { get; set; } = 2500;
 
     /// <summary>
+    /// Gets or sets whether the shell launches and supervises the edge Kiosk API as a child
+    /// process (the MSIX "logon-launched" model). False in dev, where the API runs separately;
+    /// true in the packaged kiosk so one install starts the whole edge.
+    /// </summary>
+    public bool LaunchLocalApi { get; set; }
+
+    /// <summary>
+    /// Gets or sets the path to the Kiosk API executable to launch when
+    /// <see cref="LaunchLocalApi"/> is set, relative to the shell's install directory.
+    /// </summary>
+    public string LocalApiPath { get; set; } = @"api\GoldKiosk.Kiosk.Api.exe";
+
+    /// <summary>
     /// Validates the options, throwing on the first invalid value so startup fails fast.
     /// </summary>
     /// <exception cref="InvalidOperationException">A configured value is invalid.</exception>

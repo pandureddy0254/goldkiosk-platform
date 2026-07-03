@@ -42,6 +42,10 @@ public partial class App : Application
         _logger = _services.GetRequiredService<ILogger<App>>();
         _logger.UiStarting(options.ApiBaseUrl);
 
+        // Packaged kiosk: the shell owns the edge API lifecycle (MSIX can't host a service).
+        // Blocks briefly until the API answers health so the first screen has a live backend.
+        _services.GetRequiredService<LocalApiHost>().StartAsync().GetAwaiter().GetResult();
+
         MainWindow window = _services.GetRequiredService<MainWindow>();
         window.Show();
     }
@@ -74,6 +78,7 @@ public partial class App : Application
 
         services.AddSingleton(options);
         services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<LocalApiHost>();
         services.AddSingleton<ILocalizedStrings, LocalizedStrings>();
         services.AddSingleton(_ => new HttpClient
         {

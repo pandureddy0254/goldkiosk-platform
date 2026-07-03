@@ -72,4 +72,24 @@ internal static partial class KioskUiLog
     [LoggerMessage(EventId = 2040, Level = LogLevel.Information,
         Message = "DEBUG exit gesture (Escape+F12) — shutting down")]
     public static partial void DebugExitGesture(this ILogger logger);
+
+    [LoggerMessage(EventId = 2050, Level = LogLevel.Information,
+        Message = "Local Kiosk API already answering at {ApiBaseUrl}; not launching")]
+    public static partial void LocalApiAlreadyRunning(this ILogger logger, string apiBaseUrl);
+
+    [LoggerMessage(EventId = 2051, Level = LogLevel.Error,
+        Message = "Local Kiosk API executable not found at {ExePath}")]
+    public static partial void LocalApiExecutableMissing(this ILogger logger, string exePath);
+
+    [LoggerMessage(EventId = 2052, Level = LogLevel.Information,
+        Message = "Launching local Kiosk API: {ExePath}")]
+    public static partial void LocalApiStarting(this ILogger logger, string exePath);
+
+    [LoggerMessage(EventId = 2053, Level = LogLevel.Information,
+        Message = "Local Kiosk API healthy at {ApiBaseUrl}")]
+    public static partial void LocalApiHealthy(this ILogger logger, string apiBaseUrl);
+
+    [LoggerMessage(EventId = 2054, Level = LogLevel.Warning,
+        Message = "Local Kiosk API did not become healthy at {ApiBaseUrl} within the wait window")]
+    public static partial void LocalApiHealthTimedOut(this ILogger logger, string apiBaseUrl);
 }
